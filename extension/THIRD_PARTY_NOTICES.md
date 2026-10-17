@@ -61,3 +61,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 M10 semantic token names follow `src/Tools/VSCode/extension/src/decorations.ts`
 (author: Makarius). The client maps these existing PIDE classes to VS Code
 standard TextMate scopes instead of copying the distribution's editor theme.
+
+`src/symbol.ts` ports the `Entry`/`Symbols` catalogue from the official
+`src/Tools/VSCode/extension/src/symbol.ts` (Makarius), adding reverse lookup and
+using the installed symbol table in place of VSCodium's bundled font JSON.
+`symbolInput.ts` uses the `PIDE/abbrevs_request` / `PIDE/abbrevs_response`
+notification shapes from `extension/src/lsp.ts` and `symbol_panel.ts`.

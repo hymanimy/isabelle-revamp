@@ -10,6 +10,7 @@ import { loadSymbols, unicodeSymbols } from './symbols';
 import { PrettySymbols } from './prettySymbols';
 import { lockLibraryFiles } from './libraryFiles';
 import { SemanticColors } from './semanticColors';
+import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -70,7 +71,8 @@ export async function activate(context: ExtensionContext) {
     '-o', 'vscode_html_output=true',
     '-o', 'editor_output_state=true',
     '-o', 'vscode_pide_extensions=true',
-    '-o', 'vscode_unicode_symbols_edits=false',
+    '-o', 'vscode_unicode_symbols_edits=true',
+    '-o', 'vscode_unicode_symbols_output=true',
   ];
   const server: ServerOptions = { command: executable, args };
 
@@ -80,6 +82,12 @@ export async function activate(context: ExtensionContext) {
     documentSelector: [{ scheme: 'file', language: 'isabelle' }],
     outputChannel: output,
     middleware: {
+      provideCompletionItem: async (document,position,context,token,next) =>
+        asciiCompletions(await next(document,position,context,token)),
+      resolveCompletionItem: async (item,token,next) => {
+        const resolved = await next(item,token);
+        return resolved ? asciiCompletion(resolved) : resolved;
+      },
       handleDiagnostics: (uri, diagnostics, next) => {
         for (const diagnostic of diagnostics) diagnostic.message = unicodeSymbols(diagnostic.message);
         next(uri, diagnostics);
@@ -87,6 +95,8 @@ export async function activate(context: ExtensionContext) {
       },
     },
   });
+  const symbolInput = new SymbolInput(client);
+  context.subscriptions.push(symbolInput);
   goals = new Goals(client, view);
   const semanticColors = new SemanticColors(goals);
   context.subscriptions.push(semanticColors);
@@ -115,6 +125,7 @@ export async function activate(context: ExtensionContext) {
 
   try {
     await client.start();
+    await symbolInput.request();
     output.info('Isabelle language server ready (HOL).');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -137,6 +148,7 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getAbbreviations: () => symbolInput.snapshot(),
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
     getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [],
     getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(),

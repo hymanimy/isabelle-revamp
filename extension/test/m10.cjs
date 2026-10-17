@@ -40,6 +40,7 @@ async function run() {
   assert.deepEqual(fs.readFileSync(target.fsPath),bytes);
   console.log('PASS: real definition opens HOL/Real.thy read-only; editor rejects edits; distribution bytes unchanged');
   await checkColors(root,api);
+  await checkSymbols(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
@@ -69,4 +70,49 @@ end
   assert(colors.some(c=>c.kind==='bound' && c.text==='x'));
   assert(colors.some(c=>c.kind==='skolem' && c.text==='k'));
   console.log('PASS: live PIDE free n, bound x, and fixed skolem k map to standard theme scopes');
+}
+
+async function checkSymbols(root,api) {
+  const { encodeSymbols, decodeSymbols } = require('../out/symbols');
+  assert.equal(encodeSymbols('≠ ⟹ ⋀ ‹› 𝒜'),String.raw`\<noteq> \<Longrightarrow> \<And> \<open>\<close> \<A>`);
+  assert.equal(decodeSymbols(String.raw`\<noteq>`),'≠');
+  const file=path.join(root,'.dev-host/m10-fixture/Input.thy');
+  fs.writeFileSync(file,'theory Input imports Main begin\ntext ""\nend\n');
+  const doc=await vscode.workspace.openTextDocument(file);
+  let editor=await vscode.window.showTextDocument(doc);
+  const settings=vscode.workspace.getConfiguration('isabelleRevamp',doc.uri);
+  assert.equal(settings.get('unicodeOnSave'),false);
+  const samples=[[String.raw`\noteq`,String.raw`\<noteq>`],['~=',String.raw`\<noteq>`],['==>',String.raw`\<Longrightarrow>`],['!!',String.raw`\<And>`]];
+  const receipts=[];
+  for(const [abbr,expected] of samples) {
+    await editor.edit(edit=>edit.replace(new vscode.Range(1,0,1,doc.lineAt(1).text.length),'text "'+abbr+'"'));
+    const position=new vscode.Position(1,6+abbr.length);
+    editor.selection=new vscode.Selection(position,position);
+    await pause(150);
+    const completions=await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',doc.uri,position);
+    assert(completions.items.some(item=>(item.textEdit?.newText??item.insertText)===expected),JSON.stringify(completions));
+    assert(completions.items.every(item=>!/[≠⟹⋀]/.test(item.textEdit?.newText??item.insertText??'')));
+    await vscode.commands.executeCommand('editor.action.triggerSuggest');await pause(200);
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert(doc.getText().includes(expected),doc.getText());
+    receipts.push({abbr,inserted:doc.lineAt(1).text});
+  }
+  assert(api.getAbbreviations().some(pair=>pair[0]==='hence' && pair[1]==='then have'));
+  // Direct pasted Unicode is normalised on save; opt-in permits Unicode.
+  await editor.edit(edit=>edit.replace(new vscode.Range(1,0,1,doc.lineAt(1).text.length),'text "≠ ⟹ ⋀ ‹›"'));
+  await doc.save();assert(fs.readFileSync(file,'utf8').includes(String.raw`\<noteq>`));
+  const configFile=path.join(root,'.vscode/settings.json'),original=fs.readFileSync(configFile,'utf8');
+  const prior=settings.inspect('unicodeOnSave').workspaceValue;
+  try {
+    await settings.update('unicodeOnSave',true,vscode.ConfigurationTarget.Workspace);
+    await editor.edit(edit=>edit.insert(new vscode.Position(1,0),' '));
+    await doc.save();assert(fs.readFileSync(file,'utf8').includes('≠'));
+  } finally {
+    await settings.update('unicodeOnSave',prior,vscode.ConfigurationTarget.Workspace);
+    if(JSON.stringify(JSON.parse(fs.readFileSync(configFile,'utf8')))===JSON.stringify(JSON.parse(original))) fs.writeFileSync(configFile,original);
+    await editor.edit(edit=>edit.insert(new vscode.Position(1,0),' '));await doc.save();
+  }
+  assert(!/[≠⟹⋀‹›]/.test(fs.readFileSync(file,'utf8')));
+  fs.writeFileSync(path.join(root,'.dev-host/m10-symbols.json'),JSON.stringify({receipts,abbrevs:api.getAbbreviations()},null,2));
+  console.log('PASS: session abbreviations, four accepted symbol completions, ASCII saves, explicit Unicode opt-in and restoration');
 }

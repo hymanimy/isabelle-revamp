@@ -136,3 +136,13 @@ Capture the editor in Default Dark Modern, then Default Light Modern. Other
 custom themes receive standard TextMate/semantic scope fallbacks rather than
 hardcoded colours. `Developer: Inspect Editor Tokens and Scopes` shows the
 PIDE-backed semantic classification.
+
+### 1. Unicode display and ASCII input
+
+Open `Swarm.thy` and toggle **Isabelle: Toggle Pretty Symbols**. `\<Sum>` becomes
+∑; moving the caret into it or selecting `Sum` with Find reveals ASCII. In a
+scratch formula type `\noteq`, `~=`, `==>`, and `!!`; accept suggestions with Tab
+and capture the glyphs ≠, ≠, ⟹, ⋀. Toggle display off to inspect their ASCII
+spellings. Save and inspect the file: it still contains `\<...>` names.
+`isabelleRevamp.unicodeOnSave` is **false by default**; only explicitly enabling
+it permits symbol spellings to be saved as Unicode. Leave it off for the demo.

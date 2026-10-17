@@ -1,4 +1,5 @@
 import codes from './symbolCodes.json';
+import { Symbols } from './symbol';
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,6 +7,10 @@ import { promisify } from 'node:util';
 
 // Bundled fallback; the installed distribution replaces this at startup.
 let symbols: Readonly<Record<string, string>> = codes;
+export let symbolCatalog = new Symbols(Object.entries(codes).map(([name, decoded]) =>
+  ({ name, decoded, symbol: '\\<' + name + '>', abbrevs: ['\\' + name] })));
+export const encodeSymbols = (text: string): string => symbolCatalog.encode(text);
+export const decodeSymbols = (text: string): string => symbolCatalog.decode(text);
 const superscripts: Readonly<Record<string, string>> = Object.fromEntries(
   [...'0123456789+-=()abcdefghijklmnopqrstuvwxyz'].map((char, i) =>
     [char, [...'⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖ?ʳˢᵗᵘᵛʷˣʸᶻ'][i]])
@@ -27,9 +32,15 @@ export function parseSymbolTable(source: string): Record<string, string> {
 export async function loadSymbols(executable: string): Promise<{ path: string; count: number }> {
   const { stdout } = await promisify(execFile)(executable, ['getenv', '-b', 'ISABELLE_HOME'], { timeout: 15000 });
   const path = join(stdout.trim(), 'etc/symbols');
-  const loaded = parseSymbolTable(await readFile(path, 'utf8'));
+  const source = await readFile(path, 'utf8');
+  const loaded = parseSymbolTable(source);
   if (!Object.keys(loaded).length) throw new Error('No Unicode assignments in ' + path);
   symbols = loaded;
+  symbolCatalog = new Symbols(source.split('\n').flatMap(line => {
+    const name = /^\\<([^>]+)>/.exec(line)?.[1];
+    return name && loaded[name] ? [{ name, decoded: loaded[name], symbol: '\\<' + name + '>',
+      abbrevs: ['\\' + name, ...[...line.matchAll(/\babbrev:\s+(\S+)/g)].map(match => match[1])] }] : [];
+  }));
   return { path, count: Object.keys(loaded).length };
 }
 

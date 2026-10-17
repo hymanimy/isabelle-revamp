@@ -92,13 +92,20 @@
         "isabelleRevamp.prettySymbols": {
           "type": "boolean",
           "default": true,
-          "description": "Display ASCII Isabelle symbols as mathematics; reveal source at the cursor. Does not change the file or source coordinates."
+          "description": "Display ASCII Isabelle symbols as mathematics; reveal source at the cursor. Does not change the file or source coordinates.",
+          "scope": "resource"
         },
         "isabelleRevamp.executable": {
           "type": "string",
           "default": "isabelle",
           "scope": "machine-overridable",
           "description": "Path to the Isabelle executable (~/ is supported), or isabelle on PATH. Reload the window after changing this setting."
+        },
+        "isabelleRevamp.unicodeOnSave": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "description": "Save recognised Isabelle symbols as Unicode. Off by default: completions and saved source use ASCII Isabelle spellings."
         }
       }
     },

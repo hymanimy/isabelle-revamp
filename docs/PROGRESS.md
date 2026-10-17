@@ -429,3 +429,18 @@
   without requests, prover changes, or identifier heuristics.
 - **Would do differently:** distinguish formula syntax from prose styling early;
   keep custom-theme fallbacks rather than imposing one fixed light palette.
+
+## M10.1 — Unicode transport with ASCII persistence
+
+- **Passed:** `scripts/check_m10.sh` exited 0 including M3–M8 regressions, M10
+  library/colour checks, real accepted completions for `\noteq`, `~=`, `==>`,
+  `!!`, server session abbreviations, default ASCII save and explicit Unicode
+  save opt-in/restoration. The source and MCP coordinate regression checks pass.
+- **Discovered:** the Unicode-edits option returns Unicode replacement text;
+  `PIDE/abbrevs_response` supplements, rather than includes, the base symbol
+  table. The official symbol catalogue relies on a VSCodium-specific resource.
+  The client ports its catalogue model, loads installed data, and converts
+  accepted edits to ASCII. Protocol receipts and exact shapes are recorded.
+- **Would do differently:** test both persisted encodings and base/session
+  abbreviations before connecting completion to an editor. Screenshot steps
+  are documented; no direct screen capture is claimed.

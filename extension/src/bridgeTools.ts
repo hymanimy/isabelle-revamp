@@ -4,6 +4,7 @@ import { DiagnosticSeverity, languages, Position, Range, Selection, TabInputText
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
 import { Swarm } from './swarm';
+import { encodeSymbols } from './symbols';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
 
@@ -100,7 +101,7 @@ export class BridgeTools {
       if (typeof params.text !== 'string') throw new Error('Edit text must be a string.');
       const ids = this.swarm.editedCards(document, new Range(start, end));
       const selection = editor.selection;
-      if (!await editor.edit(edit => edit.replace(new Range(start, end), params.text as string))) {
+      if (!await editor.edit(edit => edit.replace(new Range(start, end), encodeSymbols(params.text as string)))) {
         throw new Error('Document changed during the edit; read it again with open.');
       }
       editor.selection = new Selection(document.validatePosition(selection.anchor), document.validatePosition(selection.active));

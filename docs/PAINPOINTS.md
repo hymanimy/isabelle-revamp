@@ -480,3 +480,16 @@ should be.
 - **Fix needed.** Reuse current-version `text_free`, `text_bound`, and
   `text_skolem` PIDE decorations as semantic tokens. Map them to standard theme
   scopes and provide theme-specific workspace palette recommendations.
+
+## 38. Unicode completions and abbreviation lists do not preserve ASCII source
+
+- **What happened.** Enabling `vscode_unicode_symbols_edits=true` makes the
+  server return literal `≠`. `PIDE/abbrevs_request` returned only 20 session
+  abbreviations, with no `~=` / `==>` / `!!` base symbol entries; some responses
+  contain a U+0007 cursor marker. The official symbol catalogue expects a font
+  resource shipped with VSCodium, absent in stock VS Code.
+- **Experience.** Merely accepting a suggestion changes the source spelling,
+  while a seemingly complete abbreviation response omits familiar jEdit input.
+- **Fix needed.** Keep the Unicode server options, encode completion/MCP edits
+  in the client, combine session abbreviations with installed `etc/symbols`,
+  turn cursor markers into snippet tabstops, and make Unicode saving explicit.

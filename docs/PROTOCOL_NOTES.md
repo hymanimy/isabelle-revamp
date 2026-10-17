@@ -649,3 +649,35 @@ Only annotations confirmed for the current document version are exposed.
 Reference: Isabelle `src/Tools/VSCode/extension/src/decorations.ts`, `text_colors`.
 Workspace token colour recommendations cover built-in light/dark/high-contrast
 families. Custom themes retain their own standard-scope palette.
+
+## M10.1 — Unicode transport, ASCII source and abbreviations
+
+A live stdio probe ran `vscode_server -n -l HOL` with `vscode_html_output=true`,
+`editor_output_state=true`, `vscode_pide_extensions=true`,
+`vscode_unicode_symbols_output=true`, `vscode_unicode_symbols_edits=true`.
+The last two options are now explicit in the extension. Completion for
+`\noteq` returned `label: "≠"`, `filterText: "\\noteq"`, and
+`textEdit: {range:{start:{line:1,character:7},end:{line:1,character:13}},newText:"≠"}`.
+The client encodes insertion text (including resolved/additional edits) back to
+`\<noteq>` without changing that range. MCP insertions use the same encoding.
+
+`PIDE/abbrevs_request` is a **notification without params**, not a JSON-RPC
+request. The response notification is `PIDE/abbrevs_response` with
+`{abbrevs:[[input,replacement],...]}`. HOL returned 20 session entries, including
+`["hence","then have"]`, `["thus","then show"]`, and
+`["\\tag","✐‹tag \u0007›"]`; U+0007 is a cursor placeholder, converted to a
+VS Code snippet tabstop. Empty replacements are not offered. Crucially, this
+response does **not** contain the base symbol abbreviations: `~=` / `==>` / `!!`
+and named `\noteq` come from installed `etc/symbols` entries plus their names.
+The completion provider combines both authoritative sources.
+
+The small `Entry`/`Symbols` catalogue is ported from the official
+`src/Tools/VSCode/extension/src/symbol.ts` (Makarius). That implementation reads
+font JSON via `ISABELLE_VSCODIUM_RESOURCES`; stock VS Code has no such bundled
+resource. We load the same symbol/code/abbrev data from the installed table.
+Glyph decorations remain on ASCII ranges, reveal at the cursor/selection, and
+honour `prettySymbols`. `unicodeOnSave` defaults false: a save participant
+encodes recognised pasted Unicode symbols in workspace theories. Explicit true
+decodes symbol spellings on save. This opt-in changes saved source and therefore
+its subsequent columns; display-only mode and ordinary completion do not.
+Raw receipts: `.dev-host/m10-abbrevs.json`, `m10-raw-completion.json`.
