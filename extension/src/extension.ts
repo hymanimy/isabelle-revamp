@@ -8,6 +8,7 @@ import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
 import { loadSymbols, unicodeSymbols } from './symbols';
 import { PrettySymbols } from './prettySymbols';
+import { lockLibraryFiles } from './libraryFiles';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -52,6 +53,10 @@ export async function activate(context: ExtensionContext) {
     .get<string>('executable', 'isabelle');
   const executable = configured.startsWith('~/')
     ? homedir() + configured.slice(1) : configured;
+  try {
+    const patterns = await lockLibraryFiles(executable);
+    output.info(`Library read-only patterns: ${patterns.join(', ')}`);
+  } catch (error) { output.warn(`Library read-only setup failed: ${String(error)}`); }
   try {
     const table = await loadSymbols(executable);
     output.info(`Loaded ${table.count} Unicode symbols from ${table.path}`);

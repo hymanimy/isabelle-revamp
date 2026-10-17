@@ -113,3 +113,15 @@ on). Move the caret into a symbol or select it with Find to see its ASCII source
 Search for `Sum` still finds `\<Sum>`. Type `\Sum` inside a formula and accept the
 server suggestion with Tab; the inserted source is `\<Sum>`. Powers such as
 `^2` and `^n` are displayed as superscripts without changing column numbers.
+
+## M10 jEdit display parity — screenshot checks
+
+### 6. Read-only libraries
+
+Open `examples/Sqrt2.thy`, Ctrl/Cmd-click the type `real` in its theorem, and
+open the returned definition in `HOL/Real.thy`. The tab is read-only: attempting
+to type shows VS Code's read-only notice. Capture the library path and lock
+indicator. Return to the example, which remains editable. The workspace
+recommendation uses expanded installation/user-library paths; activation adds
+missing paths from `isabelle getenv` without changing global settings or
+replacing existing read-only overrides.

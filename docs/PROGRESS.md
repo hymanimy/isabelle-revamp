@@ -401,3 +401,18 @@
 - **Would do differently:** enable formula completions at language registration
   time and separate source representation from display from the first editor
   milestone.
+
+## M10.6 — read-only library navigation
+
+- **Passed:** `scripts/check_m10.sh` exited 0, including the M3–M8 automated/live
+  editor and MCP regressions and Ask subprocess checks. A real definition query
+  for `real` opened `HOL/Real.thy`; VS Code rejected typing and disk bytes stayed
+  identical. Demo screenshot steps are in `docs/DEMO.md`.
+- **Discovered:** `ISABELLE_HOME_USER` names a version directory; protecting its
+  parent covers all user libraries. Trusted extension edits bypass the typing
+  lock, so the test uses actual editor typing and the MCP retains its separate
+  workspace boundary. No global configuration or distribution changes.
+- **Would do differently:** apply library protection as part of initial language
+  registration, before the first definition navigation. A preliminary regression
+  run exited during MCP startup without a surfaced exception; the harness now
+  records failures explicitly, and the complete rerun passed.

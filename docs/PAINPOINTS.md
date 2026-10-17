@@ -455,3 +455,17 @@ should be.
   completion. Preserve ASCII edits and source coordinates. Direct screen access
   for M9 again returned `Computer Use was not approved to use Code`; retain that
   visual acceptance limitation alongside actual extension-host checks.
+
+## 36. Following a definition opens an editable installed theory
+
+- **What happened.** LSP definition navigation opens ordinary file URIs in the
+  installed HOL library; the server does not make those editors read-only.
+- **Experience.** A mathematician inspecting `real` can accidentally type into
+  the shared library instead of their own proof.
+- **Fix needed.** Discover both library roots through `isabelle getenv` and
+  apply `files.readonlyInclude` in the current workspace. Keep existing user
+  overrides and leave source files and filesystem permissions untouched.
+  A live check also found that `TextEditor.edit` bypasses this editor policy:
+  even a no-op API edit returned true. Acceptance therefore exercises the
+  actual typing command and checks unchanged bytes. This protects human
+  editing; MCP independently enforces its canonical workspace boundary.

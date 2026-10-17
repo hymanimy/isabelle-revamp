@@ -620,3 +620,16 @@ at line 1, columns 7–11 returned a single completion with label/insertText
 `\<Sum>`, filterText `\Sum`, detail `\<Sum> (symbol "∑")`, and a text edit
 replacing exactly `[1,7,1,11]` with `\<Sum>`. The accepted document contains
 ASCII, not `∑`. The receipt is `.dev-host/m9a-completion.json`.
+
+## M10.6 — library navigation protection
+
+Observed `isabelle getenv -b ISABELLE_HOME ISABELLE_HOME_USER` returns one
+absolute path per line: the app directory and `~/.isabelle/Isabelle2025-2`.
+The read-only patterns cover the app and the parent `~/.isabelle` directory.
+VS Code's `files.readonlyInclude` is a pattern-to-boolean object, set at
+workspace scope only. Existing values (including explicit false overrides)
+are preserved. No filesystem permissions or Isabelle distribution files change.
+`vscode.executeDefinitionProvider` on the type `real` returns the installed
+`src/HOL/Real.thy`. `TextEditor.edit` is a trusted API and bypasses the editor's
+read-only policy; it is unsuitable as a typing-lock test. The host acceptance
+uses the `type` command with auto-save off and verifies the buffer and disk.

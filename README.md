@@ -133,3 +133,9 @@ plaintext serializer fails. See [protocol notes](docs/PROTOCOL_NOTES.md),
 [pain points](docs/PAINPOINTS.md), and [milestone progress](docs/PROGRESS.md).
 The extension's minimal startup adaptation is credited in
 [third-party notices](extension/THIRD_PARTY_NOTICES.md).
+
+Library definitions opened through Ctrl/Cmd-click are read-only in this workspace.
+Activation adds missing `files.readonlyInclude` entries for the installed Isabelle
+and user library roots, discovered with `isabelle getenv`. This does not change
+library files, permissions, or global VS Code settings. See the numbered M10
+checks in [docs/DEMO.md](docs/DEMO.md).
