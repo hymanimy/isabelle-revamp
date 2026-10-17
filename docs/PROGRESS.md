@@ -684,6 +684,23 @@
 
 Review of the 17 Oct work on branch `leo`: three jobs, one commit each.
 
+**Whole-chain regression, after all three jobs:** `bash scripts/check_m14.sh`
+ran the full M3–M8 / M10 / M12–M14 chain — **79 checks passed, none failed**,
+extension host exit 0 — and it no longer needs the
+`ISABELLE_TEST_SWARM_SKELETON` workaround, because `examples/Swarm.thy` is a
+skeleton again. `scripts/check_m13b.sh` and `scripts/check_demo_env.py` pass.
+The live Ask controller in VS Code wrote a real receipt to
+`~/.isabelle-revamp/ask-log/`, correctly reporting
+`open (sorry) steps: sqrt4_irrational (line 5)` for the root-level admission.
+
+**Handover, before the demo:**
+
+1. Close the old `~/hack/demo` Demo window. Its installed bundle is from 13:45,
+   **before** the Ask fix; `~/hack/demo` is superseded by `demo/` in the repo.
+2. `demo/.demo/` already holds the final VSIX (installed 14:53). Launch with
+   the command `bash scripts/demo-env.sh` prints, or re-run that script first.
+3. The three commits are **not pushed** — `leo` is 3 ahead of `origin/leo`.
+
 ## Job 1 — the Ask flow stopped at open + status
 
 - **Found, primary cause:** `examples/Swarm.thy` had nothing left to prove.
