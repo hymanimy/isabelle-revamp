@@ -9,25 +9,36 @@ M6 adds a theme-aware sidebar, Unicode output and a theory/check-status header.
 M7 adds **Isabelle Swarm**, a live card board for six proof steps filled through MCP.
 M8 adds **Ask Isabelle**: streamed Claude Code replies and proof edits through those same tools.
 
-## Try the extension in under five minutes
+## Install in under five minutes
 
-Requires Isabelle2025-2 with the HOL heap, Node 20+, npm, and stock VS Code 1.104+.
+Requires stock VS Code 1.104+ and Isabelle2025-2 with its HOL heap. Node, npm,
+Python and a checkout are unnecessary for the installed extension's proof checking.
 
-1. From this repository, run `npm ci --prefix extension`.
-2. Open the repository root in VS Code: `code .`.
-3. Check `.vscode/settings.json`: `isabelleRevamp.executable` points to the
-   verified macOS installation under `~/hack/isabelle-env/`. Change this workspace
-   setting for another installation, or use `isabelle` if it is on VS Code's PATH.
-4. Press **F5**, selecting **Isabelle: Extension Development Host** if asked.
-   This compiles the extension and opens a development window with `Sqrt2.thy`.
-5. In that window, open the Command Palette and run **Isabelle: Show Goals**.
-   Click an intermediate `have` in `Sqrt2.thy` to see its goal, or follow the
-   [five-step demo](docs/DEMO.md) to try unfinished, error, and complete states.
-   **View → Output → Isabelle** shows `Isabelle language server ready (HOL).`
+1. Obtain `isabelle-revamp-0.1.0.vsix`. To build it from this checkout:
+   `npm ci --prefix extension && npm run package --prefix extension`.
+   The artifact is `dist/isabelle-revamp-0.1.0.vsix`.
+2. In VS Code, choose **Extensions → … → Install from VSIX…** and select it,
+   or run `code --install-extension dist/isabelle-revamp-0.1.0.vsix`.
+3. Open your theory folder and `examples/Sqrt2.thy` in a regular window.
+   **Isabelle Goals** opens automatically; click an intermediate `have`.
+4. Run **Isabelle: Show Swarm** to see proof cards. Run
+   **Isabelle Revamp: Setup check** for Isabelle, HOL, Claude and MCP checks.
+5. For **Isabelle: Ask**, install/sign in to Claude Code and install Python
+   3.11+. Copy the absolute MCP registration command shown in the panel if
+   needed. The bundled launcher installs its private dependencies on first use.
+   See [the installed demo](docs/DEMO.md#install-from-vsix-m11).
 
-If `code` is missing on macOS, open VS Code normally and use **File → Open Folder**,
-or invoke `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`.
-For a manual build, run `npm run compile --prefix extension`.
+Isabelle is found through `isabelleRevamp.executable`, PATH, then standard
+macOS/home install locations. If missing, the single notification offers
+**Locate…** or **Download**. A missing HOL heap can be built with
+`isabelle build -b HOL`. Source stays ASCII unless `unicodeOnSave` is enabled.
+
+For development and packaging, use Node 22+ (required by vsce), run
+`npm ci --prefix extension`, open this repository in
+VS Code, and press **F5**. `npm run compile --prefix extension` compiles the
+individual modules for the existing checks; `npm run package --prefix extension`
+type-checks and bundles the shipping extension. `bash scripts/check_m11.sh`
+audits the package, discovery and optional Ask setup.
 
 ## Check the proof and sidebar (M4)
 

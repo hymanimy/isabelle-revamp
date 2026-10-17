@@ -5,9 +5,12 @@ import { StringDecoder } from 'node:string_decoder';
 export interface AskEntry { id: number; kind: 'user' | 'assistant' | 'tool' | 'notice'; text: string }
 export interface AskState { active: boolean; entries: AskEntry[] }
 export interface AskContext { file: string; line: number; cwd: string; portFile: string }
-export const registrationCommand = 'claude mcp add --transport stdio --scope local isabelle -- "$PWD/mcp/.venv/bin/python" "$PWD/mcp/server.py"';
-export function helpLine(missing: 'claude' | 'MCP'): string {
-  return `${missing === 'claude' ? 'claude is not on PATH.' : 'The isabelle MCP server is not registered.'} From the repository root: ${registrationCommand}`;
+export function registrationCommand(serverRoot: string): string {
+  const launcher = join(serverRoot, 'mcp/launch.py').replace(/'/g, "'\\''");
+  return `claude mcp add --transport stdio --scope local isabelle -- python3 '${launcher}'`;
+}
+export function helpLine(missing: 'claude' | 'MCP', serverRoot: string): string {
+  return `${missing === 'claude' ? 'claude is not on PATH.' : 'The isabelle MCP server is not registered.'} With Claude Code and Python 3.11+ installed, run: ${registrationCommand(serverRoot)}`;
 }
 const toolNames = ['open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positions', 'processing_status'];
 
@@ -25,7 +28,7 @@ export function preamble(context: AskContext): string {
 export function claudeArgs(context: AskContext, serverRoot: string): string[] {
   // Explicit config isolates this extension instance without changing registration.
   const config = { mcpServers: { isabelle: { type: 'stdio',
-    command: join(serverRoot, 'mcp/.venv/bin/python'), args: [join(serverRoot, 'mcp/server.py'), '--port-file', context.portFile] } } };
+    command: 'python3', args: [join(serverRoot, 'mcp/launch.py'), '--port-file', context.portFile] } } };
   return ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
     '--tools', '', '--allowedTools', ...toolNames.map(name => 'mcp__isabelle__' + name),
     '--permission-mode', 'dontAsk', '--strict-mcp-config', '--mcp-config', JSON.stringify(config),
@@ -182,7 +185,7 @@ export class Ask {
       const registration = await this.execute(['mcp', 'get', 'isabelle'], context, '');
       if (this.stopped) return true;
       if (registration.code !== 0 || !/^isabelle:/m.test(registration.output)) {
-        this.notice(helpLine('MCP')); return true;
+        this.notice(helpLine('MCP', this.serverRoot)); return true;
       }
       const stream = new AskStream(this.add);
       const prompt = (history ? 'Earlier conversation (context only; read the current buffer again):\n' + history + '\n\n' : '') + 'User request:\n' + text.trim();
@@ -195,7 +198,7 @@ export class Ask {
         this.notice(`Claude exited ${result.code ?? 'by signal'} without a successful completion${result.error.trim() ? ': ' + result.error.trim() : '.'}`);
       }
     } catch (error) {
-      if (!this.stopped) this.notice((error as NodeJS.ErrnoException).code === 'ENOENT' ? helpLine('claude') : 'Claude could not run: ' + String(error));
+      if (!this.stopped) this.notice((error as NodeJS.ErrnoException).code === 'ENOENT' ? helpLine('claude', this.serverRoot) : 'Claude could not run: ' + String(error));
     } finally {
       clearTimeout(timeout);
       // Leave the brief escalation timer armed after Stop, even if the parent exits first.

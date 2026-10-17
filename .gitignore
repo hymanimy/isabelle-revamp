@@ -3,3 +3,7 @@ extension/out/
 .dev-host/
 __pycache__/
 mcp/.venv/
+dist/
+extension/mcp/
+extension/LICENSE
+mcp/.setup-lock/

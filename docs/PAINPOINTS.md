@@ -546,3 +546,38 @@ should be.
   editor hover provider. Keep line-only navigation when a name is ambiguous,
   bind actions to the current goal revision, and preserve library read-only
   protection. Never invent missing prover coordinates.
+
+## 44. A development host can hide packaging dependencies (M11)
+
+- **What happened:** Ask used the checkout's `mcp/.venv`, and ordinary TypeScript
+  output expected runtime node_modules. A fresh VSIX has neither. License
+  collection also cannot resolve the language client's package.json through its
+  restricted package exports.
+- **Experience:** a mathematician could install a seemingly complete extension
+  yet need the developer's directory layout to ask a question.
+- **Fix needed:** one esbuild bundle, explicit archive allowlist, bundled Python
+  sources and a launcher that creates its private environment on first use.
+  Collect all runtime licenses from installed package directories. The real
+  installed-copy Claude proof check now exercises this path without a checkout
+  dependency; proof checking itself needs no Python.
+
+## 45. VS Code test flags are not a regular-window acceptance check (M11)
+
+- **What happened:** a launch with only `--extensionTestsPath` opened Sqrt2 but
+  neither ran the harness nor activated the installed extension. Separately,
+  the screen tool refused access with “Computer Use was not approved to use Code”.
+- **Experience:** an apparently open demo window gave no indication why its
+  prover was absent, and a screen inspection could not establish the cause.
+- **Fix needed:** keep installed-package API tests separate from a launch with
+  no development/test flags. The latter now passes through the packaged MCP
+  server; document the screenshot path and the remaining direct-visual limit.
+
+## 46. Missing executable setup should not cascade into prover errors (M11)
+
+- **What happened:** a GUI-launched VS Code may not inherit a terminal's PATH,
+  while the old startup proceeded into symbol loading and server launch anyway.
+- **Experience:** locating an already installed prover looked like debugging
+  several unrelated extension failures.
+- **Fix needed:** search the configured path, PATH and common installation
+  directories before starting anything; show one Locate…/Download notification
+  if absent. Auto-open Goals and provide one Setup check report with exact fixes.

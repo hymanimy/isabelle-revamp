@@ -37,11 +37,12 @@ exports.checkAsk = async function () {
   assert.equal(ask.snapshot().entries.filter(e => e.kind === 'user').length, 2);
   const missing = runner('stream', { executable: path.join(root, '.dev-host/no-such-claude') });
   await missing.send(context, 'prove this');
-  assert.equal(missing.snapshot().entries.at(-1).text, helpLine('claude'));
+  assert.equal(missing.snapshot().entries.at(-1).text, helpLine('claude', root));
   const noMcp = runner('missing'); await noMcp.send(context, 'prove this');
-  assert.equal(noMcp.snapshot().entries.at(-1).text, helpLine('MCP'));
-  assert(fs.readFileSync(path.join(root, 'mcp/README.md'), 'utf8').includes(registrationCommand));
-  assert(!helpLine('claude').includes('\n') && !helpLine('MCP').includes('\n'));
+  assert.equal(noMcp.snapshot().entries.at(-1).text, helpLine('MCP', root));
+  assert(registrationCommand(root).includes(path.join(root, 'mcp/launch.py')));
+  assert(!registrationCommand(root).includes('$PWD'));
+  assert(!helpLine('claude', root).includes('\n') && !helpLine('MCP', root).includes('\n'));
   for (const mode of ['bad-json', 'exit-error']) {
     const failure = runner(mode); await failure.send(context, 'prove this');
     assert(failure.snapshot().entries.some(e => e.kind === 'notice'));

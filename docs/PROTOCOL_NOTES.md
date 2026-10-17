@@ -745,3 +745,32 @@ claiming a server-supplied column. `vscode.executeHoverProvider` at the same
 position supplies the tooltip; code-fence presentation is converted to text.
 Stale hover results are discarded. HTTP, command, remote file, query-string,
 invalid-line, and out-of-root targets are inert/refused.
+
+## M11 — packaging and installed startup
+
+- VS Code 1.138.0, Node 26.8.2, npm 11.19.1 and Python 3.13.15 were observed.
+  Build dependencies are pinned to `@vscode/vsce` 4.0.0 and esbuild 0.28.2.
+  The extension still targets `@types/vscode` 1.104.0 / engine `^1.104.0`.
+- Followed the official [bundling guide](https://code.visualstudio.com/api/working-with-extensions/bundling-extension)
+  and [packaging guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension):
+  type-check separately, bundle Node/CommonJS with only `vscode` external,
+  ship dependency licenses, and allowlist VSIX files. `vsce.dependencies=false`
+  suppresses dependency walking; `vsce.packagePath=../dist` applies to direct
+  `npx vsce package` as well as `npm run package`.
+- `isabelle build -n -l HOL` exited 0 on the installed HOL heap. Setup check uses
+  that exact dry-run command, not a guessed heap path. Executable discovery is
+  setting → PATH → `/Applications/Isabelle*/bin/isabelle` →
+  `~/hack/isabelle-env/Isabelle*/bin/isabelle` → `~/Isabelle*/bin/isabelle`.
+- Ask's explicit MCP config now uses `command: "python3"`, arguments
+  `[<absolute installed extension>/mcp/launch.py, "--port-file", <this window's file>]`.
+  The launcher creates an isolated sibling `.venv` on first use; installation
+  output goes to stderr, then `exec` starts the bundled `server.py`. The seven
+  MCP tools and Claude stream/permission flags are unchanged.
+- `--extensionTestsPath` without `--extensionDevelopmentPath` did not execute
+  the API harness or activate the installed extension in that attempted test
+  launch. The API harness was instead run against the installed extension path;
+  then both test flags were omitted for the separate regular-window MCP check.
+  The latter returned `proof (prove)`, one subgoal `(sqrt 2)² = 2`, and fully
+  checked status. No development host remained running during that check.
+- VS Code adds installation metadata to `package.json`; shipped manifest values,
+  JavaScript bundle and bundled MCP source were checked against the final VSIX.

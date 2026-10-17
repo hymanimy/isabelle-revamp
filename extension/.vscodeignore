@@ -1,0 +1,14 @@
+**/*
+!package.json
+!README.md
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!out/extension.js
+!out/DEPENDENCY_LICENSES.txt
+!syntaxes/**
+!media/**
+!language-configuration.json
+!out/symbolCodes.json
+!mcp/server.py
+!mcp/requirements.txt
+!mcp/launch.py

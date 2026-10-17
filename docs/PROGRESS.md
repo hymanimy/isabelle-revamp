@@ -504,3 +504,32 @@
   the beginning. Screenshot-able navigation and hover checks are in DEMO.md;
   direct screen capture is not claimed. Optional Sledgehammer and M9 cascade
   work remain queued while M11 packaging takes priority.
+
+## M11 — installable extension
+
+- **Passed:** `scripts/check_m11.sh` packages a 188,477-byte VSIX containing one
+  JavaScript bundle, symbol/grammar/media data, licenses and the bundled MCP
+  launcher/server/requirements. `npx vsce ls` has no source, tests or runtime
+  node_modules. Discovery priority, missing-Isabelle single notification,
+  auto-open Goals, setup fixes, Ask streaming/Stop/help tests pass. The full
+  M3–M8 and mandatory M10 regression chain exited 0.
+- **Installed verification:** installed `hymanimy.isabelle-revamp@0.1.0` into
+  real VS Code 1.138.0. The API harness loaded the installed bundle from
+  `~/.vscode/extensions/`, confirmed Sqrt2 Goals/Swarm/colouring and all four
+  setup checks, and ran real Claude through the bundled MCP environment. It
+  filled a disposable Demo proof, tagged Swarm and reached fully checked.
+  Then all development hosts were closed. A separate regular window, with no
+  test/development flags, returned the live Sqrt2 square goal, no errors and
+  `fully_checked=true`. CLI uninstall succeeded with all owned port files
+  absent; the final artifact was reinstalled, its shipped runtime bytes checked,
+  and Sqrt2 reopened and rechecked. Actual example sources remain unchanged.
+- **Discovered:** package exports block resolving dependency package.json via
+  require; bundled licenses need explicit filesystem paths. Test flags alone
+  do not create an installed-extension API harness. VS Code adds install metadata
+  to the manifest. Claude's server needs its own Python environment rather than
+  a developer checkout; the optional launcher creates one only when invoked.
+- **Would do differently:** test the shipping artifact and a regular window
+  early. Direct visual inspection is still unverified because the screen tool
+  returned “Computer Use was not approved to use Code”; DEMO.md gives the exact
+  screenshot checks. No screenshot or visual approval is claimed. M9 cascade/
+  flowchart and optional M10 Sledgehammer remain queued.

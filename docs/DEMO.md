@@ -186,3 +186,43 @@ library tab read-only. Capture that tab and its definition line. Plain clicking
 allows text selection; it does not navigate. Return to the proof to continue.
 Links belong to the currently displayed goal; old links are discarded while
 checking. Only workspace and installed/user-library file targets are allowed.
+
+## Install from VSIX (M11)
+
+1. Build with `npm ci --prefix extension` then `npm run package --prefix extension`.
+   The result is `dist/isabelle-revamp-0.1.0.vsix` (about 184 KiB).
+2. Close Extension Development Host windows. In regular VS Code, use
+   **Extensions → … → Install from VSIX…** and choose that file. The entry is
+   **Isabelle Revamp**, publisher **hymanimy**, with a sigma/check icon.
+   CLI equivalent: `code --install-extension dist/isabelle-revamp-0.1.0.vsix`.
+3. Open the theory folder and `examples/Sqrt2.thy` in a fresh regular window.
+   Goals opens on the first theory. Click `have root_squared` (line 17): the
+   coloured goal is `(sqrt 2)² = 2`, while ASCII source and columns are preserved.
+   If Isabelle is missing, **Locate…** selects `bin/isabelle`; **Download** opens
+   the official installation page. No checkout or Python is needed for checking.
+4. Run **Isabelle: Show Swarm** and **Isabelle Revamp: Setup check**. Screenshot
+   the highlighted proof, Goals, proved cards, and the four ✓/✗ setup lines.
+   Setup checks the actual `isabelle version` and `isabelle build -n -l HOL`,
+   Claude on PATH, and the workspace's `isabelle` MCP registration.
+5. Run **Isabelle: Ask**. With Python 3.11+ and signed-in Claude Code installed,
+   copy the absolute registration command if requested. It points to the
+   installed extension's `mcp/launch.py`. On first invocation it installs its
+   private FastMCP environment. Use a copy of `Demo.thy` and ask “prove this”;
+   observe streamed tool calls, Claude card tags and fully checked status.
+
+Verified on VS Code 1.138.0 / Isabelle2025-2: `scripts/check_m11.sh`, the full
+M3–M8/M10 regression chain, and a real Claude request against the installed
+bundle all passed. Installed path on this machine:
+`/Users/leo/.vscode/extensions/hymanimy.isabelle-revamp-0.1.0`.
+The installed-copy API check uses `extension/test/installed.cjs`; the separate
+regular window has no development/test flags and returned Sqrt2's live goal,
+zero errors and `fully_checked=true` through the packaged MCP server. Receipts
+are under ignored `.dev-host/m11-*`. Direct screen inspection remains unverified:
+the screen tool returned “Computer Use was not approved to use Code”.
+
+Uninstall was verified with `code --uninstall-extension hymanimy.isabelle-revamp`
+after closing its window: the default and isolated discovery files were absent.
+The final VSIX was then reinstalled and Sqrt2 reopened in regular VS Code.
+A live window owns a port file; closing its extension removes that file without
+removing another window's discovery. `dist/` and generated packaging copies
+are ignored by git.

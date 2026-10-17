@@ -3,6 +3,31 @@
 The Python stdio server connects to the running VS Code extension. It exposes
 exactly seven tools, uses FastMCP 4.1.0, and never launches a second prover.
 
+## Installed VSIX (no checkout)
+
+The extension ships `mcp/server.py`, `requirements.txt` and `launch.py` beside
+its JavaScript bundle. Install Python 3.11+ and Claude Code, then use the exact
+absolute registration line shown by **Isabelle: Ask** or **Setup check**:
+
+```sh
+claude mcp add --transport stdio --scope local isabelle -- python3 '/absolute/installed/extension/mcp/launch.py'
+```
+
+Run it in your theory folder. The launcher installs pinned dependencies into
+its own `mcp/.venv` on first invocation, writes installation output only to
+stderr, and then runs the bundled server. Network access is required once; no
+global Python packages change. Concurrent starts wait for the same setup lock.
+After installing a new extension version, use its new registration path.
+Core proof checking and the Swarm board do not need Python or MCP registration.
+
+For Codex, the corresponding installed command is:
+
+```sh
+codex mcp add isabelle -- python3 '/absolute/installed/extension/mcp/launch.py'
+```
+
+## Repository development
+
 From the repository root, install once:
 
 ```sh

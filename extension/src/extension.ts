@@ -1,6 +1,6 @@
-import { homedir } from 'node:os';
 import { resolve } from 'node:path';
-import { commands, ExtensionContext, window, workspace } from 'vscode';
+import { existsSync } from 'node:fs';
+import { commands, ConfigurationTarget, env, ExtensionContext, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
@@ -16,6 +16,7 @@ import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
+import { findIsabelle, setupReport } from './setup';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -30,7 +31,9 @@ export async function activate(context: ExtensionContext) {
   const view = new GoalsView();
   let theoryEditor = window.activeTextEditor;
   const visibleTheory = () => theoryEditor && window.visibleTextEditors.includes(theoryEditor) ? theoryEditor : undefined;
-  ask = new Ask(resolve(context.extensionPath, '..'), state => view.updateAsk(state));
+  const serverRoot = existsSync(resolve(context.extensionPath, 'mcp/launch.py'))
+    ? context.extensionPath : resolve(context.extensionPath, '..');
+  ask = new Ask(serverRoot, state => view.updateAsk(state));
   const sendAsk = async (text: string) => {
     const editor = visibleTheory();
     const folder = editor && workspace.getWorkspaceFolder(editor.document.uri);
@@ -38,7 +41,7 @@ export async function activate(context: ExtensionContext) {
       ask?.notice('Open a theory in this workspace before asking Isabelle.');
       view.updateAsk(ask!.snapshot()); return false;
     }
-    if (!bridge) { ask?.notice('The Isabelle MCP bridge is unavailable. See Output → Isabelle.'); return false; }
+    if (!bridge) { ask?.notice('Locate Isabelle, then reload the window to start checking.'); return false; }
     return ask!.send({ file: editor.document.uri.fsPath, line: editor.selection.active.line + 1,
       cwd: folder.uri.fsPath, portFile: bridge.portFile }, text);
   };
@@ -54,10 +57,38 @@ export async function activate(context: ExtensionContext) {
       view.focusAsk();
     }));
 
-  const configured = workspace.getConfiguration('isabelleRevamp')
-    .get<string>('executable', 'isabelle');
-  const executable = configured.startsWith('~/')
-    ? homedir() + configured.slice(1) : configured;
+  const locate = () => findIsabelle(workspace.getConfiguration('isabelleRevamp').get<string>('executable', 'isabelle'));
+  context.subscriptions.push(commands.registerCommand('isabelleRevamp.setupCheck', async () => {
+    output.show(true);
+    const report = await setupReport(await locate(), workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, serverRoot);
+    report.forEach(line => output.appendLine(line));
+    return report;
+  }));
+  const firstTheory = async () => {
+    if (context.workspaceState.get('goalsOpened') || !workspace.textDocuments.some(doc => doc.languageId === 'isabelle')) return;
+    await context.workspaceState.update('goalsOpened', true);
+    await commands.executeCommand('isabelleRevamp.showGoals');
+  };
+  context.subscriptions.push(workspace.onDidOpenTextDocument(() => { void firstTheory(); }));
+  void firstTheory();
+  const executable = await locate();
+  if (!executable) {
+    view.update({ phase: 'idle', text: 'Isabelle not found. Use Locate… in the notification, or set isabelleRevamp.executable and reload.', errors: [] });
+    void window.showInformationMessage('Isabelle not found', 'Locate…', 'Download').then(async choice => {
+      if (choice === 'Download') await env.openExternal(Uri.parse('https://isabelle.in.tum.de/installation.html'));
+      if (choice === 'Locate…') {
+        const files = await window.showOpenDialog({ canSelectMany: false, canSelectFiles: true, canSelectFolders: false,
+          openLabel: 'Locate Isabelle', title: 'Select bin/isabelle in your Isabelle installation' });
+        if (files?.[0]) {
+          // An explicit Locate choice saves only this setting. Prefer the workspace.
+          await workspace.getConfiguration('isabelleRevamp').update('executable', files[0].fsPath,
+            workspace.workspaceFolders?.length ? ConfigurationTarget.Workspace : ConfigurationTarget.Global);
+          await commands.executeCommand('workbench.action.reloadWindow');
+        }
+      }
+    });
+    return { getGoalState: () => view.snapshot(), setupRequired: true };
+  }
   let libraryRoots: string[] = [];
   try {
     const patterns = await lockLibraryFiles(executable);
@@ -86,7 +117,6 @@ export async function activate(context: ExtensionContext) {
   const server: ServerOptions = { command: executable, args };
 
   output.info(`Starting ${executable} ${args.join(' ')}`);
-  output.show(true);
   client = new LanguageClient('isabelleRevamp', 'Isabelle', server, {
     documentSelector: [{ scheme: 'file', language: 'isabelle' }],
     outputChannel: output,
