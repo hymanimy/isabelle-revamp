@@ -165,3 +165,14 @@ Use the free/bound/fixed-variable scratch proof from item 4 to capture matching
 variable colours in the panel. Switch light/dark themes to check readability.
 The Ask draft and transcript stay in place while the goal updates. MCP
 `goals_at` continues to return readable plain text, without HTML.
+
+### 7. Cartouches
+
+Select the whole quoted proposition, including quotes, in a scratch
+`lemma "(n::nat) = n" by simp`. Run **Isabelle: Convert quotes to cartouches**.
+The editor displays `‹(n::nat) = n›` and the proof still checks; the saved source
+contains `\<open>...\<close>`. Capture this with Pretty Symbols on, then off.
+`<<` and `>>` offer the installed cartouche abbreviations; Tab accepts their
+ASCII spellings. Typing a literal ‹ auto-closes ›, and a default save encodes
+both. The command rejects multiple quoted strings or unbalanced cartouches;
+no examples are converted automatically.

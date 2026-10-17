@@ -56,7 +56,9 @@ export class SymbolInput implements Disposable {
       const item = new CompletionItem({label:decodeSymbols(ascii).replace(/\u0007/g,''),description:abbrev},CompletionItemKind.Text);
       item.detail = 'Isabelle abbreviation: ' + ascii.replace(/\u0007/g,'');
       item.range = new Range(position.line,start,position.line,position.character);
-      item.filterText = match; item.sortText = '0' + abbrev;
+      const cartouche = abbrev === '<<' && ascii === '\\<open>' || abbrev === '>>' && ascii === '\\<close>';
+      item.filterText = match; item.sortText = (cartouche ? '00' : '01') + abbrev;
+      item.preselect = cartouche;
       if (ascii.includes('\u0007')) {
         const snippet = new SnippetString();
         const parts = ascii.split('\u0007');

@@ -43,6 +43,7 @@ async function run() {
   await checkSymbols(root,api);
   await checkScripts(root,api);
   await checkGoalMarkup(root,api);
+  await checkCartouches(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
@@ -157,4 +158,38 @@ async function checkGoalMarkup(root,api) {
   assert(state.text.includes('(sqrt 2)²'));
   fs.writeFileSync(path.join(root,'.dev-host/m10-goal-rendered.html'),html);
   console.log('PASS: real server goal classes and superscript render in sidebar while plain goal text remains unchanged');
+}
+
+async function checkCartouches(root,api) {
+  const {quotesToCartouche}=require('../out/cartouches');
+  assert.equal(quotesToCartouche('"plain"'),String.raw`\<open>plain\<close>`);
+  assert.equal(quotesToCartouche(String.raw`"say \"hi\""`),String.raw`\<open>say "hi"\<close>`);
+  assert.throws(()=>quotesToCartouche('"one" "two"'));
+  assert.throws(()=>quotesToCartouche(String.raw`"\<close>"`));
+  const file=path.join(root,'.dev-host/m10-fixture/Cartouches.thy');
+  fs.writeFileSync(file,'theory Cartouches imports Main begin\nlemma "(n::nat) = n" by simp\nend\n');
+  const doc=await vscode.workspace.openTextDocument(file),editor=await vscode.window.showTextDocument(doc);
+  editor.selection=new vscode.Selection(1,6,1,20);
+  assert(await vscode.commands.executeCommand('isabelleRevamp.convertQuotes'));
+  await doc.save();assert(doc.getText().includes(String.raw`lemma \<open>(n::nat) = n\<close> by simp`));
+  editor.selection=new vscode.Selection(1,1,1,1);
+  for(let i=0;i<200;i++){ await pause(50);if(api.getGoalState().checkStatus==='fully_checked')break; }
+  assert.equal(api.getGoalState().checkStatus,'fully_checked',JSON.stringify(api.getGoalState()));
+  for(const [abbr,expected] of [['<<',String.raw`\<open>`],['>>',String.raw`\<close>`]]) {
+    await editor.edit(edit=>edit.insert(new vscode.Position(2,0),'text '+abbr+'\n'));
+    const pos=new vscode.Position(2,5+abbr.length);editor.selection=new vscode.Selection(pos,pos);await pause(100);
+    const items=await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',doc.uri,pos);
+    assert(items.items.some(item=>(item.textEdit?.newText??item.insertText)===expected),JSON.stringify(items));
+    await vscode.commands.executeCommand('editor.action.triggerSuggest');await pause(150);
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert(doc.lineAt(2).text.includes(expected),doc.lineAt(2).text);
+    await editor.edit(edit=>edit.delete(new vscode.Range(2,0,3,0)));
+  }
+  // Actual editor auto-closing, then default save converts both glyphs to ASCII.
+  await editor.edit(edit=>edit.insert(new vscode.Position(2,0),'text \n'));
+  editor.selection=new vscode.Selection(2,5,2,5);
+  await vscode.commands.executeCommand('type',{text:'‹'});
+  assert.equal(doc.lineAt(2).text,'text ‹›');
+  await doc.save();assert.equal(doc.lineAt(2).text,String.raw`text \<open>\<close>`);
+  console.log('PASS: selected quote conversion kernel-checks, cartouche abbreviations accept ASCII, Unicode auto-close saves ASCII');
 }

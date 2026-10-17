@@ -712,3 +712,16 @@ VS Code light/dark colours. Tagged state confirmation still gates rich output:
 stale/unfinished processing hides it, and actual errors clear the goal.
 `outputText.ts` remains the plain-text path; `goals_at` explicitly omits HTML.
 Entity link routing is the later item 8, not enabled by raw href attributes.
+
+## M10.7 — cartouches
+
+The installed symbol table supplies `abbrev: <<` for `\<open>` and `abbrev: >>`
+for `\<close>`; they use item 1's completion provider and ASCII persistence.
+Language configuration auto-closes both glyph and ASCII forms, including nested
+cartouches outside comments. The selection command requires one complete quoted
+string, decodes ordinary quote/backslash and ASCII numeric escapes, checks
+balanced embedded cartouches, and replaces only the selected range with ASCII
+`\<open>...\<close>`. It performs no background conversion of examples.
+Live acceptance exposed an ambiguity in the installed table: `<<` also expands
+to `\<guillemotleft>`. Cartouche entries now have the first sort key and
+`preselect: true`; other choices remain available. The same applies to `>>`.

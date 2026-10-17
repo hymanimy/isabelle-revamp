@@ -514,3 +514,22 @@ should be.
 - **Fix needed.** Reconstruct a small HTML allowlist, retain class semantics,
   render script controls across markup boundaries, and keep an independent
   plain-text MCP path. Never pass source HTML attributes directly to the view.
+
+## 41. Quote conversion can change delimiter meaning
+
+- **What happened.** A quoted string may contain escaped quotes or unmatched
+  cartouche delimiters. Simply replacing its first and last character would
+  preserve unnecessary quote escapes or close the new cartouche too early.
+- **Experience.** A visual cleanup can unexpectedly make a checked statement
+  fail to parse.
+- **Fix needed.** Convert only one explicitly selected literal, decode its
+  ordinary string escapes, reject unbalanced embedded delimiters, and keep
+  ASCII source. Kernel-check the converted proposition in a disposable theory.
+
+## 42. Double-angle input also completes to guillemets
+
+- **What happened.** The live `<<` acceptance test inserted `\<guillemotleft>`
+  instead of `\<open>`: the installed symbol table supplies both completions.
+- **Experience.** Tab produces « when the user is trying to open a cartouche ‹.
+- **Fix needed.** Prefer and preselect `\<open>` / `\<close>` for `<<` / `>>`,
+  while retaining the other symbol alternatives in the suggestion menu.

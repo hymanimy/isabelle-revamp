@@ -12,6 +12,7 @@ import { lockLibraryFiles } from './libraryFiles';
 import { SemanticColors } from './semanticColors';
 import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
+import { convertQuotes } from './cartouches';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -66,6 +67,7 @@ export async function activate(context: ExtensionContext) {
   } catch (error) { output.warn(`Could not load installed symbols; using bundled fallback: ${String(error)}`); }
   const prettySymbols = new PrettySymbols();
   context.subscriptions.push(prettySymbols,
+    commands.registerCommand('isabelleRevamp.convertQuotes', convertQuotes),
     commands.registerCommand('isabelleRevamp.togglePrettySymbols', () => prettySymbols.toggle()));
   const args = [
     'vscode_server', '-n', '-l', 'HOL',

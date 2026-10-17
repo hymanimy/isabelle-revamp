@@ -474,3 +474,19 @@
 - **Would do differently:** retain rich and plain representations together from
   the beginning, sharing script-token interpretation but keeping the webview's
   rendering boundary strict. Demo screenshot steps cover colours and powers.
+
+## M10.7 — cartouche input and explicit conversion
+
+- **Passed:** the M3–M8 regression chain passed in the full run. New acceptance
+  initially caught an off-by-one selection in the harness, then the table's
+  guillemet/cartouche completion ambiguity. Both were fixed; final
+  `M10_ONLY=1 scripts/check_m10.sh` exited 0 with all numbered M10 checks.
+  The converted proposition kernel-checks, `<<`/`>>` acceptance inserts ASCII
+  cartouches, literal ‹ auto-closes ›, and default saving encodes both glyphs.
+- **Discovered:** familiar short forms can have multiple authoritative symbol
+  expansions. Cartouche entries need explicit completion priority. Ordinary
+  string escapes follow `Pure/General/symbol_pos.ML`; delimiter balance needs
+  checking before changing the selected syntax.
+- **Would do differently:** verify the actually accepted completion, not just
+  its presence in the menu. No example file was converted. Screenshot steps
+  document selected conversion, input, auto-closing and source inspection.

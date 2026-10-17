@@ -1,12 +1,100 @@
 {
-  "comments": { "blockComment": ["(*", "*)"] },
-  "brackets": [["(", ")"], ["[", "]"], ["{", "}"], ["‹", "›"]],
-  "autoClosingPairs": [
-    { "open": "(", "close": ")", "notIn": ["comment", "string"] },
-    { "open": "[", "close": "]", "notIn": ["comment", "string"] },
-    { "open": "{", "close": "}", "notIn": ["comment", "string"] },
-    { "open": "\"", "close": "\"", "notIn": ["comment", "string"] },
-    { "open": "‹", "close": "›", "notIn": ["comment", "string"] }
+  "comments": {
+    "blockComment": [
+      "(*",
+      "*)"
+    ]
+  },
+  "brackets": [
+    [
+      "(",
+      ")"
+    ],
+    [
+      "[",
+      "]"
+    ],
+    [
+      "{",
+      "}"
+    ],
+    [
+      "\u2039",
+      "\u203a"
+    ]
   ],
-  "surroundingPairs": [["(", ")"], ["[", "]"], ["{", "}"], ["\"", "\""], ["‹", "›"]]
+  "autoClosingPairs": [
+    {
+      "open": "(",
+      "close": ")",
+      "notIn": [
+        "comment",
+        "string"
+      ]
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "notIn": [
+        "comment",
+        "string"
+      ]
+    },
+    {
+      "open": "{",
+      "close": "}",
+      "notIn": [
+        "comment",
+        "string"
+      ]
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "notIn": [
+        "comment",
+        "string"
+      ]
+    },
+    {
+      "open": "\u2039",
+      "close": "\u203a",
+      "notIn": [
+        "comment"
+      ]
+    },
+    {
+      "open": "\\<open>",
+      "close": "\\<close>",
+      "notIn": [
+        "comment"
+      ]
+    }
+  ],
+  "surroundingPairs": [
+    [
+      "(",
+      ")"
+    ],
+    [
+      "[",
+      "]"
+    ],
+    [
+      "{",
+      "}"
+    ],
+    [
+      "\"",
+      "\""
+    ],
+    [
+      "\u2039",
+      "\u203a"
+    ],
+    [
+      "\\<open>",
+      "\\<close>"
+    ]
+  ]
 }

@@ -53,6 +53,11 @@
       {
         "command": "isabelleRevamp.showSwarm",
         "title": "Isabelle: Show Swarm"
+      },
+      {
+        "command": "isabelleRevamp.convertQuotes",
+        "title": "Isabelle: Convert quotes to cartouches",
+        "enablement": "editorLangId == isabelle"
       }
     ],
     "languages": [
