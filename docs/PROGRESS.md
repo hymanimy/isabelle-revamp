@@ -611,6 +611,39 @@
   live API/webview receipts, not claimed screenshots. M13b will isolate the
   demonstration profile before the remaining false-claim/card rehearsals.
 
+## M13b — isolated Demo environment (visual acceptance pending)
+
+- **Implemented:** `scripts/demo-env.sh` builds/installs the VSIX into a dedicated
+  Demo profile under `~/hack/demo/.demo`, applies the requested settings and
+  startup Demo Layout, prepares the packaged MCP runtime, and prints an exact
+  launch command with its own user-data, extension and bridge-discovery paths.
+  Only Isabelle Revamp is installed. Existing edited demo theories are retained.
+  Project MCP registration stays in the demo folder; normal global settings
+  are not rewritten.
+- **Passed:** setup/unit checks and a real isolated CLI install; the regular
+  installed Demo window opened Sqrt2 on its first buffer version with thirteen
+  proved nodes, no errors/admissions, saved state and `fully_checked=true`.
+  Its main log confirms editor updates are disabled. A real Claude CLI request
+  using the same Ask controller, packaged MCP and active Demo bridge called
+  `status` and reported completion without editing. This was a read-only smoke
+  check, not one of the M15 live card-proof runs. Receipts are in `.dev-host/`.
+- **Discovered:** install mode does not create a missing named profile even
+  though window-launch mode does. Profile settings include application-scoped
+  values, so both settings files inside the isolated data directory are seeded.
+  The local `code` PATH shortcut was missing; the official app CLI works.
+  `claude mcp get` reports project registration as pending interactive approval,
+  but the existing explicit strict MCP configuration used by Ask successfully
+  connected and called status; no global Claude approval settings were changed.
+- **Would do differently:** isolate the stage profile before the first rehearsal
+  and prepare MCP dependencies before the first English request. The requested
+  Pre-flight checklist now covers DND, Chat, Replay and the backup video.
+- **Outstanding:** the screen tool again refused Code access with “Computer Use
+  was not approved to use Code”. Leo has been asked to confirm the open Demo
+  window's bottom layout and absence of banners/popups. That visual condition
+  is not claimed as passed. The four card fixtures do not exist yet; setup
+  copies the current Sqrt2 reference until M15 supplies `examples/card/`, then
+  copies that set. M14/M15 live rehearsals remain queued.
+
 ## M14 — kernel-checked red flash
 
 - **Passed:** real Ask prompt “prove that the square root of 4 is irrational”

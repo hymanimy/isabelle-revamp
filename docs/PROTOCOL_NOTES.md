@@ -877,6 +877,53 @@ same model and recorded timeline. Demo Layout uses existing VS Code commands
 `workbench.action.closeAuxiliaryBar`. It preserves source tabs and unsaved text.
 No global configuration or proposed VS Code API is needed.
 
+## M13b — isolated Demo profile
+
+Verified stock VS Code 1.138.0 CLI: `--user-data-dir`, `--extensions-dir`,
+`--profile Demo`, `--install-extension <vsix> --force`, `--list-extensions`,
+`--sync off`, `--new-window`, `--skip-welcome`, `--skip-release-notes`.
+`code` was absent from this shell PATH, so setup uses the official app CLI at
+`/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code` when needed.
+
+Despite the launch flag creating a missing profile, combining it directly with
+extension installation returned `Profile 'Demo' not found.` A real blank launch
+created this record in the dedicated data directory's
+`User/globalStorage/storage.json`:
+
+```json
+{"userDataProfiles":[{"location":"-18a1adae","name":"Demo"}]}
+```
+
+The profile's files lived under `User/profiles/-18a1adae/`. Seeding the same
+record with private location `demo`, before opening Code, allowed the normal
+CLI to install into that profile successfully. The script confines this
+version-sensitive bootstrap to `~/hack/demo/.demo/user-data`; updates preserve
+existing profile metadata and settings and refuse an active `SingletonLock`.
+Application-scoped settings also live in this isolated directory's Default
+settings file; the normal VS Code data directory is never edited.
+
+The printed launch command sets `ISABELLE_REVAMP_PORT_FILE` only for the new
+process, under `.demo/port`. Project MCP registration points at that instance
+and its installed bundled launcher. A real regular-window first launch returned
+Sqrt2 version 1, all thirteen named nodes proved, saved, zero errors/admissions,
+and `fully_checked=true`. Its main log reports
+`update#disable - updates are disabled by user preference`.
+
+References: [VS Code CLI](https://code.visualstudio.com/docs/configure/command-line)
+and [profiles](https://code.visualstudio.com/docs/configure/profiles). These
+public options are preferred; the one profile-registry bootstrap is explicitly
+covered by the real CLI installation check because its format is internal.
+
+On the installed Claude Code 2.1.236, `claude mcp get isabelle` in the new Demo
+folder reports `Scope: Project config (shared via .mcp.json)` and `Status: ⏸
+Pending approval (run claude to approve)`. The actual existing Ask invocation
+uses an explicit `--strict-mcp-config`/`--mcp-config` and tool allowlist; a real
+read-only run successfully called `status` and reported Sqrt2 fully checked.
+The plain interactive registration status is therefore not being presented as
+an approval receipt, and setup does not rewrite global Claude configuration.
+[Claude's project approval documentation](https://code.claude.com/docs/en/mcp#project-server-approvals-and-workspace-trust)
+describes the separate interactive project trust mechanism.
+
 ## M14 — explicit refutation names and admitted batch fixtures
 
 No new PIDE request or prover service is used. The existing current-version

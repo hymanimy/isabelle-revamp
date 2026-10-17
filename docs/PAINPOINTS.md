@@ -705,6 +705,29 @@ should be.
   hide Goals by default, and keep the full-height editor graph as an explicit
   button. Demo Layout restores this arrangement without changing source files.
 
+## 57. The CLI creates a profile on launch, but not while installing into it (M13b)
+
+- **What happened:** `code --profile Demo --install-extension <vsix>` returned
+  `Profile 'Demo' not found.` The `code` shortcut was also absent from PATH,
+  although the app and its official CLI were installed.
+- **Experience:** preparing a clean stage environment could require opening a
+  blank welcome window and navigating settings before installing the extension.
+- **Fix needed:** resolve the official app CLI, bootstrap only the dedicated
+  profile registry before launch, and use the supported CLI for installation.
+  The script verifies the sole installed extension and prints the exact command.
+
+## 58. Default editor updates and first-use MCP setup interrupt rehearsal (M13b)
+
+- **What happened:** development-host logs showed automatic update downloads
+  and workspace trust dialogs. A fresh packaged MCP launcher also needs to
+  install its private Python dependencies on first use.
+- **Experience:** the first stage request could spend its time on setup while
+  an editor banner or welcome page occupies the screen.
+- **Fix needed:** isolate Demo settings, disable updates/trust prompts/tips,
+  prepare the bundled MCP environment before opening the window, and apply Demo
+  Layout automatically. Keep DND, Replay and backup-video readiness explicit
+  in a pre-flight checklist; do not silently claim those manual checks passed.
+
 ## 59. Batch checking rejects a deliberately unfinished counterexample demo (M14)
 
 - **What happened:** `isabelle process_theories -D examples/card -O Sqrt4`

@@ -152,6 +152,15 @@ See [the graph demo](docs/DEMO.md#proof-graph-m12).
 Ask controls and status. Real Claude rehearsal is separate from these checks;
 the first Cascade attempt stalled and is recorded in PROGRESS.md.
 
+## Stage environment (M13b)
+
+Run `bash scripts/demo-env.sh` to prepare `~/hack/demo` and the isolated **Demo**
+profile. Use its printed launch command. It installs only our VSIX, prepares MCP,
+sets font size 16 and pretty symbols, disables update/trust/tip interruptions,
+and opens Demo Layout automatically. Existing edited demo theories are preserved.
+Close that Demo window before re-running setup. See the
+[Pre-flight checklist](docs/DEMO.md#pre-flight-m13b) for DND, Chat, Replay and video.
+
 ## Run the goal probe
 
 ```sh

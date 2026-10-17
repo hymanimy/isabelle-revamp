@@ -271,6 +271,46 @@ claim that screenshots were taken.
 The earlier M12 commit's live Claude run stalled before editing; it is not a
 successful AI rehearsal. Card runs will record live success/failure separately.
 
+## Pre-flight (M13b)
+
+Prepare the isolated stage environment from the repository:
+
+```sh
+bash scripts/demo-env.sh
+```
+
+It builds and installs the current VSIX into **Demo**, under
+`~/hack/demo/.demo/`, with no other user-installed extensions. It prints the
+exact launch command, including the isolated user-data/extension directories
+and MCP port file. Use that command rather than opening the folder in a normal
+VS Code window. The generated settings disable workspace-trust prompts, editor
+and extension updates, tips, welcome pages and built-in Chat; font size is 16,
+pretty symbols are enabled, and Demo Layout runs on activation. Your normal
+VS Code profile is not reconfigured. The bundled MCP environment is prepared
+before launching, and `.mcp.json` is project-scoped to the demo folder.
+
+Close the Demo window before re-running setup. Existing edited theory files
+are preserved; an unmodified previously copied fixture can update. To use an
+already built package, pass `--vsix dist/isabelle-revamp-0.1.0.vsix`.
+The script copies non-reference theories from `examples/card/` as they become
+available. Until M15 creates that set, it uses the existing Sqrt2 reference for
+the first-launch environment check; that is not a live card-proof rehearsal.
+
+Before walking on stage:
+
+- [ ] **DND on** in macOS; silence phone and calendar notifications.
+- [ ] Open the printed **Demo** command on `~/hack/demo`; no banners or popups.
+- [ ] **Chat closed**; source visible, Ask and Proof Graph at the bottom.
+- [ ] Sqrt2 checks, and the active card is restored to its intended skeleton.
+- [ ] Claude is signed in; Ask can reach the demo's MCP bridge.
+- [ ] **Replay tested** on the current rehearsal timeline.
+- [ ] **Backup video ready** and reachable without searching for a file.
+
+`bash scripts/check_m13b.sh` checks isolated profile creation, settings updates,
+repeat setup, preservation of edited proofs, refusal to update a running Demo
+window, and a real CLI install into an ignored test folder. It does not claim
+that DND or a backup video has been prepared, or replace the visual pre-flight.
+
 ## The red flash — kernel-checked refutation (M14)
 
 1. Open `examples/card/Sqrt4.thy`, then **Isabelle: Demo Layout**. The named

@@ -151,6 +151,12 @@
           "default": false,
           "description": "Also show the Goals sidebar in Demo Layout. Off leaves more space for the proof graph.",
           "scope": "window"
+        },
+        "isabelleRevamp.demoLayoutOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "scope": "window",
+          "description": "Arrange the source, bottom Ask and Proof Graph automatically when this window starts (used by the isolated Demo profile)."
         }
       }
     },

@@ -201,6 +201,9 @@ export async function activate(context: ExtensionContext) {
     output.error(`MCP bridge failed: ${String(error)}`);
     await window.showErrorMessage('The MCP bridge could not start. See Output → Isabelle.');
   }
+  if (workspace.getConfiguration('isabelleRevamp').get<boolean>('demoLayoutOnStartup', false)) {
+    await demoLayout(visibleTheory(), graph);
+  }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
     getProofGraph: () => graph.snapshot(),
