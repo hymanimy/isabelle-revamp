@@ -693,6 +693,26 @@ The live Ask controller in VS Code wrote a real receipt to
 `~/.isabelle-revamp/ask-log/`, correctly reporting
 `open (sorry) steps: sqrt4_irrational (line 5)` for the root-level admission.
 
+**The reported scenario, live, after the fix:** `M8_LIVE=1 bash
+scripts/check_m8.sh` — **70 checks passed, none failed**, host exit 0 — runs
+two real Claude requests against `examples/Demo.thy`'s three admissions, which
+is the multi-`sorry` cascade of demo beat 3 rather than M14's single
+root-level admission. Both the cascade and a follow-up request on the same file
+passed, and the two production receipts show the fix end to end:
+
+- first request: `open (sorry) steps: expand (line 11), factor (line 13),
+  result (line 15)` and **no** history block;
+- second request: `open (sorry) steps: none` — the first run had closed all
+  three — with a history block containing only `- prove this` and **no
+  assistant text**.
+
+The same run also proved all six restored `Swarm.thy` cards through MCP to a
+kernel-checked board. One stop condition is unchanged and is a stage risk
+rather than a bug: Ask stops on `status()`, which aggregates **every open
+theory tab**, so a second unfinished theory left open makes Claude finish the
+card and still report itself stuck. `demo/README.md`'s pre-flight now carries
+that as its own checklist item.
+
 **Handover, before the demo:**
 
 1. Close the old `~/hack/demo` Demo window. Its installed bundle is from 13:45,

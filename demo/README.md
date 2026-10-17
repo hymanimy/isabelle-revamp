@@ -67,6 +67,10 @@ Before walking on stage:
 - [ ] **DND on** in macOS; silence phone and calendar notifications.
 - [ ] Open the printed **Demo** command on this folder; no banners or popups.
 - [ ] **Chat closed**; source visible, Ask and Proof Graph at the bottom.
+- [ ] **Only the card you are proving is open.** Ask stops on `status()`, which
+      aggregates every open theory tab, so a second unfinished theory (easy
+      with `Cascade.thy` and `Demo.thy` in this folder) makes Claude finish the
+      card and still report itself stuck. Close the other theory tabs.
 - [ ] `Sqrt2.thy` checks, and the active card is restored to its intended
       skeleton (`git checkout demo/` if a rehearsal left edits).
 - [ ] Claude is signed in; Ask can reach the demo's MCP bridge
