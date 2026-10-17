@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {goalHtml}=require('../out/goalHtml');
+const {goalHtml,goalMarkup}=require('../out/goalHtml');
 const {outputText}=require('../out/outputText');
 exports.checkGoalHtml=function() {
   const safe=goalHtml('<pre class="source"><span class="free" onclick="alert(1)">n</span> = m<a href="javascript:alert(1)"><span class="main">⇧2</span></a><br>&lt;x&gt;</pre>');
@@ -14,6 +14,13 @@ exports.checkGoalHtml=function() {
   assert(!goalHtml('&lt;script&gt;bad&lt;/script&gt;').includes('<script>'));
   assert(goalHtml('<span>⇧</span><a><span class="free">n</span></a>').includes('isabelle-script-sup'));
   assert.equal(outputText('<span class="free">m⇧2</span>'),'m²');
+  const links=goalMarkup('<a class="isabelle-link-99" href="file:/tmp/Theory.thy#27"><span class="const">name</span></a>');
+  assert.deepEqual(links.links,[{file:'/tmp/Theory.thy',line:26,label:'name'}]);
+  assert(!links.html.includes('href=') && !links.html.includes('isabelle-link-99'));
+  assert(links.html.includes('isabelle-link-0'));
+  for(const href of ['https://example.com','#2','command:evil','file://remote/tmp/A.thy#2','file:/tmp/A.thy#0','file:/tmp/A.thy?x#2']) {
+    assert.equal(goalMarkup('<a href="'+href+'">x</a>').links.length,0,href);
+  }
   console.log('PASS: goal HTML allowlist, dangerous elements/attributes, entity escaping and scripts across markup; plain MCP text retained');
 };
 if(require.main===module) exports.checkGoalHtml();

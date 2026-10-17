@@ -34,6 +34,8 @@ pre:empty { display: none; }
 .source .tfree, .source .tvar { color: var(--isa-type); }
 .source .keyword, .source .keyword1, .source .keyword2, .source .keyword3, .source .quasi_keyword { color: var(--isa-free); font-weight: bold; }
 .source .main, .source .inner_quoted, .source .inner_cartouche, .source .const { color: inherit; }
+.source a.isabelle-entity { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.source a.isabelle-entity:hover { text-decoration-style: solid; }
 .source .state_message { white-space: pre-wrap; }
 .source .error, .source .error_message { color: var(--vscode-errorForeground); }
 .source .warning, .source .warning_message { color: var(--vscode-editorWarning-foreground); }

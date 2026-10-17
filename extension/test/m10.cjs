@@ -44,6 +44,7 @@ async function run() {
   await checkScripts(root,api);
   await checkGoalMarkup(root,api);
   await checkCartouches(root,api);
+  await checkGoalLinks(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
@@ -192,4 +193,40 @@ async function checkCartouches(root,api) {
   assert.equal(doc.lineAt(2).text,'text ‹›');
   await doc.save();assert.equal(doc.lineAt(2).text,String.raw`text \<open>\<close>`);
   console.log('PASS: selected quote conversion kernel-checks, cartouche abbreviations accept ASCII, Unicode auto-close saves ASCII');
+}
+
+async function checkGoalLinks(root,api) {
+  const {GoalLinks,hoverText}=require('../out/goalLinks');
+  const {goalMarkup}=require('../out/goalHtml');
+  const doc=await vscode.workspace.openTextDocument(path.join(root,'examples/Sqrt2.thy'));
+  const editor=await vscode.window.showTextDocument(doc);
+  editor.selection=new vscode.Selection(16,4,16,4);
+  let snapshot;
+  for(let i=0;i<200;i++) {
+    await pause(50);snapshot=api.getGoalLinks();
+    if(snapshot.links.some(link=>link.label==='sqrt') && api.getGoalState().checkStatus==='fully_checked')break;
+  }
+  const index=snapshot.links.findIndex(link=>link.label==='sqrt');assert(index>=0,JSON.stringify(snapshot));
+  const link=snapshot.links[index];assert(link.file.endsWith('/HOL/NthRoot.thy'));assert.equal(link.line,396);
+  const driver=new GoalLinks([path.resolve(root,'../Isabelle2025-2.app')]);
+  await assert.rejects(()=>driver.target({file:'/etc/hosts',line:0,label:'localhost'}),/outside/);
+  const target=await driver.target(link);
+  let tooltip='';
+  for(let i=0;i<15 && !tooltip;i++) {
+    snapshot=api.getGoalLinks();const id=snapshot.links.findIndex(link=>link.label==='sqrt');
+    tooltip=await api.hoverGoalLink(id,snapshot.revision);await pause(50);
+  }
+  assert(tooltip, 'Real editor hover should be present for sqrt');
+  const hovers=await vscode.commands.executeCommand('vscode.executeHoverProvider',target.document.uri,target.range.start);
+  assert.equal(tooltip,hoverText(hovers));
+  const before=vscode.window.activeTextEditor.document.uri.toString();
+  await api.followGoalLink(index,snapshot.revision-1);
+  assert.equal(vscode.window.activeTextEditor.document.uri.toString(),before);
+  await api.followGoalLink(index,snapshot.revision);
+  assert.equal(vscode.window.activeTextEditor.document.uri.fsPath,link.file);
+  assert(vscode.window.activeTextEditor.selection.start.isEqual(target.range.start));
+  const bytes=target.document.getText();await vscode.commands.executeCommand('type',{text:'X'});
+  assert.equal(target.document.getText(),bytes,'Navigated library remains read-only');
+  fs.writeFileSync(path.join(root,'.dev-host/m10-goal-links.json'),JSON.stringify({link,range:target.range,tooltip},null,2));
+  console.log('PASS: live goal link, exact editor-provider hover, stale-click refusal, canonical path boundary and read-only navigation');
 }

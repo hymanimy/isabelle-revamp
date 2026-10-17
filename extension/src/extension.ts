@@ -13,6 +13,7 @@ import { SemanticColors } from './semanticColors';
 import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
+import { GoalLinks } from './goalLinks';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -57,14 +58,19 @@ export async function activate(context: ExtensionContext) {
     .get<string>('executable', 'isabelle');
   const executable = configured.startsWith('~/')
     ? homedir() + configured.slice(1) : configured;
+  let libraryRoots: string[] = [];
   try {
     const patterns = await lockLibraryFiles(executable);
+    libraryRoots = patterns.map(pattern=>pattern.slice(0,-3));
     output.info(`Library read-only patterns: ${patterns.join(', ')}`);
   } catch (error) { output.warn(`Library read-only setup failed: ${String(error)}`); }
   try {
     const table = await loadSymbols(executable);
     output.info(`Loaded ${table.count} Unicode symbols from ${table.path}`);
   } catch (error) { output.warn(`Could not load installed symbols; using bundled fallback: ${String(error)}`); }
+  const goalLinks = new GoalLinks(libraryRoots);
+  view.onNavigate = link => goalLinks.open(link);
+  view.onHover = link => goalLinks.hover(link);
   const prettySymbols = new PrettySymbols();
   context.subscriptions.push(prettySymbols,
     commands.registerCommand('isabelleRevamp.convertQuotes', convertQuotes),
@@ -151,6 +157,9 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getGoalLinks: () => view.linkSnapshot(),
+    followGoalLink: (index: number, revision: number) => view.followLink(index,revision),
+    hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),
     getScriptDecorations: () => window.activeTextEditor ? visibleScripts(window.activeTextEditor) : [],
     getAbbreviations: () => symbolInput.snapshot(),
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],

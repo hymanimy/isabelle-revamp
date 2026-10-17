@@ -533,3 +533,16 @@ should be.
 - **Experience.** Tab produces « when the user is trying to open a cartouche ‹.
 - **Fix needed.** Prefer and preselect `\<open>` / `\<close>` for `<<` / `>>`,
   while retaining the other symbol alternatives in the suggestion menu.
+
+## 43. Goal links have lines but no columns or hover text
+
+- **What happened.** The server's HTML anchor for `sqrt` points to
+  `NthRoot.thy#397`. Its markup contains neither an exact source column nor
+  editor hover content.
+- **Experience.** A raw link opens near a declaration, and hovering the goal
+  name offers less information than hovering in the editor.
+- **Fix needed.** Retain a validated host-side target table through sanitising,
+  resolve a unique visible name on the supplied line, and use the existing
+  editor hover provider. Keep line-only navigation when a name is ambiguous,
+  bind actions to the current goal revision, and preserve library read-only
+  protection. Never invent missing prover coordinates.

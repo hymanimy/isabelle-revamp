@@ -725,3 +725,23 @@ balanced embedded cartouches, and replaces only the selected range with ASCII
 Live acceptance exposed an ambiguity in the installed table: `<<` also expands
 to `\<guillemotleft>`. Cartouche entries now have the first sort key and
 `preselect: true`; other choices remain available. The same applies to `>>`.
+
+## M10.8 — definition links and editor hover
+
+Observed HTML links include
+`file:/.../src/HOL/NthRoot.thy#397` for `sqrt` and
+`file:/.../src/HOL/Power.thy#26` for the power operator. The fragment is a
+**one-based line**, not a character offset or range. No hover body accompanies
+these anchors. Reference: `src/Tools/VSCode/src/pretty_text_panel.scala` builds
+links from `Position.Def_File` and `Position.Def_Line`.
+
+The allowlist extracts valid local file/line targets into a host-side table and
+renders only generated link classes on the anchor; raw href/event attributes
+never reach the webview. A monotonically increasing goal revision binds click
+and hover messages to that table. Ctrl/Cmd-click resolves canonical paths within
+the workspace or Isabelle libraries, opens the file, and selects the entity name
+when unique on the indicated line. Otherwise it reveals the line without
+claiming a server-supplied column. `vscode.executeHoverProvider` at the same
+position supplies the tooltip; code-fence presentation is converted to text.
+Stale hover results are discarded. HTTP, command, remote file, query-string,
+invalid-line, and out-of-root targets are inert/refused.

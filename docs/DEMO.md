@@ -176,3 +176,13 @@ contains `\<open>...\<close>`. Capture this with Pretty Symbols on, then off.
 ASCII spellings. Typing a literal ‹ auto-closes ›, and a default save encodes
 both. The command rejects multiple quoted strings or unbalanced cartouches;
 no examples are converted automatically.
+
+### 8. Goal definition links and hover
+
+At `Sqrt2.thy`'s `root_squared` goal, hover over the underlined `sqrt` in Goals.
+Capture the tooltip from the editor's hover provider. Ctrl-click (Cmd-click on
+macOS) opens the definition in `HOL/NthRoot.thy`, with the name selected and the
+library tab read-only. Capture that tab and its definition line. Plain clicking
+allows text selection; it does not navigate. Return to the proof to continue.
+Links belong to the currently displayed goal; old links are discarded while
+checking. Only workspace and installed/user-library file targets are allowed.

@@ -490,3 +490,17 @@
 - **Would do differently:** verify the actually accepted completion, not just
   its presence in the menu. No example file was converted. Screenshot steps
   document selected conversion, input, auto-closing and source inspection.
+
+## M10.8 — goal definition links and hover
+
+- **Passed:** `scripts/check_m10.sh` exited 0, including M3–M8 and all mandatory
+  M10 checks. A live sqrt link opens its installed definition read-only; the
+  panel tooltip matches the editor's hover provider. Tests reject stale clicks,
+  unsafe link targets and forged webview link classes.
+- **Discovered:** the server supplies a file and line, but no column or hover
+  payload. The client resolves a unique label on that line and asks the existing
+  editor hover provider. Only validated local targets survive as opaque links.
+- **Would do differently:** preserve entity metadata alongside goal HTML from
+  the beginning. Screenshot-able navigation and hover checks are in DEMO.md;
+  direct screen capture is not claimed. Optional Sledgehammer and M9 cascade
+  work remain queued while M11 packaging takes priority.

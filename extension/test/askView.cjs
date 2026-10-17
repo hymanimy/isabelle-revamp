@@ -61,5 +61,25 @@ exports.checkAskView = async function () {
   assert.equal(fake.webview.html, initialHtml, 'Goal updates must not reload the webview');
   dispose(); view.resolveWebviewView(fake); inbound({ type: 'ready' });
   assert(posted.findLast(message => message.type === 'askState').state.entries[0].text === 'earlier');
+  let opened, hovered;
+  view.onNavigate = async link => { opened = link; };
+  view.onHover = async link => { hovered = link; return 'editor hover'; };
+  view.update({ ...state, html:'<a href="file:/tmp/Target.thy#3">target</a>' });
+  const current = view.linkSnapshot();
+  await view.followLink(0,current.revision-1);assert.equal(opened,undefined);
+  await view.followLink(0,current.revision);assert.equal(opened.line,2);
+  assert.equal(await view.hoverLink(0,current.revision),'editor hover');
+  view.update({ ...state, phase:'checking',html:'<a href="file:/tmp/Target.thy#3">target</a>' });
+  assert.equal(view.linkSnapshot().links.length,0);
+  // Actual inline script: only modified clicks navigate; hover asks the host.
+  const anchor={ classList:['isabelle-entity','isabelle-link-0'],closest(){return this;},title:'' };
+  elements.goal.contains=()=>true;elements.goal.querySelector=()=>anchor;
+  receive({data:{type:'goal',revision:7,goal:{theory:'Demo',status:'ready',phase:'ready',text:'x',html:'<a>x</a>',errors:''}}});
+  const click={target:anchor,ctrlKey:false,metaKey:false,preventDefault(){}};
+  const count=messages.length;elements.goal.events.click(click);assert.equal(messages.length,count);
+  elements.goal.events.click({...click,ctrlKey:true});assert.equal(messages.at(-1).action,'open');assert.equal(messages.at(-1).revision,7);
+  elements.goal.events.mouseover({target:anchor});assert.equal(messages.at(-1).action,'hover');
+  receive({data:{type:'goalHover',revision:6,index:0,text:'stale'}});assert.notEqual(anchor.title,'stale');
+  receive({data:{type:'goalHover',revision:7,index:0,text:'editor hover'}});assert.equal(anchor.title,'editor hover');
   console.log('PASS: Ask webview Enter/newline/IME, disabled controls, Stop, focus command, retained draft/transcript, and escaped streamed text');
 };

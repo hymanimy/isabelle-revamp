@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { WebviewView, WebviewViewProvider } from 'vscode';
 import { AskState } from './ask';
 import { escapeText } from './outputText';
-import { goalHtml } from './goalHtml';
+import { GoalLink, goalMarkup } from './goalHtml';
 import { viewHeader, viewTheme } from './viewTheme';
 
 export interface GoalState {
@@ -25,8 +25,9 @@ function presentation(state: GoalState) {
     error: 'Proof error — see editor diagnostics.',
     unavailable: 'Goal state unavailable. Move the cursor to retry.',
   }[state.phase];
+  const markup = checking || state.html === undefined ? undefined : goalMarkup(state.html);
   return { theory: state.theory ?? 'Isabelle Goals', status, phase: state.phase,
-    html: checking ? undefined : state.html === undefined ? undefined : goalHtml(state.html),
+    html: markup?.html, links: markup?.links ?? [],
     text: checking ? '' : state.text, errors: checking ? '' : state.errors.join('\n\n') };
 }
 
@@ -67,7 +68,25 @@ const vscode = acquireVsCodeApi();
 const prompt = document.getElementById('prompt');
 const send = document.getElementById('send'), stop = document.getElementById('stop');
 const transcript = document.getElementById('transcript');
-let active = false;
+let active = false, revision = 0;
+const goalNode = document.getElementById('goal');
+function entity(event) {
+  const node = event.target.closest?.('a.isabelle-entity');
+  if (!node || !goalNode.contains(node)) return;
+  const token = [...node.classList].find(name => name.startsWith('isabelle-link-'));
+  const index = Number(token?.slice('isabelle-link-'.length));
+  return Number.isInteger(index) ? { node, index } : undefined;
+}
+goalNode.addEventListener('click', event => {
+  const link = entity(event); if (!link) return;
+  event.preventDefault();
+  if (event.ctrlKey || event.metaKey) vscode.postMessage({ type:'goalLink', action:'open', index:link.index, revision });
+});
+goalNode.addEventListener('mouseover', event => {
+  const link = entity(event); if (!link || link.node.title) return;
+  link.node.title = 'Loading definition…';
+  vscode.postMessage({ type:'goalLink', action:'hover', index:link.index, revision });
+});
 prompt.value = vscode.getState()?.draft || '';
 prompt.addEventListener('input', () => vscode.setState({ draft: prompt.value }));
 function submit() {
@@ -83,8 +102,14 @@ prompt.addEventListener('keydown', event => {
 });
 window.addEventListener('message', event => {
   const message = event.data;
+  if (message.type === 'goalHover' && message.revision === revision) {
+    const node = goalNode.querySelector('.isabelle-link-' + message.index);
+    if (node) node.title = message.text || 'Ctrl/Cmd-click to open definition.';
+    return;
+  }
   if (message.type === 'focus') { prompt.focus(); return; }
   if (message.type === 'goal') {
+    revision = message.revision;
     const goal = message.goal;
     document.querySelector('h1').textContent = goal.theory;
     document.querySelector('.status').textContent = goal.status;
@@ -118,6 +143,10 @@ export class GoalsView implements WebviewViewProvider {
   private focusPending = false;
   private state: GoalState = { phase: 'idle', text: '', errors: [] };
   private askState: AskState = { active: false, entries: [] };
+  private revision = 0;
+  private links: GoalLink[] = [];
+  onNavigate?: (link: GoalLink) => Promise<void>;
+  onHover?: (link: GoalLink) => Promise<string>;
   onAsk?: (text: string) => void;
   onStop?: () => void;
 
@@ -130,6 +159,11 @@ export class GoalsView implements WebviewViewProvider {
         if (this.focusPending) this.focusAsk();
       } else if (message?.type === 'ask' && typeof message.text === 'string') this.onAsk?.(message.text);
       else if (message?.type === 'stop') this.onStop?.();
+      else if (message?.type === 'goalLink') {
+        if (message.action === 'open') void this.followLink(message.index,message.revision).catch(() => {});
+        else if (message.action === 'hover') void this.hoverLink(message.index,message.revision).then(text =>
+          view.webview.postMessage({type:'goalHover',index:message.index,revision:message.revision,text})).catch(() => {});
+      }
     });
     view.onDidDispose(() => { messages.dispose(); this.view = undefined; });
     view.webview.html = goalsHtml(this.state);
@@ -143,11 +177,25 @@ export class GoalsView implements WebviewViewProvider {
   }
   update(state: GoalState): void {
     this.state = state;
-    void this.view?.webview.postMessage({ type: 'goal', goal: presentation(state) });
+    const { links, ...goal } = presentation(state);
+    this.links = links;
+    void this.view?.webview.postMessage({ type: 'goal', goal, revision: ++this.revision });
   }
   updateAsk(state: AskState): void {
     this.askState = state;
     void this.view?.webview.postMessage({ type: 'askState', state });
+  }
+  linkSnapshot() { return { revision:this.revision, links:this.links.map(link=>({...link})) }; }
+  private link(index: number, revision: number): GoalLink | undefined {
+    return revision===this.revision && Number.isInteger(index) && index>=0 ? this.links[index] : undefined;
+  }
+  async followLink(index: number, revision: number): Promise<void> {
+    const link=this.link(index,revision);if(link) await this.onNavigate?.(link);
+  }
+  async hoverLink(index: number, revision: number): Promise<string> {
+    const link=this.link(index,revision);if(!link) return '';
+    const text=await this.onHover?.(link);
+    return revision===this.revision ? text ?? '' : '';
   }
   snapshot(): GoalState { return { ...this.state, errors: [...this.state.errors] }; }
 }
