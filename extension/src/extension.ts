@@ -17,7 +17,7 @@ import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
 import { Swarm } from './swarm';
-import { Ask } from './ask';
+import { Ask, openSteps } from './ask';
 import { findIsabelle, setupReport } from './setup';
 import { ProofGraph } from './proofGraph';
 
@@ -49,10 +49,12 @@ export async function activate(context: ExtensionContext) {
     }
     if (!bridge) { ask?.notice('Locate Isabelle, then reload the window to start checking.'); return false; }
     return ask!.send({ file: editor.document.uri.fsPath, line: editor.selection.active.line + 1,
-      cwd: folder.uri.fsPath, portFile: bridge.portFile }, text);
+      cwd: folder.uri.fsPath, portFile: bridge.portFile,
+      openSteps: openSteps(editor.document.getText()) }, text);
   };
   askView.onAsk = text => { void sendAsk(text); };
   askView.onStop = () => ask?.stop();
+  askView.onClear = () => ask?.clear();
   context.subscriptions.push(output,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
     window.registerWebviewViewProvider('isabelleRevamp.ask', askView, { webviewOptions: { retainContextWhenHidden: true } }),
@@ -221,7 +223,7 @@ export async function activate(context: ExtensionContext) {
     getAbbreviations: () => symbolInput.snapshot(),
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
     getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [],
-    getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(),
+    getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(), clearAsk: () => ask?.clear(),
     selectSwarmStep: (uri: string, version: number, id: string) => swarm.select(uri, version, id) };
 }
 

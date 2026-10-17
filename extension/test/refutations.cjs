@@ -23,7 +23,10 @@ assert.equal(refutationGraph([original], [], false).nodes[0].status, 'open', 'Re
 assert.equal(refutationGraph([node('ordinary', 'proved')], [], false).nodes[0].status, 'checking');
 assert.equal(refutationGraph([node('ordinary', 'proved')], [], true).nodes[0].status, 'proved');
 assert.equal(refutationGraph([original, { ...counter, parent: original.id }], [], false).edges.length, 0, 'Only separate top-level declarations pair');
-const prompt = preamble({ file: 'Sqrt4.thy', line: 5 });
+const prompt = preamble({ file: 'Sqrt4.thy', line: 5, openSteps: [{ name: 'sqrt4_irrational', line: 5 }] });
 assert(prompt.includes('<theorem_name>_refuted') && prompt.includes('byte for byte') && prompt.includes('never use the admitted original theorem'));
 assert(prompt.includes('fully_checked remains false') && !prompt.includes('do not write a proof'));
+// The open-step count must not talk the agent out of the refutation it owes us.
+assert(prompt.includes('Sqrt4.thy has 1 open (sorry) step: sqrt4_irrational (line 5)'), prompt);
+assert(prompt.includes('unless a statement is false'), 'The red flash needs its carve-out from "close them all"');
 console.log('PASS: exact refutation names, accepted/current state only, retraction, stable edges, ordinary root semantics and Ask guardrails');

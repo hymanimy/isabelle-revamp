@@ -28,13 +28,14 @@ button:disabled { opacity: .5; cursor: default; }
 #transcript .notice { color: var(--vscode-editorWarning-foreground); }
 </style></head><body>
 <div id="input"><textarea id="prompt" rows="1" aria-label="Ask Isabelle" placeholder="Ask Isabelle — prove this" aria-describedby="ask-status"></textarea>
-<button id="send">Send</button><button id="stop" disabled>Stop</button></div>
+<button id="send">Send</button><button id="stop" disabled>Stop</button><button id="clear">Clear</button></div>
 <p id="ask-status" role="status">Enter sends · Shift+Enter adds a line</p>
 <div id="transcript" role="log" aria-label="Ask transcript"></div>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
 const prompt = document.getElementById('prompt');
 const send = document.getElementById('send'), stop = document.getElementById('stop');
+const clear = document.getElementById('clear');
 const transcript = document.getElementById('transcript');
 let active = false;
 prompt.value = vscode.getState()?.draft || '';
@@ -47,6 +48,7 @@ function submit() {
 }
 send.addEventListener('click', submit);
 stop.addEventListener('click', () => vscode.postMessage({ type: 'stop' }));
+clear.addEventListener('click', () => { if (!active) vscode.postMessage({ type: 'clear' }); });
 prompt.addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); submit(); }
 });
@@ -56,9 +58,12 @@ window.addEventListener('message', event => {
   if (message.type === 'askState') {
     const wasActive = active;
     active = message.state.active;
-    prompt.disabled = active; send.disabled = active; stop.disabled = !active;
+    prompt.disabled = active; send.disabled = active; stop.disabled = !active; clear.disabled = active;
     document.getElementById('ask-status').textContent = active ? 'Claude is working…' : 'Enter sends · Shift+Enter adds a line';
     const follow = transcript.scrollTop + transcript.clientHeight >= transcript.scrollHeight - 40;
+    // Clear shrinks the entry list, so drop rendered lines the state no longer has.
+    const live = new Set(message.state.entries.map(entry => String(entry.id)));
+    for (const child of [...transcript.children]) if (!live.has(child.dataset.id)) child.remove();
     for (const entry of message.state.entries) {
       let node = [...transcript.children].find(child => child.dataset.id === String(entry.id));
       if (!node) { node = document.createElement('p'); node.dataset.id = String(entry.id); transcript.append(node); }
@@ -79,6 +84,7 @@ export class AskView implements WebviewViewProvider {
   private state: AskState = { active: false, entries: [] };
   onAsk?: (text: string) => void;
   onStop?: () => void;
+  onClear?: () => void;
   resolveWebviewView(view: WebviewView): void {
     this.view = view;
     view.webview.options = { enableScripts: true, localResourceRoots: [] };
@@ -88,6 +94,7 @@ export class AskView implements WebviewViewProvider {
         if (this.focusPending) this.focus();
       } else if (message?.type === 'ask' && typeof message.text === 'string') this.onAsk?.(message.text);
       else if (message?.type === 'stop') this.onStop?.();
+      else if (message?.type === 'clear') this.onClear?.();
     });
     view.onDidDispose(() => { messages.dispose(); this.view = undefined; });
     view.webview.html = askHtml();

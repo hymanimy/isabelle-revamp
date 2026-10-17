@@ -34,7 +34,7 @@ async function run() {
   } finally { process.env.PATH = previousPath; }
   const installed = '/Applications/Extensions/Isabelle Revamp';
   assert(registrationCommand(installed).includes("'/Applications/Extensions/Isabelle Revamp/mcp/launch.py'"));
-  const args = claudeArgs({ portFile: '/tmp/port', file: '/tmp/A.thy', line: 1 }, installed);
+  const args = claudeArgs({ portFile: '/tmp/port', file: '/tmp/A.thy', line: 1, openSteps: [] }, installed);
   const config = JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.isabelle;
   assert.equal(config.command, 'python3'); assert(config.args[0].startsWith(installed));
 

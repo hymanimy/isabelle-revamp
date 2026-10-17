@@ -679,3 +679,77 @@
   and TypeScript compilation passed. Pending M13b files remain separate.
   The VSIX packaging audit also passed: 227,293 bytes, bundled runtime and
   offline graph, no runtime node_modules. The artifact remains gitignored.
+
+# Claude review
+
+Review of the 17 Oct work on branch `leo`: three jobs, one commit each.
+
+## Job 1 — the Ask flow stopped at open + status
+
+- **Found, primary cause:** `examples/Swarm.thy` had nothing left to prove.
+  Commit 96aa75d ("Demo prep") replaced its six `sorry` admissions with real
+  justifications, so the committed demo skeleton became a finished proof —
+  `git show 215e7fa:examples/Swarm.thy` has six admissions, `96aa75d` has none.
+  On a theory with no open step, `open` + `status` + "nothing required here" is
+  the **correct** answer, not a bug. `examples/Sqrt2.thy` is complete too, so
+  both halves of the reported sequence ran against finished theories. Codex had
+  noticed the edited file and worked around it in the M14 check with
+  `ISABELLE_TEST_SWARM_SKELETON`, reading it as Leo's deliberate edit
+  (PROGRESS, M14 regression checks) rather than as a lost fixture.
+- **Found, secondary cause — the suspected one, confirmed in code:**
+  `ask.ts:191–202` built each new prompt from every prior `user` **and
+  `assistant`** entry, and that transcript was global rather than per file. The
+  model's own "Fully checked." could therefore be replayed as context for a
+  different theory. Real, and fixed. But it is not what produced this symptom,
+  because the fixture genuinely had nothing to prove, so the two causes are
+  reported separately rather than merged into one story.
+- **Found, third cause:** the preamble never said how much was open, so the
+  agent had no independent signal with which to contradict a stale transcript.
+  PIDE `sorryPositions` cannot supply one either: it stays empty until Isabelle
+  has annotated the buffer, which is exactly when a fresh file looks finished.
+- **Changed:**
+  - restored `examples/Swarm.thy` byte-for-byte from committed `215e7fa`
+    (six admissions, verified by `diff`). Codex's completed variant remains
+    recoverable from `96aa75d`; `Swarm_solution.thy` is still the reference.
+  - `openSteps(source)` in `ask.ts` reads admissions from the buffer text
+    through the existing `isarTokens`/`proofStructure` lexer, with no Isabelle
+    dependency, so an unchecked theory never reports itself finished. Comments
+    and strings are already opaque to that lexer, so `sorry_lemma` and prose do
+    not count. A theorem with no named steps is itself the open obligation,
+    which is the `Sqrt4` red-flash shape.
+  - the preamble now opens with `<file> has N open (sorry) step(s): <names and
+    lines>; 'prove this' means close them all, one per edit`; for N = 0 it says
+    so and tells the agent to say so and stop. Lists cap at twelve names plus
+    "and K more".
+  - per-file history of **prior requests only**; the model's own output never
+    returns to it. Switching theory starts a fresh history and puts a notice in
+    the transcript naming the new file.
+  - a **Clear** button. The webview renderer only ever appended lines, so it
+    also had to learn to remove rendered lines the state no longer holds.
+  - every run writes `~/.isabelle-revamp/ask-log/<timestamp>.md` with the
+    theory, cursor line, open steps, request, prompt, system prompt, transcript
+    and outcome. The write is wrapped so a logging failure cannot interrupt a
+    run, and a same-millisecond collision gets a numeric suffix.
+- **Kept deliberately:** the refutation paragraph is untouched, and
+  "close them all" carries an explicit carve-out — "unless a statement is
+  false — then follow the refutation rule below" — so the M14 red flash still
+  has permission not to prove `sqrt4_irrational`.
+- **Verified:** `node extension/test/ask.cjs` covers the four fixture shapes
+  (`Demo` 3 steps, `Swarm` 6, `Sqrt4` root-level 1, `Sqrt2` none), and asserts
+  that the assistant text is absent from a follow-up prompt, that a second
+  theory inherits no history, that returning to the first theory sees only its
+  own requests, that Clear forgets both, and that four runs leave four
+  receipts. `extension/test/askView.cjs` covers Clear being inert mid-run and
+  the rendering actually emptying. `refutations.cjs` now pins the open-step
+  line and the carve-out so the red flash cannot regress silently.
+- **Verified live:** `M14_ONLY=1 M14_LIVE=1 bash scripts/check_m14.sh` passed
+  against the new preamble with real Claude Code, real MCP and real
+  Isabelle2025-2: the counter-lemma was accepted in **14,829 ms** (previous best
+  15,476 ms), the original theorem and its sole `sorry` were untouched, and the
+  extracted counter-proof exited 0 with admissions disabled. Receipt:
+  [Sqrt4 run 4](card-runs/Sqrt4-4.md). The restored `Swarm.thy` skeleton also
+  means the M7/M12 checks no longer need the
+  `ISABELLE_TEST_SWARM_SKELETON` workaround.
+- **VSIX:** the 14:07 `dist/isabelle-revamp-0.1.0.vsix` did match the sources it
+  was built from (newest source 13:45), so Codex's package was not stale. It is
+  stale now that `ask.ts` has changed, and was rebuilt with `npm run package`.

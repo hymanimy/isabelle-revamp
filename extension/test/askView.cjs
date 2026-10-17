@@ -11,11 +11,12 @@ exports.checkAskView = async function () {
   assert(!goalsHtml(state).includes('id="prompt"'));
   class Element {
     constructor() { this.children = []; this.dataset = {}; this.events = {}; this.textContent = ''; this.value = ''; this.disabled = false; this.scrollTop = 0; this.scrollHeight = 0; this.clientHeight = 100; }
-    append(child) { this.children.push(child); }
+    append(child) { child.parent = this; this.children.push(child); }
+    remove() { const at = this.parent ? this.parent.children.indexOf(this) : -1; if (at >= 0) this.parent.children.splice(at, 1); }
     addEventListener(name, callback) { this.events[name] = callback; }
     focus() { this.focused = true; }
   }
-  const elements = Object.fromEntries(['prompt', 'send', 'stop', 'transcript', 'ask-status', 'goal', 'errors', 'h1', '.status'].map(name => [name, new Element()]));
+  const elements = Object.fromEntries(['prompt', 'send', 'stop', 'clear', 'transcript', 'ask-status', 'goal', 'errors', 'h1', '.status'].map(name => [name, new Element()]));
   let receive, saved = { draft: 'unsent draft' };
   const messages = [];
   vm.runInNewContext(html.match(/<script nonce="asknonce">([\s\S]+)<\/script>/)[1], {
@@ -45,11 +46,20 @@ exports.checkAskView = async function () {
   receive({ data: { type: 'askState', state: { active: true, entries: [{ id: 1, kind: 'assistant', text: 'streaming' }] } } });
   assert.equal(elements.transcript.children[0], node);
   elements.stop.events.click(); assert.equal(messages.at(-1).type, 'stop');
+  // Clear is inert during a run, and an emptied state must empty the rendering.
+  elements.clear.events.click();
+  assert.notEqual(messages.at(-1).type, 'clear', 'Clear must not fire mid-run');
   receive({ data: { type: 'askState', state: { active: false, entries: [{ id: 1, kind: 'assistant', text: 'done' }] } } });
   assert(!elements.prompt.disabled && elements.stop.disabled && elements.prompt.focused);
+  assert(!elements.clear.disabled);
+  elements.clear.events.click();
+  assert.equal(messages.at(-1).type, 'clear');
+  receive({ data: { type: 'askState', state: { active: false, entries: [] } } });
+  assert.equal(elements.transcript.children.length, 0, 'Clear must remove rendered lines, not only the state');
   let inbound, dispose; const posted = [];
-  const view = new AskView(); let asked, stopped = false;
+  const view = new AskView(); let asked, stopped = false, cleared = false;
   view.onAsk = text => { asked = text; }; view.onStop = () => { stopped = true; };
+  view.onClear = () => { cleared = true; };
   view.focus();
   const fake = { webview: { onDidReceiveMessage(fn) { inbound = fn; return { dispose() {} }; },
     postMessage(value) { posted.push(value); return Promise.resolve(true); } }, onDidDispose(fn) { dispose = fn; } };
@@ -58,8 +68,8 @@ exports.checkAskView = async function () {
   inbound({ type: 'ready' });
   assert(posted.some(m => m.type === 'focus'));
   assert(posted.some(m => m.type === 'askState' && m.state.entries[0].text === 'earlier'));
-  inbound({ type: 'ask', text: 'prove this' }); inbound({ type: 'stop' });
-  assert.equal(asked, 'prove this'); assert(stopped);
+  inbound({ type: 'ask', text: 'prove this' }); inbound({ type: 'stop' }); inbound({ type: 'clear' });
+  assert.equal(asked, 'prove this'); assert(stopped); assert(cleared);
   view.update({ active: false, entries: [{ id: 1, kind: 'user', text: 'earlier' }] });
   assert.equal(fake.webview.html, initialHtml, 'Transcript updates must not reload the webview');
   dispose(); view.resolveWebviewView(fake); inbound({ type: 'ready' });

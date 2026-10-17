@@ -1,10 +1,48 @@
 import { ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { isarTokens, proofStructure } from './isarSteps';
 
 export interface AskEntry { id: number; kind: 'user' | 'assistant' | 'tool' | 'notice'; text: string }
 export interface AskState { active: boolean; entries: AskEntry[] }
-export interface AskContext { file: string; line: number; cwd: string; portFile: string }
+export interface OpenStep { name: string; line: number }
+export interface AskContext { file: string; line: number; cwd: string; portFile: string; openSteps: OpenStep[] }
+
+// Open obligations read straight from the buffer, so a theory that Isabelle has
+// not finished annotating never looks finished. PIDE sorry positions arrive late;
+// the preamble must state what is open before the first tool call.
+export function openSteps(source: string): OpenStep[] {
+  const admissions = isarTokens(source).filter(token => !token.quoted && token.text === 'sorry');
+  if (!admissions.length) return [];
+  const { nodes } = proofStructure(source);
+  const found = new Map<string, OpenStep>();
+  for (const token of admissions) {
+    // The innermost obligation owning this admission. A theorem whose proof has
+    // no named steps is itself that obligation (the Sqrt4 red-flash skeleton).
+    const owner = nodes.filter(node => node.start <= token.start && token.start < node.end).at(-1);
+    // Keyed by node, not by name: distinct obligations may share a label.
+    const key = owner?.id ?? 'sorry@' + token.start;
+    const line = source.slice(0, (owner ?? token).start).split('\n').length;
+    if (!found.has(key)) found.set(key, { name: owner?.name ?? 'unnamed step', line });
+  }
+  return [...found.values()];
+}
+
+export function openStepsLine(context: AskContext): string {
+  const file = basename(context.file);
+  const steps = context.openSteps ?? [];
+  if (!steps.length) {
+    return `${file} has no open (sorry) steps: nothing in it needs proving. `
+      + 'Say exactly that and stop, unless this request asks for something other than a proof.';
+  }
+  const names = steps.map(step => `${step.name} (line ${step.line})`);
+  const listed = names.length > 12 ? [...names.slice(0, 12), `and ${names.length - 12} more`] : names;
+  return `${file} has ${names.length} open (sorry) step${names.length === 1 ? '' : 's'}: ${listed.join(', ')}. `
+    + "'prove this' means close them all, one per edit, "
+    + 'unless a statement is false — then follow the refutation rule below instead of proving it.';
+}
 export function registrationCommand(serverRoot: string): string {
   const launcher = join(serverRoot, 'mcp/launch.py').replace(/'/g, "'\\''");
   return `claude mcp add --transport stdio --scope local isabelle -- python3 '${launcher}'`;
@@ -16,7 +54,8 @@ const toolNames = ['open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positi
 
 export function preamble(context: AskContext): string {
   return 'You have the `isabelle` MCP tools. The active theory is ' + context.file + ', cursor at line ' + context.line
-    + '. Work only through those tools. Write structured Isar: named `have` steps with short `by` justifications, no Sledgehammer. '
+    + '. ' + openStepsLine(context) + '\n'
+    + 'Work only through those tools. Write structured Isar: named `have` steps with short `by` justifications, no Sledgehammer. '
     + 'After each edit check errors and status; stop when fully_checked is true, a counter-lemma is accepted as described below, or you are stuck, and say which.\n'
     + 'Query proof_graph, pick an open leaf whose dependencies are proved, prove it, repeat; one step per edit. '
     + 'Work directly on one ready leaf; do not delegate or seek advice from another agent. '
@@ -117,12 +156,17 @@ export class AskStream {
   }
 }
 
-interface RunOptions { executable?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv }
+interface RunOptions { executable?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; logDir?: string }
 export class Ask {
   private state: AskState = { active: false, entries: [] };
   private child?: ChildProcessWithoutNullStreams;
   private stopped = false;
   private sequence = 0;
+  // Prior requests only, keyed by theory file. The model's own output is never
+  // replayed: a transcript that ended "nothing required here" otherwise tells
+  // the next run on another file that its work is already done.
+  private requests = new Map<string, string[]>();
+  private lastFile?: string;
   constructor(private serverRoot: string, private changed: (state: AskState) => void, private options: RunOptions = {}) {}
   snapshot(): AskState { return structuredClone(this.state); }
   private publish(): void { this.changed(this.snapshot()); }
@@ -130,6 +174,31 @@ export class Ask {
     const entry = { id: ++this.sequence, kind, text }; this.state.entries.push(entry); return entry;
   };
   notice(text: string): void { this.add('notice', text); this.publish(); }
+  clear(): void {
+    if (this.state.active) return;
+    this.state.entries = []; this.requests.clear(); this.lastFile = undefined; this.publish();
+  }
+
+  private log(context: AskContext, text: string, prompt: string, entries: AskEntry[], outcome: string): void {
+    try {
+      const directory = this.options.logDir ?? join(homedir(), '.isabelle-revamp/ask-log');
+      mkdirSync(directory, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      let name = stamp;
+      for (let n = 2; existsSync(join(directory, name + '.md')); n++) name = `${stamp}-${n}`;
+      const steps = (context.openSteps ?? []).map(step => `${step.name} (line ${step.line})`).join(', ') || 'none';
+      writeFileSync(join(directory, name + '.md'), [
+        `# Ask run ${stamp}`, '',
+        `- theory: ${context.file}`, `- cursor line: ${context.line}`,
+        `- open (sorry) steps: ${steps}`, `- outcome: ${outcome}`, '',
+        '## Request', '', text, '',
+        '## Prompt sent', '', '```', prompt, '```', '',
+        '## System prompt', '', '```', preamble(context), '```', '',
+        '## Transcript', '',
+        ...entries.map(entry => `- **${entry.kind}**: ${entry.text}`), '',
+      ].join('\n'));
+    } catch { /* a logging failure must never interrupt a run */ }
+  }
 
   private signal(child: ChildProcessWithoutNullStreams, signal: NodeJS.Signals): void {
     try {
@@ -188,32 +257,46 @@ export class Ask {
 
   async send(context: AskContext, text: string): Promise<boolean> {
     if (this.state.active || !text.trim()) return false;
-    const history = this.state.entries.filter(entry => entry.kind === 'user' || entry.kind === 'assistant')
-      .map(entry => `${entry.kind}: ${entry.text}`).join('\n\n');
-    this.state.active = true; this.stopped = false; this.add('user', text.trim()); this.publish();
+    const request = text.trim();
+    const earlier = this.requests.get(context.file) ?? [];
+    const history = earlier.map(item => '- ' + item).join('\n');
+    this.state.active = true; this.stopped = false;
+    if (this.lastFile && this.lastFile !== context.file) {
+      this.add('notice', `Now asking about ${basename(context.file)}. Earlier requests about ${basename(this.lastFile)} are not part of this one.`);
+    }
+    this.lastFile = context.file;
+    this.requests.set(context.file, [...earlier, request]);
+    const first = this.state.entries.length;
+    this.add('user', request); this.publish();
+    let prompt = '';
+    let outcome = 'no completion';
     const timeout = setTimeout(() => this.stop('Stopped after the 10-minute time limit. Edits already submitted remain in the editor.'), this.options.timeoutMs ?? 600000);
     try {
       const registration = await this.execute(['mcp', 'get', 'isabelle'], context, '');
-      if (this.stopped) return true;
+      if (this.stopped) { outcome = 'stopped'; return true; }
       if (registration.code !== 0 || !/^isabelle:/m.test(registration.output)) {
-        this.notice(helpLine('MCP', this.serverRoot)); return true;
+        this.notice(helpLine('MCP', this.serverRoot)); outcome = 'MCP not registered'; return true;
       }
       const stream = new AskStream(this.add);
-      const prompt = (history ? 'Earlier conversation (context only; read the current buffer again):\n' + history + '\n\n' : '') + 'User request:\n' + text.trim();
+      prompt = (history ? `Earlier requests about this same file (context only; read the current buffer again, and do not assume any of them finished):\n${history}\n\n` : '')
+        + 'User request:\n' + request;
       const result = await this.execute(claudeArgs(context, this.serverRoot), context, prompt, record => {
         let value;
         try { value = JSON.parse(record); } catch { throw new Error('Claude returned an invalid stream-json record.'); }
         stream.accept(value); this.publish();
       });
+      outcome = this.stopped ? 'stopped' : `exit ${result.code ?? 'signal'}${stream.result ? ', completed' : ', no result record'}`;
       if (!this.stopped && (result.code !== 0 || !stream.result)) {
         this.notice(`Claude exited ${result.code ?? 'by signal'} without a successful completion${result.error.trim() ? ': ' + result.error.trim() : '.'}`);
       }
     } catch (error) {
+      outcome = 'failed: ' + String(error);
       if (!this.stopped) this.notice((error as NodeJS.ErrnoException).code === 'ENOENT' ? helpLine('claude', this.serverRoot) : 'Claude could not run: ' + String(error));
     } finally {
       clearTimeout(timeout);
       // Leave the brief escalation timer armed after Stop, even if the parent exits first.
       this.state.active = false; this.publish();
+      this.log(context, request, prompt, this.state.entries.slice(first), outcome);
     }
     return true;
   }
