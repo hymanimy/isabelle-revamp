@@ -41,6 +41,7 @@ async function run() {
   console.log('PASS: real definition opens HOL/Real.thy read-only; editor rejects edits; distribution bytes unchanged');
   await checkColors(root,api);
   await checkSymbols(root,api);
+  await checkScripts(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
@@ -115,4 +116,26 @@ async function checkSymbols(root,api) {
   assert(!/[≠⟹⋀‹›]/.test(fs.readFileSync(file,'utf8')));
   fs.writeFileSync(path.join(root,'.dev-host/m10-symbols.json'),JSON.stringify({receipts,abbrevs:api.getAbbreviations()},null,2));
   console.log('PASS: session abbreviations, four accepted symbol completions, ASCII saves, explicit Unicode opt-in and restoration');
+}
+
+async function checkScripts(root,api) {
+  const {scriptRanges}=require('../out/scriptDecorations');
+  const source=String.raw`m\<^sup>2 x\<^sub>1 y\<^sup>\<alpha> z\<^bsup>n+1\<^esup> v\<^bsub>i+1\<^esub> \<^bold>A`;
+  const groups=scriptRanges(source);
+  assert.deepEqual(groups.map(group=>[group.style,source.slice(...group.content)]),[['sup','2'],['sub','1'],['sup',String.raw`\<alpha>`],['sup','n+1'],['sub','i+1'],['bold','A']]);
+  assert.equal(scriptRanges(String.raw`x\<^sup> y\<^sub>
+z\<^bsup>n`).length,0);
+  assert.equal(scriptRanges('x⇧𝒜')[0].content[1]-scriptRanges('x⇧𝒜')[0].content[0],2);
+  const file=path.join(root,'.dev-host/m10-fixture/Scripts.thy');
+  const original='theory Scripts imports Main begin\ntext "'+source+'"\nend\n';
+  fs.writeFileSync(file,original);
+  const doc=await vscode.workspace.openTextDocument(file),editor=await vscode.window.showTextDocument(doc);
+  editor.selection=new vscode.Selection(0,0,0,0);await pause(100);
+  assert.equal(api.getScriptDecorations().length,6);
+  assert(!api.getPrettySymbols().some(item=>item.text==='⇧' || item.text==='⇩'));
+  const group=api.getScriptDecorations()[0],caret=doc.positionAt(group.controls[0][0]+3);
+  editor.selection=new vscode.Selection(caret,caret);await pause(100);
+  assert.equal(api.getScriptDecorations().length,5);
+  assert.equal(doc.getText(),original);assert.equal(fs.readFileSync(file,'utf8'),original);
+  console.log('PASS: ASCII/Unicode script controls, symbol arguments, nested-capable blocks, cursor reveal and unchanged bytes');
 }

@@ -444,3 +444,16 @@
 - **Would do differently:** test both persisted encodings and base/session
   abbreviations before connecting completion to an editor. Screenshot steps
   are documented; no direct screen capture is claimed.
+
+## M10.2 — script decorations
+
+- **Passed:** `scripts/check_m10.sh` exited 0 with M3–M8 and previous M10 checks.
+  New host checks cover ASCII/decoded controls, Unicode symbol arguments,
+  superscript/subscript blocks, bold, incomplete controls, supplementary-plane
+  character offsets, cursor reveal, and unchanged buffer/disk bytes.
+- **Discovered:** the official code assumes decoded one-character controls.
+  Reusing its CSS requires token-aware source ranges for ASCII compatibility;
+  generic symbol replacements must omit actively hidden controls.
+- **Would do differently:** keep symbol tokens and UTF-16 ranges explicit from
+  the beginning instead of treating formatting markers as ordinary glyphs.
+  Screenshot instructions are in the item 2 demo section.

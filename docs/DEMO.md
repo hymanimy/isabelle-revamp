@@ -146,3 +146,13 @@ and capture the glyphs ≠, ≠, ⟹, ⋀. Toggle display off to inspect their A
 spellings. Save and inspect the file: it still contains `\<...>` names.
 `isabelleRevamp.unicodeOnSave` is **false by default**; only explicitly enabling
 it permits symbol spellings to be saved as Unicode. Leave it off for the demo.
+
+### 2. Superscript and subscript controls
+
+In a scratch theory's `text` command, type
+`m\<^sup>2 x\<^sub>1 y\<^bsup>n+1\<^esup>`.
+Away from the caret these display as a raised 2, lowered 1, and raised `n+1`.
+Capture the display, then move into a control spelling to show its ASCII source.
+Toggle Pretty Symbols off to see every control; saving with the default setting
+keeps all original ASCII spellings. Script blocks and non-Latin symbol arguments
+use CSS positioning rather than a limited Unicode superscript alphabet.

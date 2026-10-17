@@ -681,3 +681,15 @@ encodes recognised pasted Unicode symbols in workspace theories. Explicit true
 decodes symbol spellings on save. This opt-in changes saved source and therefore
 its subsequent columns; display-only mode and ordinary completion do not.
 Raw receipts: `.dev-host/m10-abbrevs.json`, `m10-raw-completion.json`.
+
+## M10.2 — script controls on ASCII source
+
+`scriptDecorations.ts` ports the hiding and relative font-size/position rules
+from Isabelle's `src/Tools/VSCode/extension/src/script_decorations.ts` (Denis
+Paluca). The original scans single decoded characters; this client scans
+Isabelle symbol tokens with original UTF-16 offsets. Single sub/sup/bold controls
+apply to one following non-whitespace symbol; bsub/esub and bsup/esup delimit
+balanced blocks. Both encoded and decoded forms use the installed symbol table.
+Malformed controls stay visible. A selected control reveals its source and
+suspends that group's formatting. No document edits occur. Generic glyph
+replacements exclude hidden controls so an extra ⇧/⇩ is not drawn.

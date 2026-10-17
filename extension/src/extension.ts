@@ -11,6 +11,7 @@ import { PrettySymbols } from './prettySymbols';
 import { lockLibraryFiles } from './libraryFiles';
 import { SemanticColors } from './semanticColors';
 import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
+import { visibleScripts } from './scriptDecorations';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -148,6 +149,7 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getScriptDecorations: () => window.activeTextEditor ? visibleScripts(window.activeTextEditor) : [],
     getAbbreviations: () => symbolInput.snapshot(),
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
     getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [],

@@ -67,3 +67,8 @@ standard TextMate scopes instead of copying the distribution's editor theme.
 using the installed symbol table in place of VSCodium's bundled font JSON.
 `symbolInput.ts` uses the `PIDE/abbrevs_request` / `PIDE/abbrevs_response`
 notification shapes from `extension/src/lsp.ts` and `symbol_panel.ts`.
+
+`src/scriptDecorations.ts` adapts the hidden-control and script/bold decoration
+CSS and grouping approach from `src/Tools/VSCode/extension/src/script_decorations.ts`
+(Denis Paluca, TU Muenchen). Token scanning is extended to ASCII spellings,
+Unicode code points and matched block delimiters; cursor reveal is client-side.

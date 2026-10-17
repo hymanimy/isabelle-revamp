@@ -493,3 +493,13 @@ should be.
 - **Fix needed.** Keep the Unicode server options, encode completion/MCP edits
   in the client, combine session abbreviations with installed `etc/symbols`,
   turn cursor markers into snippet tabstops, and make Unicode saving explicit.
+
+## 39. Formatting controls are longer than one character in ASCII source
+
+- **What happened.** The official script decorator advances by one character,
+  because VSCodium works with decoded control glyphs. Applying it verbatim to
+  `\<^sup>2` would raise part of the escape spelling and leave a visible arrow.
+- **Experience.** Powers and indices look like source markup rather than maths.
+- **Fix needed.** Port the CSS but walk complete Isabelle symbols at original
+  UTF-16 offsets, including balanced script blocks and supplementary glyphs.
+  Suppress the generic glyph replacement for controls that are being hidden.
