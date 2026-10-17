@@ -136,3 +136,13 @@
   and its Isabelle log confirms startup. Leo has been asked to check cursor
   movement and the wrong-tactic error using **Isabelle: Show Goals**. M4 has not
   started; record M3 as fully passed after that confirmation.
+
+## 2026-10-17 — M3 passed with Leo's visual confirmation
+
+- **Passed:** Leo confirmed the sidebar visual check passed. Together with the
+  live integration checks above, this satisfies M3's stopping condition.
+- **Discovered:** unfinished proofs need an explicit `unfinished (sorry)` label;
+  Leo requested this distinction for M4 onward, with real errors still reported.
+- **Would do differently:** distinguish unfinished work from failed commands in
+  the first sidebar design rather than relying on the absence of an error banner.
+- **Next:** M4, the readable sqrt-2 proof and five-step demo, including that label.
