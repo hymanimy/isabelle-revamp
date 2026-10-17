@@ -1,6 +1,7 @@
+import { basename } from 'node:path';
 import { Diagnostic, DiagnosticSeverity, Disposable, Range, TextDocument, TextEditor } from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { GoalsView } from './goalsView';
+import { GoalsView, GoalState } from './goalsView';
 import { outputText } from './outputText';
 
 interface Caret { uri: string; line: number; character: number; version: number }
@@ -109,7 +110,7 @@ export class Goals implements Disposable {
     this.confirmed = undefined;
     this.dynamic = '';
     this.requestedAt = Date.now();
-    this.view.update({ phase: next ? 'checking' : 'idle', text: '', errors: [] });
+    this.publish({ phase: next ? 'checking' : 'idle', text: '', errors: [] });
     if (!this.available) return;
     if (!next) {
       void this.client.sendNotification('PIDE/caret_update', {}).catch(() => this.unavailable());
@@ -146,7 +147,7 @@ export class Goals implements Disposable {
     } catch {
       if (generation === this.generation) {
         clearTimeout(this.deadline);
-        this.view.update({ phase: 'unavailable', text: '', errors: [] });
+        this.publish({ phase: 'unavailable', text: '', errors: [] });
       }
     } finally {
       if (--this.pending === 0) this.earlyStates.clear();
@@ -176,7 +177,7 @@ export class Goals implements Disposable {
     const failed = errors.length > 0 || [...errorTypes].some(type => flags?.get(type));
     if (busy || this.confirmed === undefined) {
       const phase = !busy && Date.now() - this.requestedAt >= 10000 ? 'unavailable' : 'checking';
-      this.view.update({ phase, text: '', errors: [] });
+      this.publish({ phase, text: '', errors: [] });
       return;
     }
     // Only accept untagged dynamic output if it agrees with the current state.
@@ -190,7 +191,16 @@ export class Goals implements Disposable {
     // A failed method can inherit a parent's "No subgoals!" state. Show its
     // diagnostic instead, never that misleading state under an error banner.
     const phase = failed ? 'error' : unfinished ? 'unfinished' : 'ready';
-    this.view.update({ phase, text: failed ? '' : text, errors });
+    this.publish({ phase, text: failed ? '' : text, errors });
+  }
+
+  private publish(state: GoalState): void {
+    const document = this.caret ? this.document : undefined;
+    this.view.update({ ...state,
+      // Isabelle theory files are named after their theory; no source parser is needed.
+      theory: document ? basename(document.uri.fsPath, '.thy') : undefined,
+      checkStatus: document ? this.documentStatus(document).state : undefined,
+    });
   }
 
   unavailable(): void {
@@ -202,7 +212,7 @@ export class Goals implements Disposable {
     this.confirmed = undefined;
     this.confirmedVersions.clear();
     this.annotatedVersions.clear();
-    this.view.update({ phase: 'unavailable', text: '', errors: [] });
+    this.publish({ phase: 'unavailable', text: '', errors: [] });
   }
 
   observe(document: TextDocument): void {
@@ -251,7 +261,8 @@ export class Goals implements Disposable {
     const sorry = this.sorryPositions(document);
     const incomplete = sorry.length > 0 || keywords.includes('oops') || !theoryClosed
       || (this.badRanges.get(uri)?.length ?? 0) > 0;
-    const state = !processing.processed ? 'checking' : failed ? 'error' : incomplete ? 'unfinished' : 'fully_checked';
+    const state: NonNullable<GoalState['checkStatus']> = !processing.processed ? 'checking'
+      : failed ? 'error' : incomplete ? 'unfinished' : 'fully_checked';
     return { ...processing, state, fully_checked: state === 'fully_checked',
       saved: !document.isDirty, theory_closed: theoryClosed, sorry_count: sorry.length, has_errors: failed, errors };
   }

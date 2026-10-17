@@ -6,7 +6,8 @@ complete; the temporary edits below let you demonstrate live checking.
 
 1. Press **F5 → Isabelle: Extension Development Host**. In the new window, open
    **Command Palette → Isabelle: Show Goals**, then click the theorem statement
-   in **examples/Sqrt2.thy**. The sidebar shows the goal `sqrt 2 ∉ ℚ`.
+   in **examples/Sqrt2.thy**. The sidebar header shows **Sqrt2**, then
+   **fully checked**, with the goal `sqrt 2 ∉ ℚ` below it.
 2. At the bottom of the proof, select the final `by simp` immediately before the
    outer `qed` and type `sorry`. The sidebar changes from **checking…** to
    **unfinished (sorry)**. This admits the last step; it is not a proof error or
@@ -15,6 +16,7 @@ complete; the temporary edits below let you demonstrate live checking.
    `have denominator_squared`, and `have common_factor`. Watch the goals change:
    clear the denominator, prove the numerator is even, derive the denominator's
    square equation, and find the common factor. Every `have` has its own goal.
+   Squares display as `²`; sidebar colours and the goal font follow VS Code.
 4. Replace that final `sorry` with `by (rule TrueI)`. The tactic cannot prove
    `False`: an inline diagnostic appears and the sidebar shows **Proof error**.
 5. Replace it with `by simp`, then click inside that final `by` command. The

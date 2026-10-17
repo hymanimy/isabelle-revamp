@@ -146,6 +146,9 @@ should be.
   check manually: `Sqrt2.thy` has colored Isar keywords and **Output → Isabelle**
   shows `Isabelle language server ready (HOL).` This is a test-environment
   permission issue, not a theorem error or an Isabelle installation failure.
+  The M6 retry using the inventory's `com.microsoft.VSCode` identifier returned
+  `Computer Use was not approved to use Code` again. M6 therefore records actual
+  tokenizer/live-host checks separately from the still-unverified screen view.
 
 ## 12. Goal notifications cannot identify the cursor that produced them
 
@@ -246,3 +249,53 @@ should be.
   ranges, stopping once they clear. The client polls at 250 ms while busy;
   no Isabelle source changes are needed. Keep a restore-after-edit integration
   check, since testing only a freshly opened proof missed this interaction.
+
+## 20. A square looked like an arrow followed by two
+
+- **What happened.** Live HTML output for `have root_squared` contained `⇧2`.
+  Removing HTML tags left `(sqrt 2)⇧2 = 2` in the sidebar. Diagnostic messages
+  could also contain source escapes such as `\<notin>` and `\<rat>`.
+- **Experience.** Familiar mathematics becomes a notation puzzle, and copied
+  goals look different from the formulas a mathematician expects.
+- **Fix needed.** Decode the distribution's default symbol assignments in the
+  client and render supported single-character sub/superscripts as Unicode.
+  M6 shows `(sqrt 2)² = 2` and shares the conversion with MCP and diagnostics.
+  Unsupported controls/custom names remain visible; source files are unchanged.
+
+## 21. Core-only highlighting missed commands in the actual demo
+
+- **What happened.** The M2 keyword list omitted `text`, `where`, and `and` used
+  in Sqrt2. Its word boundaries also allowed `theory'` and `Some.proof` to be
+  coloured as if part of the identifier were an Isar command.
+- **Experience.** An explanatory text block and a proof clause lack the expected
+  visual structure, while an ordinary identifier can look like a command.
+- **Fix needed.** Include the demo's commands and respect apostrophes, qualified
+  names and Unicode letters at keyword boundaries. M6 checks all 46 demo command
+  lines and comment/string/cartouche contexts using VS Code's real TextMate
+  engine, including distinct token styles in four built-in themes.
+
+## 22. The highlighting check depended on VS Code's runtime packaging
+
+- **What happened.** Running the earlier scratch tokenizer check with plain Node
+  failed with `Cannot find module '…/node_modules.asar/vscode-textmate'`.
+  Electron can read VS Code's `.asar` archive; plain Node cannot. An initial
+  theme-test helper also assumed a separately available `jsonc-parser`, which
+  this installation does not expose.
+- **Experience.** A developer cannot reproduce a previous highlighting check
+  with the obvious Node command, even though the editor itself works.
+- **Fix needed.** Keep the check in the repository and run it inside the stock
+  Extension Development Host via `bash scripts/check_m6.sh`. Read the shipped
+  compiled theme JSON directly; no extra parser or test framework is required.
+
+## 23. A completed one-line tactic can have no cursor goal
+
+- **What happened.** The M6 header fixture `lemma "True" by simp` checked with
+  `process_theories`, but selecting `simp` did not yield a confirmed cursor state:
+  the sidebar eventually reported unavailable. Selecting the same lemma's
+  statement returned `goal (1 subgoal): 1. True` and **fully checked** promptly.
+- **Experience.** A correct file can look stalled when the selected position
+  has no printable proof state. That is different from a failed theorem.
+- **Fix needed.** Keep the unavailable message distinct from an error and point
+  the demo at a statement or an intermediate Isar command with an open goal.
+  The M6 theory-switch check now selects the lemma statement. A richer
+  no-goal/context display is outside this milestone's limited polish scope.

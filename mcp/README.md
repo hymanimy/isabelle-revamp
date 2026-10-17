@@ -44,7 +44,7 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 | --- | --- |
 | `open(file)` | Opens the editor and returns its current `text`, `version`, and `saved` flag. Includes unsaved user edits. |
 | `edit(file, start_line, start_col, end_line, end_col, text)` | Replaces the range through VS Code, saves the buffer, and returns its new version/status. Uses the editor's undo history. Read with `open` first. |
-| `goals_at(file, line, col)` | Moves the visible cursor to a proof command and waits up to 30 seconds. Returns `text` identical to the sidebar, plus `phase`, diagnostics and the file/version/position. |
+| `goals_at(file, line, col)` | Moves the visible cursor to a proof command and waits up to 30 seconds. Returns Unicode `text` identical to the sidebar, plus `phase`, diagnostics, the file/version/position, `theory` and `checkStatus`. |
 | `errors(file)` | Returns error messages/ranges, `has_errors`, and `complete`. `complete=false` means an empty or partial list is inconclusive. |
 | `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag for all open theory tabs. |
 | `sorry_positions(file)` | Returns server-marked `[start_line,start_col,end_line,end_col]` ranges and a `complete` flag. Comments and strings containing the word are ignored. |
@@ -59,8 +59,8 @@ I/Q's file argument. We do not load I/Q or modify Isabelle.
 ## Agent workflow
 
 1. Call `open` to read the current buffer, then `goals_at` on the theorem or a
-   `have` command. Avoid blank lines and the final `end`, which need not return a
-   proof state. The sidebar follows this same cursor.
+   `have` command. Blank lines, the final `end`, and a completed top-level `by`
+   tactic need not return a proof state. The sidebar follows this same cursor.
 2. Use `sorry_positions` to find admitted steps. If its list is incomplete,
    first obtain a goal for that document version and poll `processing_status`.
 3. Submit an edit, then poll processing and inspect `errors` and `status`.

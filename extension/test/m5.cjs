@@ -29,9 +29,10 @@ exports.run = async function () {
         try {
           const receipt = JSON.parse(line);
           if (receipt.check === 'sidebar matches MCP goals') {
-            assert.deepEqual(api.getGoalState(), {
-              phase: receipt.result.phase, text: receipt.result.text, errors: receipt.result.errors,
-            });
+            const state = api.getGoalState();
+            for (const key of ['phase', 'text', 'errors', 'theory', 'checkStatus']) {
+              assert.deepEqual(state[key], receipt.result[key], key);
+            }
           }
           receipts.push(receipt);
           console.log('PASS: ' + receipt.check);

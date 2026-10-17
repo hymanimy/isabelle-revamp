@@ -21,7 +21,7 @@ exports.checkCursorRaces = async function () {
   const goals = new Goals(client, { update(value) { state = value; } });
   const uri = 'file:///fixture/Sqrt2.thy';
   const editor = (line, version = 1) => ({
-    document: { languageId: 'isabelle', uri: { scheme: 'file', toString: () => uri }, version },
+    document: { languageId: 'isabelle', uri: { scheme: 'file', fsPath: '/fixture/Sqrt2.thy', toString: () => uri }, version },
     selection: { active: { line, character: 4 } },
   });
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));

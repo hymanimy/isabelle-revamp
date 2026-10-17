@@ -374,3 +374,39 @@ result contract are in [mcp/README.md](../mcp/README.md). The Python-facing side
 standard FastMCP stdio, including MCP initialize, tool discovery, and tool calls.
 `scripts/check_m5.sh` drives that full route into a real VS Code/Isabelle host;
 the host compares received goal text and phase with the sidebar's actual model.
+
+## M6: Unicode presentation and header metadata
+
+A live probe at zero-based line 16, character 4 (`have root_squared`) received
+`PIDE/dynamic_output` with the existing `{ "content": HTML }` shape. The square
+was encoded literally inside HTML as `<span class="main">⇧2</span>`, not a
+`<sup>` element. After stripping tags the goal was `(sqrt 2)⇧2 = 2`. The probe's
+original theorem-only success predicate timed out at this different goal; the
+notification itself was received and inspected. M6's live editor check verifies
+the resulting `(sqrt 2)² = 2` output.
+
+`etc/symbols` assigns `\<^sup>` to U+21E7 (`⇧`) and `\<^sub>` to U+21E9 (`⇩`).
+The client copies the distribution's 439 default Unicode assignments and decodes
+named escapes in plain diagnostic messages as well as extracted HTML text. It
+converts single-character sub/superscripts when Unicode has an equivalent;
+unknown/custom symbols and unsupported controls stay verbatim. This is display
+conversion only: editor source, coordinates, saved proofs, and Isabelle remain
+unchanged. HTML is still stripped and escaped, never inserted from the server.
+
+`goals_at` now also returns `theory` (the active `.thy` basename) and
+`checkStatus` (`checking`, `fully_checked`, `unfinished`, or `error`). The latter
+uses M5's current-version processing/admission/error/closing-command checks;
+it is not inferred from `No subgoals!`. The existing `phase`, `text`, and `errors`
+are preserved; goal text and diagnostics now use the Unicode conversion shared
+by the sidebar and MCP. No new Isabelle protocol messages are involved.
+
+The view uses VS Code's documented [theme variables](https://code.visualstudio.com/api/extension-guides/webview#theming-webview-content).
+Highlighting uses standard [TextMate scopes](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide),
+tested with the installed editor's tokenizer and four built-in themes.
+
+The second-theory header fixture (`lemma "True" by simp`) also showed a position
+limit: selecting the final `simp` did not produce a confirmed state, although
+`process_theories` checked the file successfully. Moving to the lemma statement
+returned `proof (prove)\ngoal (1 subgoal):\n 1. True` and settled the current-version
+status. The live header test uses that position. An unavailable cursor state
+must not be equated with a failed theory or asserted to be fully checked.

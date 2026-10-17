@@ -6,6 +6,15 @@ The minimal LanguageClient startup in `src/extension.ts` is adapted from
 and file/language document selector, using the current LanguageClient API.
 The grammar is written here for the requested core Isar subset.
 
+`src/symbolCodes.json` contains the 439 `code:` assignments from
+`Isabelle2025-2.app/etc/symbols`, with the `\<…>` wrapper removed from each key
+and each hexadecimal code converted to its Unicode character. No assignments
+were invented. `src/symbols.ts` interprets the single-character sub/superscript
+controls for characters with Unicode equivalents; unsupported controls and
+custom symbol names are preserved. The control meanings were checked against
+`src/Pure/General/html.scala:154–179` and live server output. The license below
+also covers the copied symbol data.
+
 The distribution copyright notice is reproduced below. No Isabelle source files
 were modified.
 

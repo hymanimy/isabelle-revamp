@@ -5,6 +5,7 @@ import { Goals } from './goals';
 import { GoalsView } from './goalsView';
 import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
+import { unicodeSymbols } from './symbols';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -40,6 +41,7 @@ export async function activate(context: ExtensionContext) {
     outputChannel: output,
     middleware: {
       handleDiagnostics: (uri, diagnostics, next) => {
+        for (const diagnostic of diagnostics) diagnostic.message = unicodeSymbols(diagnostic.message);
         next(uri, diagnostics);
         goals?.setDiagnostics(uri.toString(), diagnostics);
       },

@@ -5,6 +5,7 @@ M1 provides a plain-text goal probe; M2 adds Isar highlighting and server startu
 M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,
 fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
 `sorry`. M5 connects AI agents to that same editor through seven MCP tools.
+M6 adds a theme-aware sidebar, Unicode output and a theory/check-status header.
 
 ## Try the extension in under five minutes
 
@@ -35,6 +36,10 @@ compile and run **Developer: Reload Window** there.
 The sidebar briefly shows `checking…` during processing. An admitted `sorry`
 shows **unfinished (sorry)**; a failed tactic shows **Proof error** and an inline
 diagnostic. Each of the demo's 11 `have` commands has a distinct goal.
+The header names the active theory and shows **fully checked** once its complete
+buffer has passed. Goals and diagnostics display Unicode (including `²`);
+the source file keeps its original Isabelle notation. Colours and the goal font
+follow your VS Code theme and editor settings.
 
 ```sh
 isabelle process_theories -D examples -O Sqrt2
@@ -60,6 +65,21 @@ and returns the sidebar's text; `edit` changes and saves the VS Code buffer.
 
 After installing the MCP dependencies, `bash scripts/check_m5.sh` runs the real
 stdio-to-editor acceptance check, including the M3/M4 regressions.
+
+## Verify the polished sidebar and highlighting (M6)
+
+Run `bash scripts/check_m6.sh` after installing both extension and MCP dependencies.
+It includes the M3–M5 live checks, Unicode goals, theory-header switching, and
+the installed VS Code TextMate engine's highlighting across Dark+, Light+, and
+both high-contrast themes. The grammar covers the core Isar keywords and the
+demo's `text`, `where`, and `and`, with nested comments/cartouches and symbols.
+It uses a separate profile under `.dev-host/` and leaves the demo unchanged.
+
+For a visual check, reload the development host, open **Isabelle: Show Goals**,
+and click `have root_squared`: the sidebar should show `(sqrt 2)² = 2` below
+**Sqrt2 · fully checked**. Use **Preferences: Color Theme** to inspect light,
+dark and high-contrast rendering. The automated checks validate token styles
+and the view model; they do not replace looking at the rendered window.
 
 ## Run the goal probe
 

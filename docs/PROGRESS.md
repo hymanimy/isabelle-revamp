@@ -221,3 +221,44 @@
   completeness, admissions and saved state separate from the start; no single
   goal string or empty diagnostic list can establish completion.
 - **Next:** M6's limited sidebar polish. M6 has not started.
+
+## 2026-10-17 — M6 implemented; automated acceptance passed
+
+- **Changed:** the sidebar now uses VS Code theme colours, the editor's font,
+  and explicit high-contrast borders. Its header shows the active theory's name
+  and current check status, using M5's completion evidence. **unfinished (sorry)**
+  remains separate from genuine proof errors; pending output stays hidden.
+  Goal text and diagnostic messages decode Isabelle's default symbols to Unicode,
+  including `⇧2` → `²`. The sidebar and MCP share that text and header metadata.
+  The copied symbol assignments are attributed in `THIRD_PARTY_NOTICES.md`.
+- **Highlighting:** added the demo's missing `text`, `where`, and `and` keywords
+  and corrected identifier boundaries for apostrophes, qualified names, and
+  Unicode letters. The committed test uses the installed VS Code TextMate and
+  Oniguruma engines, checks all 27 keywords and 46 command lines in Sqrt2, escaped
+  and Unicode symbols, nested comments/cartouches, and quoted strings. Keyword
+  and string foreground colours are distinct from ordinary identifiers in
+  Dark+, Light+, High Contrast, and High Contrast Light.
+- **Passed:** `bash scripts/check_m6.sh` compiled and exited 0 in stock VS Code
+  with live Isabelle. It includes all M3–M5 checks: distinct goals, cursor races,
+  errors and admissions, real MCP proof edits, completion, and connection rules.
+  It additionally verified the live `(sqrt 2)² = 2` goal, Unicode diagnostics,
+  fully checked headers, and switching to another theory. The real demo remained
+  unchanged. Receipts are in `.dev-host/m6-results.json`; the final compile and
+  targeted Unicode checks also passed after guarding unknown symbol names
+  against inherited object properties. `git diff --check` passed.
+- **Discovered:** HTML output can contain literal Isabelle formatting controls,
+  and diagnostic text can retain named source escapes. The initial second-theory
+  test selected a completed top-level tactic without a printable proof state;
+  selecting its lemma statement promptly supplied a goal and completion status.
+  `process_theories` independently checked that fixture. PAINPOINTS entries
+  20–23 and the M6 protocol notes record the observations and remaining limits.
+- **Visual limitation:** the screen tool again returned **Computer Use was not
+  approved to use Code**. No direct M6 screenshot inspection is claimed. The
+  real editor/tokenizer tests above passed; the README gives the remaining
+  manual light/dark/high-contrast check. No global settings were changed.
+- **Would do differently:** make the tokenizer check reproducible in the
+  repository from M2, test the actual demo vocabulary, and distinguish goal
+  availability from theory completion when choosing cursor fixtures.
+- **Next:** reload the development host and visually review the polished sidebar
+  and highlighting. M6's requested implementation scope is complete; no further
+  features or milestones were started.
