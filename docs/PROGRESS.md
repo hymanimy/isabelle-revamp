@@ -146,3 +146,32 @@
 - **Would do differently:** distinguish unfinished work from failed commands in
   the first sidebar design rather than relying on the absence of an error banner.
 - **Next:** M4, the readable sqrt-2 proof and five-step demo, including that label.
+
+## 2026-10-17 — M4 passed: readable proof and unfinished status
+
+- **Changed:** completed `examples/Sqrt2.thy` with a reduced-fraction/parity proof
+  importing only `Complex_Main`. Its 11 intermediate `have` commands expose
+  distinct goals. Added the five-step click path in [DEMO.md](DEMO.md), updated
+  the README and probe for the completed example, and added **unfinished (sorry)**
+  to the sidebar as requested. No prover or distribution files were modified.
+- **Passed:** `isabelle process_theories -D examples -O Sqrt2` (using the installed
+  absolute executable path) exited 0. The source contains zero `sorry` and zero
+  `oops`. `bash scripts/check_m4.sh` compiled and ran a real stock VS Code host,
+  exiting 0: all 11 goal texts were distinct, the actual completed proof showed
+  `No subgoals!`, admitting the last step showed **unfinished (sorry)**, and a
+  separate failed tactic still took precedence as an error. Comments and text
+  mentioning `sorry` stayed ready; restoring the proof cleared errors/admissions.
+  The suite also passed M3's cursor-race, diagnostics, and slow-command checks.
+  The updated stdio probe exited 0 at the theorem statement. Temporary test edits
+  stayed under `.dev-host/`; the actual example was verified unchanged by them.
+- **Discovered:** the server's `background_bad` range identifies the literal
+  `sorry` command, so the client can distinguish it from comments and genuine
+  errors without inventing a source parser. Exact observed shape is recorded in
+  [PROTOCOL_NOTES.md](PROTOCOL_NOTES.md). Real-to-natural-number transfer needs
+  Isabelle's coercion lemmas; reversing `of_nat_mult` and `of_nat_power` lets
+  `simp` check the square equation. PAINPOINTS entries 15–16 record both issues.
+- **Would do differently:** use a fixed placeholder fixture for M3 regression
+  tests from the start, and check number-type transfer separately before building
+  the parity argument. In the new goal test, match actual `have` commands rather
+  than the word inside prose; the initial test mistakenly selected a text block.
+- **Next:** M5, the local socket and MCP tools. M5 has not started.

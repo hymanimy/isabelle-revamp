@@ -2,7 +2,7 @@ import { WebviewView, WebviewViewProvider } from 'vscode';
 import { escapeText } from './outputText';
 
 export interface GoalState {
-  phase: 'idle' | 'checking' | 'ready' | 'error' | 'unavailable';
+  phase: 'idle' | 'checking' | 'ready' | 'unfinished' | 'error' | 'unavailable';
   text: string;
   errors: string[];
 }
@@ -12,6 +12,7 @@ export function goalsHtml(state: GoalState): string {
     idle: 'Open a theory and place the cursor in a proof.',
     checking: 'checking…',
     ready: 'Goal at cursor',
+    unfinished: 'unfinished (sorry)',
     error: 'Proof error — see editor diagnostics.',
     unavailable: 'Goal state unavailable. Move the cursor to retry.',
   }[state.phase];

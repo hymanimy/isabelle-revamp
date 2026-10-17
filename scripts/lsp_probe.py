@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""M1: print Isabelle's LSP traffic and the goal at the unfinished proof.
+"""M1: print Isabelle's LSP traffic and the sqrt-2 theorem's goal.
 
 Uses only Python's standard library. Positions are zero-based; the default
-caret is on `show ?thesis`, immediately before the placeholder `sorry`.
+caret is on the theorem statement in the completed M4 example. Isabelle can
+still display that command's goal when the rest of its proof is complete.
 """
 
 import argparse
@@ -94,7 +95,7 @@ async def probe(process, args, path, source):
             text = content if args.server_plaintext else plain_text(content)
             print("\n--- Goal state (plain text) ---\n" + text + "\n", flush=True)
             if "goal (1 subgoal):" in text and "sqrt 2 ∉ ℚ" in text:
-                print("PASS: printed the unfinished sqrt 2 goal as plain text.", flush=True)
+                print("PASS: printed the sqrt 2 goal as plain text.", flush=True)
                 return
 
 

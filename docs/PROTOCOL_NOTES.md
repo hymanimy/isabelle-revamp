@@ -19,6 +19,10 @@ The probe prints the raw notifications and a separate plain-text goal block.
 It exits 0 only after recognizing the unfinished `sqrt 2 ∉ ℚ` goal and shutting
 down the server cleanly. With `isabelle` on PATH, omit `--isabelle`.
 
+As of M4 the default file is fully proved. The same default position (line 6,
+character 4, zero-based) now selects its theorem statement; that command still
+has the displayed goal. The M1 transcript below records the earlier placeholder.
+
 To reproduce the original bug, change only the server output mode:
 
 ```sh
@@ -268,3 +272,26 @@ References inside the installed distribution: `src/Tools/VSCode/src/state_panel.
 Reproduce the host checks with `bash scripts/check_m3.sh`. This runs the installed
 VS Code executable directly so its test exit status is captured; it adds no
 framework or downloaded editor. Results are written to `.dev-host/m3-results.json`.
+
+## M4: distinguish an admitted proof from an error
+
+A fresh stdio run on the original M1 placeholder, with M3's launch options,
+returned this entry in `PIDE/decoration` (other entries omitted):
+
+```json
+{"jsonrpc":"2.0","method":"PIDE/decoration","params":{"uri":"FILE_URI","entries":[{"type":"background_bad","content":[{"range":[7,4,7,9]}]}]}}
+```
+
+That exact source range is the `sorry` command. No error diagnostic was emitted;
+the dynamic output at that command nevertheless contained `No subgoals!`.
+The client keeps these ranges, as decoration deltas, and checks their current
+source text for `sorry`. It displays **unfinished (sorry)** for that document
+while retaining the cursor's goal. It does not infer admissions from a search
+for the word in source: comments, strings and explanatory cartouches are ignored
+because they have no corresponding `background_bad` range. Other bad markup is
+not reclassified as `sorry`. Busy state and genuine diagnostics/error decorations
+keep their existing precedence.
+
+This is a status for admissions in the open document, not a certificate about
+the axioms or transitive imports of an arbitrary theory. M4 separately checks
+the complete example with `process_theories` and no `sorry` in its source.

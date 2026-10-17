@@ -1,10 +1,11 @@
-import { Diagnostic, DiagnosticSeverity, Disposable, TextEditor } from 'vscode';
+import { Diagnostic, DiagnosticSeverity, Disposable, Range, TextDocument, TextEditor } from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { GoalsView } from './goalsView';
 import { outputText } from './outputText';
 
 interface Caret { uri: string; line: number; character: number; version: number }
-interface Decoration { uri: string; entries: { type: string; content: unknown[] }[] }
+type SourceRange = [number, number, number, number];
+interface Decoration { uri: string; entries: { type: string; content: { range: SourceRange }[] }[] }
 interface StateOutput { id: number; content: string }
 
 // PIDE/decoration messages are deltas: omitted entries retain their old value.
@@ -18,6 +19,7 @@ const errorTypes = new Set(['text_overview_error']);
 export class Goals implements Disposable {
   private generation = 0;
   private caret?: Caret;
+  private document?: TextDocument;
   private timer?: ReturnType<typeof setTimeout>;
   private deadline?: ReturnType<typeof setTimeout>;
   private panel?: number;
@@ -28,6 +30,7 @@ export class Goals implements Disposable {
   private available = false;
   private requestedAt = 0;
   private decorations = new Map<string, Map<string, boolean>>();
+  private badRanges = new Map<string, SourceRange[]>();
   private diagnostics = new Map<string, string[]>();
   private subscriptions: Disposable[] = [];
 
@@ -44,7 +47,12 @@ export class Goals implements Disposable {
       }),
       client.onNotification('PIDE/decoration', (message: Decoration) => {
         const flags = this.decorations.get(message.uri) ?? new Map<string, boolean>();
-        for (const entry of message.entries) flags.set(entry.type, entry.content.length > 0);
+        for (const entry of message.entries) {
+          flags.set(entry.type, entry.content.length > 0);
+          if (entry.type === 'background_bad') {
+            this.badRanges.set(message.uri, entry.content.map(item => item.range));
+          }
+        }
         this.decorations.set(message.uri, flags);
         if (message.uri === this.caret?.uri) this.render();
       }),
@@ -59,6 +67,7 @@ export class Goals implements Disposable {
 
   follow(editor?: TextEditor): void {
     const document = editor?.document;
+    this.document = document;
     const next = document?.languageId === 'isabelle' && document.uri.scheme === 'file'
       ? { uri: document.uri.toString(), version: document.version,
           line: editor!.selection.active.line, character: editor!.selection.active.character }
@@ -140,9 +149,15 @@ export class Goals implements Disposable {
     // Only accept untagged dynamic output if it agrees with the current state.
     // Rich messages that disagree (e.g. a failed tactic) stay in diagnostics.
     const text = this.dynamic === this.confirmed ? this.dynamic : this.confirmed;
+    // Isabelle marks an admitted command as background_bad. Match its actual
+    // source range: mentions in comments/quoted text are not admissions, and
+    // other bad markup must not be mistaken for `sorry`.
+    const unfinished = (this.badRanges.get(this.caret.uri) ?? []).some(range =>
+      this.document?.getText(new Range(...range)) === 'sorry');
     // A failed method can inherit a parent's "No subgoals!" state. Show its
     // diagnostic instead, never that misleading state under an error banner.
-    this.view.update({ phase: failed ? 'error' : 'ready', text: failed ? '' : text, errors });
+    const phase = failed ? 'error' : unfinished ? 'unfinished' : 'ready';
+    this.view.update({ phase, text: failed ? '' : text, errors });
   }
 
   unavailable(): void {

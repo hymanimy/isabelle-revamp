@@ -2,9 +2,9 @@
 
 Isabelle/HOL in stock VS Code, using the unmodified `isabelle vscode_server`.
 M1 provides a plain-text goal probe; M2 adds Isar highlighting and server startup;
-M3 adds the **Isabelle Goals** sidebar and live errors.
-The complete sqrt-2 proof and MCP server are later milestones.
-`examples/Sqrt2.thy` currently contains one intentional `sorry`.
+M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,
+fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
+`sorry`. The MCP server is the next milestone.
 
 ## Try the extension in under five minutes
 
@@ -17,33 +17,38 @@ Requires Isabelle2025-2 with the HOL heap, Node 20+, npm, and stock VS Code 1.10
    setting for another installation, or use `isabelle` if it is on VS Code's PATH.
 4. Press **F5**, selecting **Isabelle: Extension Development Host** if asked.
    This compiles the extension and opens a development window with `Sqrt2.thy`.
-5. In that window, check the **Isabelle** language indicator and the colored Isar
-   keywords. **View → Output → Isabelle** should show
-   `Isabelle language server ready (HOL).`
+5. In that window, open the Command Palette and run **Isabelle: Show Goals**.
+   Click an intermediate `have` in `Sqrt2.thy` to see its goal, or follow the
+   [five-step demo](docs/DEMO.md) to try unfinished, error, and complete states.
+   **View → Output → Isabelle** shows `Isabelle language server ready (HOL).`
 
 If `code` is missing on macOS, open VS Code normally and use **File → Open Folder**,
 or invoke `/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`.
 For a manual build, run `npm run compile --prefix extension`.
 
-## Check the goals sidebar (M3)
+## Check the proof and sidebar (M4)
 
 In a fresh F5 development host, run **Isabelle: Show Goals** from the Command
 Palette. The view lives in the Explorer sidebar. If reusing an older host, first
 compile and run **Developer: Reload Window** there.
 
-1. In `Sqrt2.thy`, move between `theorem`, `proof -`, and `show ?thesis`.
-   The view briefly shows `checking…`, then the goal at that command.
-2. Replace `sorry` with `by simp`. Expect an inline error and **Proof error** in
-   the sidebar. Undo the edit; the original example is intentionally unfinished.
-3. To check the solved state before M4, temporarily change the statement to
-   `"(2 :: real) = 2"` and use `by simp`. Expect **No subgoals!** and no errors.
-   Undo both edits. This is a UI control, not a proof of sqrt-2 irrationality.
+The sidebar briefly shows `checking…` during processing. An admitted `sorry`
+shows **unfinished (sorry)**; a failed tactic shows **Proof error** and an inline
+diagnostic. Each of the demo's 11 `have` commands has a distinct goal.
 
-Run the automated checks with `bash scripts/check_m3.sh` on this Mac. For another
-installation, pass the VS Code **application executable** as its first argument.
+```sh
+isabelle process_theories -D examples -O Sqrt2
+bash scripts/check_m4.sh
+```
+
+If Isabelle is missing from PATH, use
+`"$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle"` for the first command.
+For another VS Code installation, pass its **application executable** as the
+first argument to `scripts/check_m4.sh`.
 The runner uses a separate host profile and test theory under ignored `.dev-host/`.
-It checks rapid cursor changes, delayed replies, checking state during a slow
-command, diagnostics, and the solved control, without editing the real example.
+It includes M3's cursor/diagnostic regression checks, then checks every demo
+`have`, the real completed proof, and editing between unfinished/error/complete
+states. It leaves the real example unchanged.
 
 ## Run the goal probe
 
@@ -51,7 +56,7 @@ command, diagnostics, and the solved control, without editing the real example.
 python3 scripts/lsp_probe.py --isabelle "$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle"
 ```
 
-It prints every server notification and the goal at `show ?thesis`:
+It prints every server notification and the goal at the theorem statement:
 
 ```text
 proof (prove)

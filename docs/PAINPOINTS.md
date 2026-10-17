@@ -183,3 +183,28 @@ should be.
 - **Fix needed.** Use the foreground app executable for the integration runner.
   `scripts/check_m3.sh` does this and keeps the profile, fixture, and result files
   inside the repository's ignored `.dev-host/` directory.
+
+## 15. An admitted step can look finished
+
+- **What happened.** The live server returned `No subgoals!` at a `sorry`, with
+  no error diagnostic and a `background_bad` range over the five-character
+  command. Leo requested a distinct unfinished label after M3's visual check.
+- **Experience.** A mathematician could mistake an admitted statement for a
+  completed proof, or interpret error-looking highlighting as a failed tactic.
+- **Fix needed.** Display **unfinished (sorry)** when the server marks that
+  command, retaining the useful cursor goal. Genuine errors still take precedence.
+  Use the marked source range so comments or quoted discussions of `sorry` do
+  not trigger the label. Implemented in M4.
+
+## 16. Moving an equation between real and natural numbers is not automatic
+
+- **What happened.** The first M4 draft used the Lean tactic `exact_mod_cast`;
+  Isabelle reported `Undefined method: "exact_mod_cast"`. Replacing it with
+  `linarith` still failed to transfer `(real m)^2 = 2 * (real n)^2` to the natural
+  number equation. `by (simp flip: of_nat_mult of_nat_power)` checks successfully.
+- **Experience.** The mathematical equality is clear, but the editor requires
+  the proof assistant's specific vocabulary for moving between number types.
+- **Fix needed.** Keep a checked, readable example of this transfer alongside
+  the proof. The demo names both `squared_real` and `squared`, so the change of
+  number type is visible instead of hidden in a large tactic invocation. This
+  was a client-authoring mistake, not an Isabelle kernel failure.

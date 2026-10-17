@@ -12,10 +12,23 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 exports.run = async function () {
   const root = path.resolve(__dirname, '../..');
   const original = fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8');
+  // Keep the M3 unfinished control independent of the completed M4 demo.
+  const placeholder = String.raw`theory Sqrt2
+  imports Complex_Main
+begin
+
+theorem sqrt2_irrational: "sqrt (2 :: real) \<notin> \<rat>"
+proof -
+  show ?thesis
+    sorry
+qed
+
+end
+`;
   const directory = path.join(root, '.dev-host/m3-fixture');
   fs.mkdirSync(directory, { recursive: true });
   const file = path.join(directory, 'Sqrt2.thy');
-  fs.writeFileSync(file, original);
+  fs.writeFileSync(file, placeholder);
   const document = await vscode.workspace.openTextDocument(file);
   const editor = await vscode.window.showTextDocument(document);
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
@@ -43,7 +56,7 @@ exports.run = async function () {
   }
   const errors = () => vscode.languages.getDiagnostics(document.uri)
     .filter(d => d.severity === vscode.DiagnosticSeverity.Error);
-  const ready = () => api.getGoalState().phase === 'ready';
+  const ready = () => ['ready', 'unfinished'].includes(api.getGoalState().phase);
 
   try {
     await checkCursorRaces();
@@ -59,6 +72,9 @@ exports.run = async function () {
     await vscode.window.showTextDocument(document);
     await move(6);
     await until('sqrt 2 goal at show', () => ready() && api.getGoalState().text.includes('sqrt 2 ∉ ℚ'));
+    await until('sorry is unfinished, not an error', () => api.getGoalState().phase === 'unfinished');
+    assert(goalsHtml(api.getGoalState()).includes('unfinished (sorry)'));
+    assert(!goalsHtml(api.getGoalState()).includes('Proof error'));
     const first = api.getGoalState().text;
     await move(5);
     assert.equal(api.getGoalState().phase, 'checking');
@@ -75,7 +91,7 @@ exports.run = async function () {
     await move(6);
     await until('return to show after rapid movement', () => ready() && api.getGoalState().text === first);
 
-    await replace(original.replace('sorry', 'by simp'));
+    await replace(placeholder.replace('sorry', 'by simp'));
     await move(7, 9);
     assert.equal(api.getGoalState().phase, 'checking');
     await until('wrong tactic produces an editor diagnostic', () => errors().some(d => d.message.includes('Failed to apply')));
@@ -83,8 +99,8 @@ exports.run = async function () {
     assert.equal(api.getGoalState().text, '');
     assert(errors().some(d => d.range.start.line === 7));
 
-    // M4 owns the sqrt-2 proof. This unsaved test control checks the solved UI path.
-    const solved = original.replace('sqrt (2 :: real) \\<notin> \\<rat>', '(2 :: real) = 2')
+    // This unsaved test control checks the solved UI path independently of M4.
+    const solved = placeholder.replace('sqrt (2 :: real) \\<notin> \\<rat>', '(2 :: real) = 2')
       .replace('sorry', 'by simp');
     const slow = solved.replace('theorem sqrt2_irrational',
       'ML \\<open>OS.Process.sleep (Time.fromReal 2.0)\\<close>\ntheorem sqrt2_irrational');
@@ -97,7 +113,7 @@ exports.run = async function () {
     await until('correct control has no subgoals and clears diagnostics', () =>
       ready() && api.getGoalState().text.includes('No subgoals!') && errors().length === 0);
 
-    await replace(original);
+    await replace(placeholder);
     await move(6);
     await until('restore the original sqrt-2 placeholder', () => ready() && api.getGoalState().text === first);
     fs.writeFileSync(path.join(root, '.dev-host/m3-results.json'), JSON.stringify(snapshots, null, 2));
@@ -109,7 +125,7 @@ exports.run = async function () {
     }, null, 2));
     throw error;
   } finally {
-    await replace(original);
+    await replace(placeholder);
     await document.save();
   }
 };
