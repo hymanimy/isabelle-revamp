@@ -5,10 +5,12 @@
     "/Users/leo/.isabelle/**": true
   },
   "files.exclude": {
-    "**/Swarm_solution.thy": true
+    "**/Swarm_solution.thy": true,
+    "**/Cascade_solution.thy": true
   },
   "search.exclude": {
-    "**/Swarm_solution.thy": true
+    "**/Swarm_solution.thy": true,
+    "**/Cascade_solution.thy": true
   },
   "editor.tokenColorCustomizations": {
     "[Default Dark Modern][Default Dark+][Dark+][Default High Contrast]": {

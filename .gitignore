@@ -7,3 +7,4 @@ dist/
 extension/mcp/
 extension/LICENSE
 mcp/.setup-lock/
+extension/media/proofGraph.js

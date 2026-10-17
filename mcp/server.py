@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seven MCP tools, one named connection per client to the VS Code extension."""
+"""Eight MCP tools, one named connection per client to the VS Code extension."""
 import argparse
 import asyncio
 from contextlib import asynccontextmanager
@@ -144,6 +144,12 @@ async def sorry_positions(file: str) -> dict:
 async def processing_status() -> dict:
     """Report processing/known flags and pending ranges for each open workspace theory. A new or inactive edited file stays unknown until a goal query confirms it."""
     return await bridge.request('processing_status')
+
+
+@mcp.tool(annotations=READ)
+async def proof_graph(file: str) -> dict:
+    """Return proof nodes (id, name, status, range, parent) and directed edges from the same model as the Proof Graph tab. complete=false means annotations are provisional. Pick an open leaf with proved dependencies; one step per edit."""
+    return await bridge.request('proof_graph', file=file)
 
 
 if __name__ == '__main__':

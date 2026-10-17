@@ -1,0 +1,51 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column;
+  color: var(--vscode-editor-foreground); background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 18px; border-bottom: 1px solid var(--vscode-panel-border); }
+h1 { margin: 0; font-size: 16px; font-weight: 600; }
+#status { margin: 5px 0 0; color: var(--vscode-descriptionForeground); }
+nav { display: flex; gap: 6px; flex-wrap: wrap; }
+button { padding: 6px 10px; font: inherit; color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background); border: 0; border-radius: 3px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+main { flex: 1; min-height: 0; overflow: hidden; }
+svg { width: 100%; height: 100%; touch-action: none; cursor: grab; }
+svg:active { cursor: grabbing; }
+footer { padding: 8px 18px; color: var(--vscode-descriptionForeground); border-top: 1px solid var(--vscode-panel-border); }
+.container { fill: var(--vscode-editor-inactiveSelectionBackground); fill-opacity: .16;
+  stroke: var(--vscode-panel-border); stroke-dasharray: 3 3; rx: 12; }
+.edge { fill: none; stroke: var(--vscode-descriptionForeground); opacity: .6; stroke-width: 1.3; marker-end: url(#arrow); }
+.edge.nesting { opacity: .26; stroke-dasharray: 3 3; }
+#arrow path { fill: var(--vscode-descriptionForeground); }
+.node { cursor: pointer; transition: opacity 300ms; }
+.tile { transform-box: fill-box; transform-origin: center; }
+.node rect { rx: 7; fill: var(--vscode-editor-background); stroke: var(--vscode-descriptionForeground);
+  stroke-width: 1.5; transition: stroke 300ms, fill 300ms; }
+.node text { fill: var(--vscode-editor-foreground); text-anchor: middle; pointer-events: none; font-size: 12px; }
+.node .detail { font-size: 10px; fill: var(--vscode-descriptionForeground); }
+.node.open rect { stroke-dasharray: 6 4; }
+.node.checking rect { stroke: var(--vscode-editorWarning-foreground); }
+.node.proved rect { stroke: var(--vscode-testing-iconPassed); fill: color-mix(in srgb, var(--vscode-testing-iconPassed) 12%, var(--vscode-editor-background)); }
+.node.error rect, .node.abandoned rect { stroke: var(--vscode-errorForeground); fill: color-mix(in srgb, var(--vscode-errorForeground) 12%, var(--vscode-editor-background)); }
+.node.abandoned .name { text-decoration: line-through; }
+.node:focus rect { stroke-width: 3; }
+.pulse .tile { animation: accepted 400ms ease-out; }
+.edge.pulse { animation: accepted-edge 400ms ease-out; }
+.fading { opacity: 0; pointer-events: none; }
+.key { display: inline-block; width: 8px; height: 8px; border: 1px solid var(--vscode-descriptionForeground); }
+.key.open { border-style: dashed; }
+.key.checking { background: var(--vscode-editorWarning-foreground); }
+.key.proved { background: var(--vscode-testing-iconPassed); }
+.key.error { background: var(--vscode-errorForeground); }
+.finished .name { font-size: 16px; font-weight: 600; }
+.finished .detail { font-size: 12px; }
+.replaying .pulse .tile, .replaying .edge.pulse { animation-duration: 50ms; }
+.replaying .node, .replaying .node rect { transition-duration: 37.5ms; }
+@keyframes accepted { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes accepted-edge { 50% { stroke: var(--vscode-testing-iconPassed); stroke-width: 3; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, .node rect { animation: none !important; transition: none !important; }
+}

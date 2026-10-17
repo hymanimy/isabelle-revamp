@@ -581,3 +581,92 @@ should be.
 - **Fix needed:** search the configured path, PATH and common installation
   directories before starting anything; show one Locate…/Download notification
   if absent. Auto-open Goals and provide one Setup check report with exact fixes.
+
+## 47. A long proof remains pending outside the caret window (M12)
+
+- **What happened:** Cascade's commands beyond 50 lines from the caret stayed
+  `background_unprocessed1`, even after a tagged state reply. The default
+  `vscode_caret_perspective=50` limits the server's perspective. At the theory
+  header there was also no proof-state reply to confirm the annotation version.
+- **Experience:** opening a large graph appeared to leave its last steps checking
+  forever, although short demos had passed.
+- **Fix needed:** launch with `-o vscode_caret_perspective=0` for whole-document
+  checking. When opening the graph from outside a theorem, select the nearest
+  theorem. Preserve the version gate and keep its source tab when the graph has
+  focus; never turn missing annotations into proved nodes.
+
+## 48. The requested real-number statement is unavailable in Main (M12)
+
+- **What happened:** the installed `HOL/Main.thy` explicitly excludes real and
+  complex numbers. The requested literal real sqrt/rational statement therefore
+  cannot be expressed using only that import.
+- **Experience:** an elementary number-theory demo unexpectedly requires deciding
+  how much library infrastructure to import.
+- **Fix needed:** keep the Main-only constraint and state the equivalent witness
+  claim for natural numbers: `b > 0` and `a^2 = n * b^2` imply `n = k^2` for some
+  natural k. Explain this formulation in the fixture. The committed reference
+  kernel-checks without admissions or computational-algebra imports. Its gcd
+  cancellation uses a local `simp only: mult_cancel_left` to avoid unrelated
+  simplifier expansion of the nonzero premise.
+
+## 49. A graph needs a browser bundle as well as the extension bundle (M12)
+
+- **What happened:** Dagre 3 provides ESM type declarations with a CommonJS
+  runtime; TypeScript rejected a normal import in the extension's CommonJS
+  build. The webview also cannot load the host's Node modules.
+- **Experience:** adding an offline layout library initially looked like changing
+  the entire extension module system.
+- **Fix needed:** use an explicit type-only import with its resolution mode and
+  bundle the small browser entry separately with esbuild. Include both runtime
+  bundles and their licenses in the VSIX, with no runtime node_modules or CDN.
+
+## 50. Re-layout during folding costs a frame and moves the target (M12)
+
+- **What happened:** the first actual-webview 200-node run measured one 33.4 ms
+  interval against a 16.7 ms baseline while accepted nodes folded.
+- **Experience:** a cascade can jump horizontally just as the audience tries to
+  follow the next obligation.
+- **Fix needed:** run Dagre when source topology changes, then keep remaining
+  nodes anchored as children disappear. Folding projects the cached layout and
+  removes empty containers; the final root is fitted separately. The focused
+  rerun measured 194 frames, maximum 17.7 ms, and zero missed-frame intervals.
+  Status-only updates performed no Dagre layout. Timing is measured in the real
+  webview and is specific to the current machine/run, not a universal guarantee.
+
+## 51. A reference method must match the skeleton's fact context (M12)
+
+- **What happened:** preserving a dependency in `using numerator_divides sorry`
+  and replacing only `sorry` with `by (rule dvd_mult_div_cancel [OF
+  numerator_divides])` passed the same fact twice to the rule method. Isabelle
+  reported “Failed to apply initial proof method”.
+- **Experience:** copying a valid reference justification into its demo leaf
+  unexpectedly failed.
+- **Fix needed:** give skeleton and reference identical `using` contexts and
+  use `by (rule dvd_mult_div_cancel)` there. A fixture check now reconstructs the
+  exact reference by replacing only the 38 leaf admissions; the reconstructed
+  proof must match the kernel-checked source.
+
+## 52. Hidden graph tabs suspend animation frames (M12)
+
+- **What happened:** the final-state check found 38 internally folded leaves
+  but 52 rendered nodes after the webview became hidden. A queued animation
+  frame never ran, so parent folds did not advance.
+- **Experience:** returning to a backgrounded graph could show old expanded
+  nodes even though Isabelle had accepted the whole theory.
+- **Fix needed:** coalesce logical fold completion with a timer, independently
+  of painting; keep visible motion in CSS. Acceptance waits for the rendered
+  state rather than assuming a tab-focus command has completed synchronously.
+
+## 53. A live Claude run stopped making progress after reading the graph (M12)
+
+- **What happened:** the real Ask request called `open Cascade.thy` and
+  `proof_graph Cascade.thy`, then said “Let me get advice before committing to
+  an approach.” It submitted no edits for several minutes. The test was
+  manually stopped; the captured exit notice was “Claude exited 143 without a
+  successful completion.” The bridge and prover remained healthy with 38
+  admissions, no errors and complete current-version annotations.
+- **Experience:** the UI streamed a sentence but gave no useful proof progress.
+- **Fix needed:** require direct work on one ready leaf, with no delegation or
+  outside advice, in the Ask preamble. Keep the failed run explicit; it is not
+  an AI-proof acceptance pass. Further live acceptance belongs with the planned
+  card runs. The observation does not establish why the model paused.

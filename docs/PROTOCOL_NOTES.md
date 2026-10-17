@@ -774,3 +774,65 @@ invalid-line, and out-of-root targets are inert/refused.
   checked status. No development host remained running during that check.
 - VS Code adds installation metadata to `package.json`; shipped manifest values,
   JavaScript bundle and bundled MCP source were checked against the final VSIX.
+
+## M12 — recursive proof graph and whole-document perspective
+
+No new Isabelle request or prover code is involved. Nodes come from the existing
+Isar lexer, recursively tracking `proof`/`qed`, cases and brace scopes. Quoted
+terms, cartouches and nested comments stay opaque. Named fact use and implicit
+chaining supply directed edges; parent links separately describe proof nesting.
+A conclusion has an edge to the obligation it discharges. Case assumptions flow
+to their uses, avoiding a spurious cycle back into the case. This is a source
+explanation, not a kernel dependency certificate.
+
+The first live Cascade test exposed `vscode_caret_perspective`'s default of 50:
+with the cursor on line 1, `processing_status` kept unprocessed ranges from
+line 52 onwards; moving it to the theorem moved that boundary by nine lines.
+The installed `src/Tools/VSCode/etc/options` documents `0` as unrestricted;
+`src/Tools/VSCode/src/vscode_model.scala:110` implements the whole visible
+model's range in that mode. Launch now includes `-o vscode_caret_perspective=0`.
+The rerun produced all 52 annotated nodes and all 38 open leaves. This is needed
+for honest whole-theory completion, rather than treating out-of-view work as done.
+
+`PIDE/state_init` at a theory header does not supply a proof-state confirmation.
+Opening the graph outside a theorem selects the nearest theorem first. The
+same tagged state and full-decoration/version gate as Goals/MCP is retained.
+Graph focus retains the open source tab; MCP edits preserve graph focus while
+moving the source cursor and querying its state. Closing the source tab still
+invalidates Ask context.
+
+`proof_graph(file)` is the eighth MCP tool. Its response includes `file`, `uri`,
+`version`, `theory`, `complete`, `fully_checked`, `proved`, `total`, `elapsed`
+(milliseconds), `nodes` and `edges`. Each node has `id`, `name`, `statement`,
+`command`, `status`, a four-integer zero-based UTF-16 `range`, `parent` (null for
+a theorem), and an optional ten-second `agent` display tag. Edge entries have
+`from`, `to`, and `kind` (`fact`, `implicit`, or `nesting`). The tool is read-only;
+unknown or stale annotation versions cannot certify green nodes. Root completion
+uses the same `fully_checked` decision as `status()`.
+
+The editor tab uses bundled `@dagrejs/dagre` 3.1.1 and graphlib 4.0.5, with no CDN
+or webview network access. Layout runs per visible node set; status updates use
+SVG classes and CSS transforms. Nested layouts place consumers above their
+prerequisites; arrows retain the logical prerequisite → consumer direction.
+Replay consumes locally recorded status frames at 8× and issues no prover calls.
+`workbench.action.maximizeEditorHideSidebar` targets the editor group; maximizing
+the bottom panel would instead enlarge the terminal/Output surface.
+
+The first 200-node SVG timing receipt had one missed frame during repeated fold
+layout. Dagre now runs only on source topology changes; folds filter cached
+positions and remove empty containers, keeping remaining targets stationary.
+The focused receipt recorded 194 frames at a 16.7 ms baseline, a 17.7 ms maximum
+gap, 200 pulses and zero missed intervals; status-only updates ran zero layouts.
+The check counts an animation-frame interval over 1.8× the measured baseline as
+missed, records visibility/reduced-motion settings, and reports the raw timing.
+
+On macOS, an occluded Electron window can report the webview as hidden and
+suspend animation frames ([Electron BrowserWindow documentation](https://www.electronjs.org/docs/latest/api/browser-window)).
+The timing harness therefore launches its isolated test window with
+`--disable-backgrounding-occluded-windows`, `--disable-renderer-backgrounding`
+and `--disable-background-timer-throttling`, following the
+[Chrome tooling flags](https://github.com/GoogleChrome/chrome-launcher/blob/main/docs/chrome-flags-for-tools.md).
+These are test-process flags, not extension or global settings. Logical fold
+completion uses a coalesced timer, and replay catches up overdue frames without
+waiting on a separate throttled zero-delay timer for each one. The production
+extension keeps normal OS background behavior.

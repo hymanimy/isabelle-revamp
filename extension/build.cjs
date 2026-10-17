@@ -10,7 +10,7 @@ async function build() {
   // Keep runtime dependency licenses even though their code is in one bundle.
   let notices = '# Bundled dependency licenses\n';
   for (const name of ['vscode-languageclient', 'vscode-languageserver-protocol', 'vscode-languageserver-types',
-    'vscode-languageserver-textdocument', 'vscode-jsonrpc', 'semver', 'minimatch', 'brace-expansion', 'balanced-match']) {
+    'vscode-languageserver-textdocument', 'vscode-jsonrpc', 'semver', 'minimatch', 'brace-expansion', 'balanced-match', '@dagrejs/dagre', '@dagrejs/graphlib']) {
     const root = path.join(__dirname, 'node_modules', name);
     const license = fs.readdirSync(root).find(file => /^licen[cs]e/i.test(file));
     if (!license) throw new Error('Missing bundled license: ' + name);
@@ -22,5 +22,7 @@ async function build() {
   await esbuild.build({ entryPoints: ['src/extension.ts'], bundle: true, platform: 'node',
     format: 'cjs', target: 'node22', outfile: 'out/extension.js', external: ['vscode'],
     sourcemap: false, minify: false, legalComments: 'inline' });
+  await esbuild.build({ entryPoints: ['src/proofGraphWebview.ts'], bundle: true, platform: 'browser',
+    format: 'iife', target: 'es2022', outfile: 'media/proofGraph.js', legalComments: 'inline' });
 }
 build().catch(error => { console.error(error); process.exitCode = 1; });

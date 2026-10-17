@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-import { commands, ConfigurationTarget, env, ExtensionContext, Uri, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
@@ -17,6 +17,7 @@ import { GoalLinks } from './goalLinks';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 import { findIsabelle, setupReport } from './setup';
+import { ProofGraph } from './proofGraph';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -30,9 +31,11 @@ export async function activate(context: ExtensionContext) {
   const output = window.createOutputChannel('Isabelle', { log: true });
   const view = new GoalsView();
   let theoryEditor = window.activeTextEditor;
-  const visibleTheory = () => theoryEditor && window.visibleTextEditors.includes(theoryEditor) ? theoryEditor : undefined;
-  const serverRoot = existsSync(resolve(context.extensionPath, 'mcp/launch.py'))
-    ? context.extensionPath : resolve(context.extensionPath, '..');
+  const visibleTheory = () => theoryEditor && !theoryEditor.document.isClosed && window.tabGroups.all.some(group =>
+    group.tabs.some(tab => tab.input instanceof TabInputText && tab.input.uri.toString() === theoryEditor!.document.uri.toString()))
+    ? theoryEditor : undefined;
+  const serverRoot = existsSync(resolve(context.extensionPath, 'src/extension.ts'))
+    ? resolve(context.extensionPath, '..') : context.extensionPath;
   ask = new Ask(serverRoot, state => view.updateAsk(state));
   const sendAsk = async (text: string) => {
     const editor = visibleTheory();
@@ -113,6 +116,7 @@ export async function activate(context: ExtensionContext) {
     '-o', 'vscode_pide_extensions=true',
     '-o', 'vscode_unicode_symbols_edits=true',
     '-o', 'vscode_unicode_symbols_output=true',
+    '-o', 'vscode_caret_perspective=0',
   ];
   const server: ServerOptions = { command: executable, args };
 
@@ -140,21 +144,25 @@ export async function activate(context: ExtensionContext) {
   const semanticColors = new SemanticColors(goals);
   context.subscriptions.push(semanticColors);
   const swarm = new Swarm(goals);
+  const graph = new ProofGraph(goals, context.extensionPath);
   context.subscriptions.push(swarm,
+    graph,
     window.registerWebviewViewProvider('isabelleRevamp.swarm', swarm.view),
+    commands.registerCommand('isabelleRevamp.showProofGraph', () => graph.show()),
     commands.registerCommand('isabelleRevamp.showSwarm', () => commands.executeCommand('isabelleRevamp.swarm.focus')));
   swarm.follow(window.activeTextEditor);
+  graph.follow(window.activeTextEditor);
   context.subscriptions.push(goals,
     window.onDidChangeTextEditorSelection(event => {
-      if (event.textEditor === window.activeTextEditor) { goals?.follow(event.textEditor); swarm.follow(event.textEditor); }
+      if (event.textEditor === window.activeTextEditor) { goals?.follow(event.textEditor); swarm.follow(event.textEditor); graph.follow(event.textEditor); }
     }),
     window.onDidChangeActiveTextEditor(editor => {
       if (editor) theoryEditor = editor;
-      goals?.follow(editor ?? visibleTheory()); swarm.follow(editor);
+      goals?.follow(editor ?? visibleTheory()); swarm.follow(editor); graph.follow(editor);
     }),
     workspace.onDidChangeTextDocument(event => {
       goals?.observe(event.document);
-      if (event.contentChanges.length) swarm.changed(event.document);
+      if (event.contentChanges.length) { swarm.changed(event.document); graph.changed(event.document); }
       if (event.document === window.activeTextEditor?.document) goals?.follow(window.activeTextEditor);
     }),
     client.onDidChangeState(event => {
@@ -175,7 +183,7 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, view, swarm));
+  bridge = new Bridge(new BridgeTools(goals, view, swarm, graph));
   try {
     await bridge.start();
     output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);
@@ -187,6 +195,10 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getProofGraph: () => graph.snapshot(),
+    inspectProofGraph: (action: 'snapshot' | 'benchmark' | 'replay') => graph.panel.inspect(action),
+    fullscreenProofGraph: () => graph.panel.fullscreen(),
+    selectProofNode: (uri: string, version: number, id: string) => graph.select(uri, version, id),
     getGoalLinks: () => view.linkSnapshot(),
     followGoalLink: (index: number, revision: number) => view.followLink(index,revision),
     hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),

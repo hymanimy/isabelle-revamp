@@ -20,10 +20,11 @@
     "onCommand:isabelleRevamp.ask",
     "onCommand:isabelleRevamp.showGoals",
     "onCommand:isabelleRevamp.showSwarm",
-    "onCommand:isabelleRevamp.setupCheck"
+    "onCommand:isabelleRevamp.setupCheck",
+    "onCommand:isabelleRevamp.showProofGraph"
   ],
   "scripts": {
-    "compile": "tsc -p .",
+    "compile": "tsc -p . && node build-webview.cjs",
     "vscode:prepublish": "npm run build",
     "build": "tsc -p . --noEmit && node build.cjs",
     "package": "vsce package"
@@ -68,6 +69,10 @@
       {
         "command": "isabelleRevamp.setupCheck",
         "title": "Isabelle Revamp: Setup check"
+      },
+      {
+        "command": "isabelleRevamp.showProofGraph",
+        "title": "Isabelle: Show Proof Graph"
       }
     ],
     "languages": [
@@ -183,6 +188,7 @@
     ]
   },
   "dependencies": {
+    "@dagrejs/dagre": "3.1.1",
     "vscode-languageclient": "10.1.2"
   },
   "devDependencies": {

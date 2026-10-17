@@ -4,7 +4,7 @@ Isabelle/HOL in stock VS Code, using the unmodified `isabelle vscode_server`.
 M1 provides a plain-text goal probe; M2 adds Isar highlighting and server startup;
 M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,
 fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
-`sorry`. M5 connects AI agents to that same editor through seven MCP tools.
+`sorry`. M5 connects AI agents to that same editor through MCP tools.
 M6 adds a theme-aware sidebar, Unicode output and a theory/check-status header.
 M7 adds **Isabelle Swarm**, a live card board for six proof steps filled through MCP.
 M8 adds **Ask Isabelle**: streamed Claude Code replies and proof edits through those same tools.
@@ -72,7 +72,8 @@ states. It leaves the real example unchanged.
 
 Follow [mcp/README.md](mcp/README.md) to install the Python environment and register
 the stdio server with Codex or Claude Code. The tools are `open`, `edit`,
-`goals_at`, `errors`, `status`, `sorry_positions`, and `processing_status`.
+`goals_at`, `errors`, `status`, `sorry_positions`, `processing_status`, and
+`proof_graph`.
 Up to two agents connect to each extension instance. `goals_at` moves the visible cursor
 and returns the sidebar's text; `edit` changes and saves the VS Code buffer.
 Read `open` immediately before an edit: another agent's changes invalidate old
@@ -123,7 +124,26 @@ Follow the [Ask demo](docs/DEMO.md#ask-isabelle). `bash scripts/check_m8.sh` che
 streaming, Stop, missing-tool help, webview behavior and earlier regressions.
 `M8_LIVE=1 bash scripts/check_m8.sh` also runs the two real Claude acceptance
 requests with your configured account/model, temporarily editing and restoring
-`Demo.thy`. Ask uses only the installed Claude Code CLI and the seven MCP tools.
+`Demo.thy`. Ask uses only the installed Claude Code CLI and the MCP tools.
+
+## Full-screen Proof Graph (M12)
+
+Open `examples/Cascade.thy`, then run **Isabelle: Show Proof Graph**. The editor
+tab shows nested proof obligations and fact dependencies; the compact Swarm
+sidebar remains available. Use **Full screen**, **Fit**, drag to pan and scroll
+to zoom. Grey dashed nodes are open, amber is checking, green is proved, and red
+is an error or an abandoned proof. Accepted subtrees fold into their parent;
+**Replay ×8** plays the recorded timeline without changing the proof.
+
+Cascade has 52 nodes, including the theorem, and 38 open leaf proofs across
+three nested levels. It proves the rational-square-root claim using natural
+numerator/denominator witnesses so it needs only `Main`. The zero-sorry reference
+is `examples/Cascade_solution.thy`. See [the graph demo](docs/DEMO.md#proof-graph-m12).
+
+`bash scripts/check_m12.sh` runs the reference kernel check, existing regressions,
+real webview transitions/replay and a 200-node animation timing check.
+`M12_LIVE=1 bash scripts/check_m12.sh` additionally uses your signed-in Claude
+Code account to fill a disposable skeleton through Ask and MCP.
 
 ## Run the goal probe
 

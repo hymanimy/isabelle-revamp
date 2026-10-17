@@ -533,3 +533,45 @@
   returned “Computer Use was not approved to use Code”; DEMO.md gives the exact
   screenshot checks. No screenshot or visual approval is claimed. M9 cascade/
   flowchart and optional M10 Sledgehammer remain queued.
+
+## M12 — full editor proof graph
+
+- **Implemented:** offline bundled Dagre/SVG editor tab, recursive scoped Isar
+  dependencies, nested containers, honest PIDE states, source navigation,
+  zoom/pan/Fit/full screen, CSS pulses, delayed folding and timestamped 8× replay.
+  The compact Swarm remains. `proof_graph` is the eighth MCP tool and Ask now
+  requests one dependency-ready leaf per edit, without delegation.
+- **Fixture:** Main-only rational-square-root witness theorem, 52 nodes and 38
+  admitted leaves across three nested levels. The reference kernel-checks;
+  replacing each admission with its reference method reconstructs that exact
+  proof. Swarm.thy is unchanged.
+- **Passed:** the full existing M3–M8 and mandatory M10 checks, including real
+  FastMCP comparisons of the graph model, read-only libraries, Unicode/ASCII
+  coordinates, diagnostics and two-client editing. Live webview checks confirm
+  grey leaves, a hand proof rendered green in under two seconds, pulsing edges,
+  red nodes that stay visible, reference completion, folding to the root and
+  replay without source changes. The 200-node timing check is measured in the
+  actual webview, with raw receipts under `.dev-host/`.
+- **Live AI limitation:** a real Claude request read the file and graph, then
+  said “Let me get advice before committing to an approach.” It made no edits
+  for several minutes and was manually stopped (exit 143). This is explicitly
+  not a successful AI acceptance run. The revised direct-leaf preamble still
+  needs live acceptance in the forthcoming card runs. Per Leo's instruction to
+  commit the current M12 work and continue, this limitation is carried forward.
+- **Discovered:** long theories need `vscode_caret_perspective=0`; theory headers
+  do not return tagged proof states; hidden tabs suspend animation frames and
+  throttle timers; reference methods must share the skeleton's `using` context.
+- **Would do differently:** start with the long fixture and a backgrounded tab,
+  retain source focus independently of webview focus, and measure the renderer
+  early. Direct screen inspection remains unavailable after the screen tool
+  again refused Code access; no screenshot or visual approval is claimed.
+- **Remaining performance acceptance:** the final focused `check_m12.sh` run
+  passed reference filling, root folding and replay, then failed its strict
+  zero-missed-frame assertion: 194 frames, 16.7 ms baseline, 33.4 ms maximum,
+  one missed interval, 200 pulses and zero status-only Dagre layouts. An earlier
+  focused benchmark had zero misses; later full runs varied between one and
+  two. The strict check is retained and is not represented as passing. Layout
+  caching and unchanged-node/edge paint suppression are implemented; the cause
+  of the remaining timing outlier has not been established. This acceptance
+  item is carried forward with the real-Claude limitation under the explicit
+  instruction to commit current M12 work before continuing.

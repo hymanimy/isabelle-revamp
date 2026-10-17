@@ -5,13 +5,14 @@ import { Goals } from './goals';
 import { GoalsView } from './goalsView';
 import { Swarm } from './swarm';
 import { encodeSymbols } from './symbols';
+import { ProofGraph } from './proofGraph';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
 
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BridgeTools {
-  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm) {}
+  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm, private graph: ProofGraph) {}
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');
@@ -67,7 +68,7 @@ export class BridgeTools {
         ? { fully_checked: files.length > 0 && files.every(file => 'fully_checked' in file && file.fully_checked), files }
         : { processing: files.some(file => file.processing), files };
     }
-    if (!['open', 'edit', 'goals_at', 'errors', 'sorry_positions'].includes(method)) {
+    if (!['open', 'edit', 'goals_at', 'errors', 'sorry_positions', 'proof_graph'].includes(method)) {
       throw new Error('Unknown method: ' + method);
     }
     const document = await this.document(params.file);
@@ -85,7 +86,12 @@ export class BridgeTools {
       return { ...identity(), complete: processing.processed,
         positions: processing.known ? this.goals.sorryPositions(document) : [] };
     }
-    const editor = await window.showTextDocument(document);
+    if (method === 'proof_graph') return this.graph.snapshot(document);
+    const column = window.tabGroups.all.find(group => group.tabs.some(tab =>
+      tab.input instanceof TabInputText && tab.input.uri.toString() === document.uri.toString()))?.viewColumn;
+    const keepGraph = this.graph.panel.active;
+    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: keepGraph });
+    this.graph.follow(editor);
     this.goals.follow(editor);
     if (method === 'open') {
       agent.versions.set(document.uri.toString(), document.version);
@@ -100,6 +106,7 @@ export class BridgeTools {
       if (start.isAfter(end)) throw new Error('Edit start must not be after its end.');
       if (typeof params.text !== 'string') throw new Error('Edit text must be a string.');
       const ids = this.swarm.editedCards(document, new Range(start, end));
+      const graphIds = this.graph.editedNodes(document, new Range(start, end));
       const selection = editor.selection;
       if (!await editor.edit(edit => edit.replace(new Range(start, end), encodeSymbols(params.text as string)))) {
         throw new Error('Document changed during the edit; read it again with open.');
@@ -108,6 +115,7 @@ export class BridgeTools {
       this.goals.observe(document);
       this.goals.follow(editor);
       this.swarm.tag(document, ids, agent.name);
+      this.graph.tag(document, graphIds, agent.name);
       agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };
@@ -119,7 +127,7 @@ export class BridgeTools {
     const version = document.version;
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
-      if (document.version !== version || window.activeTextEditor !== editor
+      if (document.version !== version || (window.activeTextEditor !== editor && !this.graph.panel.active)
         || !editor.selection.active.isEqual(position) || !this.goals.matches(document, position.line, position.character)) {
         throw new Error('The document or cursor changed during the query. Retry goals_at.');
       }

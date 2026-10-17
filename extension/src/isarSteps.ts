@@ -97,3 +97,155 @@ export function proofSteps(source: string, cursor: number): ProofStep[] {
   if (card?.end === source.length) closeRange(tokens[limit]?.start ?? source.length);
   return cards;
 }
+
+export interface ProofNode extends ProofStep {
+  name: string; statement: string; parent?: string; abandoned: boolean;
+}
+export interface ProofEdge { from: string; to: string; kind: 'fact' | 'implicit' | 'nesting' }
+export interface ProofStructure { nodes: ProofNode[]; edges: ProofEdge[] }
+
+// The graph is a source-level explanation, not a kernel dependency certificate.
+// Its colours are supplied separately by current-version PIDE annotations.
+export function proofStructure(source: string): ProofStructure {
+  type Node = ProofNode & { own: Token[]; previous?: string; implicit: boolean };
+  type Frame = { owner: Node; current?: Node; caseNode?: Node; prefix: Token[]; brace?: boolean };
+  const nodes: Node[] = [], frames: Frame[] = [];
+  const tokens = isarTokens(source);
+  const commands = new Set([...steps, 'case', 'hence', 'thus']);
+  const prefixes = new Set(['from', 'with', 'then']);
+  const endings = new Set(['by', 'sorry', '.', '..', 'done']);
+  const occurrences = new Map<string, number>();
+  let brackets = 0;
+  const trim = (start: number, end: number) => end - (source.slice(start, end).match(/\s*$/)?.[0].length ?? 0);
+  const close = (node: Node | undefined, end: number) => { if (node) node.end = trim(node.start, end); };
+  function finishFrame(frame: Frame, end: number) {
+    if (frame.current !== frame.owner) close(frame.current, end);
+    close(frame.caseNode, end);
+  }
+  function create(token: Token, index: number, parent?: Node, previous?: Node, prefix: Token[] = []): Node {
+    const rest = source.slice(token.end);
+    const named = /^\s*([\p{L}_][\p{L}\p{N}_'.]*)(?:\s*\[[^\]]*\])?\s*:/u.exec(rest)?.[1];
+    const caseName = token.text === 'case' ? /^\s*\(?\s*([\p{L}_][\p{L}\p{N}_'.]*)/u.exec(rest)?.[1] : undefined;
+    const statement = tokens[index + 1]?.quoted ? tokens[index + 1].text.slice(1, -1) : rest.split('\n')[0].trim();
+    const name = named ?? caseName ?? (statement || token.text).slice(0, 40);
+    const key = (parent ? parent.id + '/' : '') + (named ?? caseName ?? token.text);
+    const count = occurrences.get(key) ?? 0; occurrences.set(key, count + 1);
+    const node: Node = { id: key + (count ? '#' + count : ''), name, label: name, command: token.text,
+      statement, start: token.start, commandEnd: token.end, end: source.length, parent: parent?.id,
+      closed: ['case', 'also', 'finally'].includes(token.text), abandoned: false,
+      own: [...prefix, token], previous: previous?.id,
+      implicit: ['hence', 'thus', 'also', 'finally'].includes(token.text) || prefix.some(item => ['then', 'with'].includes(item.text)) };
+    nodes.push(node); return node;
+  }
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i], word = token.text;
+    let frame = frames.at(-1);
+    if (token.quoted) { (frame?.prefix.length ? frame.prefix : frame?.current?.own)?.push(token); continue; }
+    if (word === '(' || word === '[') brackets++;
+    if (brackets) {
+      (frame?.prefix.length ? frame.prefix : frame?.current?.own)?.push(token);
+      if (word === ')' || word === ']') brackets--;
+      continue;
+    }
+    if (theorems.has(word)) {
+      for (const open of frames) { finishFrame(open, token.start); close(open.owner, token.start); }
+      frames.length = 0;
+      const root = create(token, i);
+      frames.push({ owner: root, current: root, prefix: [] });
+      continue;
+    }
+    if (!frame) continue;
+    if (word === 'proof') {
+      const owner = frame.current ?? frame.caseNode ?? frame.owner;
+      owner.own.push(token); frames.push({ owner, prefix: [] }); continue;
+    }
+    if (word === '{') { frames.push({ owner: frame.caseNode ?? frame.owner, prefix: [], brace: true }); continue; }
+    if (word === '}') {
+      if (frame.brace) { finishFrame(frame, token.start); frames.pop(); }
+      continue;
+    }
+    if (word === 'qed') {
+      finishFrame(frame, token.start);
+      frame.owner.closed = true; frame.owner.finish = token; close(frame.owner, token.end);
+      frames.pop();
+      if (frames.length === 1 && frames[0].owner === frame.owner) frames.length = 0;
+      continue;
+    }
+    if (word === 'oops') {
+      for (const open of frames) {
+        finishFrame(open, token.end); open.owner.abandoned = true; open.owner.finish = token; close(open.owner, token.end);
+        if (open.current) { open.current.abandoned = true; open.current.finish = token; }
+      }
+      frames.length = 0; continue;
+    }
+    if (word === 'end' && frames.length === 1) { close(frame.owner, token.start); frames.length = 0; continue; }
+    if (frames.length > 1 && (prefixes.has(word) || frame.prefix.length && !commands.has(word))) {
+      if (!frame.prefix.length) close(frame.current, token.start);
+      frame.prefix.push(token); continue;
+    }
+    if (frames.length > 1 && word === 'next') {
+      finishFrame(frame, token.start); frame.current = undefined; frame.caseNode = undefined; frame.prefix = []; continue;
+    }
+    if (frames.length > 1 && commands.has(word)) {
+      close(frame.current, frame.prefix[0]?.start ?? token.start);
+      if (word === 'case') close(frame.caseNode, token.start);
+      const parent = word === 'case' ? frame.owner : frame.caseNode ?? frame.owner;
+      const node = create(token, i, parent, frame.current, frame.prefix);
+      frame.current = node; frame.prefix = [];
+      if (word === 'case') frame.caseNode = node;
+      continue;
+    }
+    frame.current?.own.push(token);
+    if (frame.current && endings.has(word)) {
+      frame.current.closed = true; frame.current.finish = token;
+      if (word === '.' || word === '..') frame.current.implicit = true;
+    }
+  }
+  for (const frame of frames) { finishFrame(frame, source.length); close(frame.owner, source.length); }
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const factNames = new Map(nodes.map(node => {
+    const end = node.own.findIndex(token => !token.quoted && ['using', 'proof', 'by', 'sorry'].includes(token.text));
+    const header = end < 0 ? node.own : node.own.slice(0, end);
+    const names = header.filter((token, i) => !token.quoted && /^[\p{L}_][\p{L}\p{N}_'.]*$/u.test(token.text)
+      && header[i + 1]?.text === ':' && header[i + 2]?.text !== ':').map(token => token.text);
+    return [node.id, new Set([node.name, ...names])] as const;
+  }));
+  const edges = new Map<string, ProofEdge>();
+  const add = (from: string, to: string, kind: ProofEdge['kind']) => {
+    if (from !== to) edges.set(from + '\0' + to, { from, to, kind });
+  };
+  function visible(candidate: Node, node: Node): boolean {
+    if (!candidate.parent) return true;
+    let parent = node.parent;
+    while (parent) {
+      if (candidate.parent === parent || candidate.id === parent && candidate.command === 'case') return true;
+      parent = byId.get(parent)?.parent;
+    }
+    return !candidate.parent && !node.parent;
+  }
+  for (const node of nodes) {
+    // A show discharges the enclosing obligation. Case commands introduce
+    // assumptions, not circular obligations back from their own conclusions.
+    if (node.parent && ['show', 'thus'].includes(node.command)) {
+      let owner = byId.get(node.parent);
+      while (owner?.command === 'case') owner = owner.parent ? byId.get(owner.parent) : undefined;
+      if (owner) add(node.id, owner.id, 'nesting');
+    }
+    if (node.implicit && node.previous) add(node.previous, node.id, 'implicit');
+    let facts = false;
+    for (let i = 0; i < node.own.length; i++) {
+      const token = node.own[i];
+      if (token.quoted) continue;
+      if (['using', 'from', 'with', 'by', 'apply', 'unfolding'].includes(token.text)) facts = true;
+      if (!facts && !(node.own[i + 1]?.text === '[' && node.own[i + 2]?.text === 'OF')) continue;
+      const candidate = nodes.filter(other => (factNames.get(other.id)!.has(token.text)
+        || other.command === 'case' && token.text.startsWith(other.name + '.')) && other.start < node.start
+        && (other.end <= token.start || other.command === 'case') && visible(other, node)).at(-1);
+      if (candidate) add(candidate.id, node.id, 'fact');
+    }
+    const headerEnd = node.own.find(token => !token.quoted && ['proof', 'by', 'sorry', 'apply'].includes(token.text))?.start
+      ?? Math.min(node.end, source.indexOf('\n', node.start) < 0 ? source.length : source.indexOf('\n', node.start));
+    node.statement = source.slice(node.start, headerEnd).trim();
+  }
+  return { nodes: nodes.map(({ own, previous, implicit, ...node }) => node), edges: [...edges.values()] };
+}

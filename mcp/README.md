@@ -1,7 +1,7 @@
 # Isabelle MCP
 
 The Python stdio server connects to the running VS Code extension. It exposes
-exactly seven tools, uses FastMCP 4.1.0, and never launches a second prover.
+exactly eight tools, uses FastMCP 4.1.0, and never launches a second prover.
 
 ## Installed VSIX (no checkout)
 
@@ -58,7 +58,7 @@ Registration is left to you; the test runner does not change client configuratio
 For **Isabelle: Ask**, Claude Code must also be signed in and on VS Code's PATH.
 Ask checks `claude mcp get isabelle` from the workspace root, then supplies the
 bundled server and this extension's discovery file explicitly to that child.
-It changes no registration and allows only these seven tools; a run occupies
+It changes no registration and allows only these eight tools; a run occupies
 one of the two client slots. See [the Ask demo](../docs/DEMO.md#ask-isabelle).
 M7 supports two simultaneous clients; a third connection is refused. Each client
 runs its own stdio server and shares the extension's prover. Restart the MCP
@@ -80,8 +80,9 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 | `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag for all open theory tabs. |
 | `sorry_positions(file)` | Returns server-marked `[start_line,start_col,end_line,end_col]` ranges and a `complete` flag. Comments and strings containing the word are ignored. |
 | `processing_status()` | Returns per-file `known`, `processed`, `processing`, version, and pending ranges; the top-level `processing` flag is true if any open theory is pending. |
+| `proof_graph(file)` | Returns recursive nodes (`id`, `name`, `status`, UTF-16 `range`, `parent`), dependency edges (`from`, `to`, `kind`), `complete`, `fully_checked`, counts and document version. Read-only; it does not move the cursor. |
 
-The last two tools follow the purposes of I/Q's `get_sorry_positions` and
+`sorry_positions` and `processing_status` follow the purposes of I/Q's `get_sorry_positions` and
 `get_processing_status`, read before implementation in the
 [AutoCorrode I/Q tool list](https://github.com/awslabs/AutoCorrode/blob/main/iq/README.md#mcp-tools).
 Our parameter-free processing query lists open theory tabs rather than accepting
@@ -92,8 +93,11 @@ I/Q's file argument. We do not load I/Q or modify Isabelle.
 1. Call `open` to read the current buffer, then `goals_at` on the theorem or a
    `have` command. Blank lines, the final `end`, and a completed top-level `by`
    tactic need not return a proof state. The sidebar follows this same cursor.
-2. Use `sorry_positions` to find admitted steps. If its list is incomplete,
-   first obtain a goal for that document version and poll `processing_status`.
+2. Query `proof_graph`: choose an `open` leaf whose incoming dependencies are
+   `proved`. Parent links represent nested proofs; a `case` supplies assumptions
+   to its children. Replace one leaf per edit, then repeat. `sorry_positions`
+   supplies the exact admitted command ranges. If `complete` is false, obtain
+   a goal for that document version and poll `processing_status`.
 3. Read `open` again, recompute the range, and submit an edit. Then poll
    processing and inspect `errors` and `status`.
    **unfinished (sorry)** is distinct from an error. `No subgoals!` alone is not
@@ -119,12 +123,20 @@ Editor operations from both clients are serialized. Each connection remembers
 the version returned by its last `open` or successful `edit`; a change by the
 other client or by hand invalidates that version. A stale edit returns
 `The buffer changed since this client last read it. Call open and recompute the edit range.`
-The seven tool signatures remain unchanged.
+The original seven tool signatures remain unchanged; M12 adds `proof_graph`.
 
 **Isabelle Swarm** tags edited cards for ten seconds using MCP initialization's
 client name (normalised to Claude/Codex for those clients). This is self-reported
 display metadata, not authentication. The connection token remains the local
 authentication mechanism. See [SWARM_PROMPT.md](../docs/SWARM_PROMPT.md) for the demo.
+
+Graph edges explain explicit local Isar fact use and implicit chaining; they
+are not a kernel dependency certificate. Unrecognised or imported library facts
+are not invented as nodes. Status is conservative: `checking` until fresh PIDE
+annotations arrive, `open` for admissions, `error` for diagnostics, `abandoned`
+for `oops`, and `proved` for accepted commands. Only a fully checked document
+can mark its theorem root proved. Edits keep the graph tab focused when active;
+Goals and the compact Swarm still follow the source cursor.
 
 ## Verify end to end
 
@@ -133,7 +145,7 @@ bash scripts/check_m5.sh
 ```
 
 This uses the installed VS Code application and Isabelle, runs M3/M4 regressions,
-then drives all seven tools through a real FastMCP stdio client. It compares
+then drives all eight tools through a real FastMCP stdio client. It compares
 goals with the actual sidebar model, replaces a `sorry` with the complete M4
 proof in a disposable Sqrt2 copy, and checks completion, errors, processing,
 connection refusal, and file boundaries. The real example remains unchanged.

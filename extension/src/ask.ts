@@ -12,12 +12,15 @@ export function registrationCommand(serverRoot: string): string {
 export function helpLine(missing: 'claude' | 'MCP', serverRoot: string): string {
   return `${missing === 'claude' ? 'claude is not on PATH.' : 'The isabelle MCP server is not registered.'} With Claude Code and Python 3.11+ installed, run: ${registrationCommand(serverRoot)}`;
 }
-const toolNames = ['open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positions', 'processing_status'];
+const toolNames = ['open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positions', 'processing_status', 'proof_graph'];
 
 export function preamble(context: AskContext): string {
   return 'You have the `isabelle` MCP tools. The active theory is ' + context.file + ', cursor at line ' + context.line
     + '. Work only through those tools. Write structured Isar: named `have` steps with short `by` justifications, no Sledgehammer. '
     + 'After each edit check errors and status; stop when fully_checked is true or you are stuck, and say which.\n'
+    + 'Query proof_graph, pick an open leaf whose dependencies are proved, prove it, repeat; one step per edit. '
+    + 'Work directly on one ready leaf; do not delegate or seek advice from another agent. '
+    + 'Parent links describe nested proofs. A case node supplies assumptions to its children. '
     + 'The cursor line above is one-based; MCP lines and UTF-16 columns are zero-based. '
     + 'Read open immediately before each edit and recompute its range. Query goals_at on a theorem or have command '
     + 'after editing to confirm the current version, then check errors and status. '
