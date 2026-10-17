@@ -10,6 +10,7 @@ import subprocess
 from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
+DEMO = ROOT / 'demo'
 EXTENSION = 'hymanimy.isabelle-revamp'
 SETTINGS = {
     'security.workspace.trust.enabled': False,
@@ -27,6 +28,17 @@ SETTINGS = {
     'isabelleRevamp.prettySymbols': True,
     'isabelleRevamp.demoLayoutOnStartup': True,
 }
+# Kept out of the stage window; demo/.vscode/settings.json is seeded with these.
+HIDDEN = {'**/.demo': True, '**/*_solution.thy': True, '**/*_reference.thy': True}
+
+
+def resolve_destination(path):
+    """The demo folder to prepare. demo/ is committed; nothing else inside the repo."""
+    destination = path.expanduser().resolve()
+    if destination != DEMO and (destination == ROOT or ROOT in destination.parents
+                                and '.dev-host' not in destination.parts):
+        raise SystemExit('Use demo/, a .dev-host/ scratch directory, or a folder outside the repository.')
+    return destination
 
 
 def read_json(file):
@@ -34,9 +46,14 @@ def read_json(file):
 
 
 def write_json(file, value):
+    text = json.dumps(value, indent=2) + '\n'
+    # The committed demo folder is a working tree: leave an unchanged file alone
+    # so preparing the environment never shows up as a modification.
+    if file.exists() and file.read_text() == text:
+        return
     file.parent.mkdir(parents=True, exist_ok=True)
     temporary = file.with_suffix(file.suffix + '.tmp')
-    temporary.write_text(json.dumps(value, indent=2) + '\n')
+    temporary.write_text(text)
     temporary.replace(file)
 
 
@@ -83,6 +100,11 @@ def prepare_profile(data, settings):
 
 
 def copy_theories(destination, previous):
+    # Only for a scratch destination. The committed demo/ folder already owns
+    # its theories, and git is a better reset than a hash table.
+    if destination == DEMO:
+        print(f'Theories are version-controlled in {DEMO.relative_to(ROOT)}; reset them with "git checkout demo/".')
+        return {}
     cards = ROOT / 'examples/card'
     sources = [file for file in sorted(cards.glob('*.thy')) if not file.stem.endswith(('_solution', '_reference'))]
     if not sources:
@@ -104,12 +126,10 @@ def copy_theories(destination, previous):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--directory', type=Path, default=Path.home() / 'hack/demo')
+    parser.add_argument('--directory', type=Path, default=DEMO)
     parser.add_argument('--vsix', type=Path, help='Use an existing VSIX instead of building the current source')
     args = parser.parse_args()
-    destination = args.directory.expanduser().resolve()
-    if destination == ROOT or ROOT in destination.parents and '.dev-host' not in destination.parts:
-        raise SystemExit('Use a separate demo folder, not the source repository.')
+    destination = resolve_destination(args.directory)
     destination.mkdir(parents=True, exist_ok=True)
     private = destination / '.demo'
     data, extensions = private / 'user-data', private / 'extensions'
@@ -159,12 +179,18 @@ def main():
     hashes = copy_theories(destination, previous.get('theories', {}))
     workspace_file = destination / '.vscode/settings.json'
     workspace = read_json(workspace_file)
-    workspace.setdefault('files.exclude', {}).update({'**/.demo': True, '**/*_solution.thy': True, '**/*_reference.thy': True})
-    workspace.setdefault('search.exclude', {}).update({'**/.demo': True, '**/*_solution.thy': True, '**/*_reference.thy': True})
+    workspace.setdefault('files.exclude', {}).update(HIDDEN)
+    workspace.setdefault('search.exclude', {}).update(HIDDEN)
     write_json(workspace_file, workspace)
     # Prepare the optional MCP runtime now, not during the stage request.
     subprocess.run(['python3', str(launcher), '--help'], check=True, stdout=subprocess.DEVNULL)
-    launch = ['env', 'ISABELLE_REVAMP_PORT_FILE=' + str(private / 'port'), *cli, '--new-window', '--sync', 'off', '--skip-welcome', '--skip-release-notes', str(destination), str(destination / 'Sqrt2.thy')]
+    # Beat 1 opens on Sqrt2; a scratch directory may only hold the card fixtures.
+    opening = destination / 'Sqrt2.thy'
+    if not opening.is_file():
+        opening = next(iter(sorted(destination.glob('*.thy'))), None)
+    launch = ['env', 'ISABELLE_REVAMP_PORT_FILE=' + str(private / 'port'), *cli, '--new-window',
+              '--sync', 'off', '--skip-welcome', '--skip-release-notes', str(destination),
+              *([str(opening)] if opening else [])]
     write_json(metadata_file, {'profile': profile, 'settings': settings, 'launch': launch,
                               'extension': str(launcher.parents[1]), 'theories': hashes})
     print(f'Prepared Demo: {destination}')

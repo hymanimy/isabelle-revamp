@@ -279,30 +279,37 @@ Prepare the isolated stage environment from the repository:
 bash scripts/demo-env.sh
 ```
 
-It builds and installs the current VSIX into **Demo**, under
-`~/hack/demo/.demo/`, with no other user-installed extensions. It prints the
-exact launch command, including the isolated user-data/extension directories
-and MCP port file. Use that command rather than opening the folder in a normal
-VS Code window. The generated settings disable workspace-trust prompts, editor
-and extension updates, tips, welcome pages and built-in Chat; font size is 16,
-pretty symbols are enabled, and Demo Layout runs on activation. Your normal
-VS Code profile is not reconfigured. The bundled MCP environment is prepared
-before launching, and `.mcp.json` is project-scoped to the demo folder.
+It builds and installs the current VSIX into **Demo**, under `demo/.demo/`,
+with no other user-installed extensions, and prints the exact launch command,
+including the isolated user-data/extension directories and MCP port file. Use
+that command rather than opening the folder in a normal VS Code window. The
+**user-level** settings it writes into that profile disable workspace-trust
+prompts, editor and extension updates, tips, welcome pages, built-in Chat and
+telemetry, and record this machine's Isabelle path. The **workspace** settings
+— pretty symbols, Demo Layout on activation, font size 16, the Isar palette —
+are committed in `demo/.vscode/settings.json`, so preparing the environment
+leaves the working tree clean. Your normal VS Code profile is not
+reconfigured. The bundled MCP environment is prepared before launching, and
+`.mcp.json` is project-scoped to `demo/` and gitignored.
 
-Close the Demo window before re-running setup. Existing edited theory files
-are preserved; an unmodified previously copied fixture can update. To use an
-already built package, pass `--vsix dist/isabelle-revamp-0.1.0.vsix`.
-The script copies non-reference theories from `examples/card/` as they become
-available. Until M15 creates that set, it uses the existing Sqrt2 reference for
-the first-launch environment check; that is not a live card-proof rehearsal.
+Close the Demo window before re-running setup. To use an already built package,
+pass `--vsix dist/isabelle-revamp-0.1.0.vsix`. `demo/`'s theories are
+version-controlled, so setup never copies over them and a rehearsal is reset
+with `git checkout demo/`. A scratch directory passed with `--directory` still
+receives copies of the non-reference theories from `examples/card/`, preserving
+any edited file. See [demo/README.md](../demo/README.md) for the file set, the
+card-theorem mapping and the gap: card theorem 3, "infinitely many primes", has
+no fixture in the repository.
 
 Before walking on stage:
 
 - [ ] **DND on** in macOS; silence phone and calendar notifications.
-- [ ] Open the printed **Demo** command on `~/hack/demo`; no banners or popups.
+- [ ] Open the printed **Demo** command on `demo/`; no banners or popups.
 - [ ] **Chat closed**; source visible, Ask and Proof Graph at the bottom.
-- [ ] Sqrt2 checks, and the active card is restored to its intended skeleton.
-- [ ] Claude is signed in; Ask can reach the demo's MCP bridge.
+- [ ] Sqrt2 checks, and the active card is restored to its intended skeleton
+      (`git checkout demo/` after a rehearsal).
+- [ ] Claude is signed in; Ask can reach the demo's MCP bridge, and the Ask
+      transcript is **Clear**ed from the previous rehearsal.
 - [ ] **Replay tested** on the current rehearsal timeline.
 - [ ] **Backup video ready** and reachable without searching for a file.
 

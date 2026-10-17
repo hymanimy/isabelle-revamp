@@ -1,5 +1,19 @@
 # Isabelle Revamp
 
+## Two ways in
+
+**Demo** — [`demo/`](demo/README.md) is the folder you open on stage: five
+theories plus workspace settings, no source and no tests. Run `bash
+scripts/demo-env.sh` from this root; it installs the current VSIX into an
+isolated **Demo** VS Code profile under `demo/.demo/` and prints the single
+command that opens the folder. Use that command, never a normal window.
+
+**Dev** — this repository root is the development workspace. Run `npm ci
+--prefix extension`, open the root in VS Code, then **Run → Start Debugging**
+(F5) for an Extension Development Host. The sources are `extension/` and
+`mcp/`; the checks are `scripts/check_*.sh`. Nothing in `demo/` is needed to
+build, test or package.
+
 Isabelle/HOL in stock VS Code, using the unmodified `isabelle vscode_server`.
 M1 provides a plain-text goal probe; M2 adds Isar highlighting and server startup;
 M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,

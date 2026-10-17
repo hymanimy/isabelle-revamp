@@ -1,0 +1,116 @@
+{
+  "isabelleRevamp.prettySymbols": true,
+  "isabelleRevamp.demoLayoutOnStartup": true,
+  "editor.fontSize": 16,
+  "workbench.startupEditor": "none",
+  "files.exclude": {
+    "**/.demo": true,
+    "**/*_solution.thy": true,
+    "**/*_reference.thy": true
+  },
+  "search.exclude": {
+    "**/.demo": true,
+    "**/*_solution.thy": true,
+    "**/*_reference.thy": true
+  },
+  "files.readonlyInclude": {
+    "/Users/leo/hack/isabelle-env/Isabelle2025-2.app/**": true,
+    "/Users/leo/.isabelle/**": true
+  },
+  "editor.tokenColorCustomizations": {
+    "[Default Dark Modern][Default Dark+][Dark+][Default High Contrast]": {
+      "textMateRules": [
+        {
+          "scope": [
+            "keyword.control.isabelle",
+            "keyword.operator.isabelle"
+          ],
+          "settings": {
+            "foreground": "#82AAFF"
+          }
+        },
+        {
+          "scope": [
+            "variable.other.free.isabelle",
+            "entity.name.type.free.isabelle"
+          ],
+          "settings": {
+            "foreground": "#82AAFF"
+          }
+        },
+        {
+          "scope": [
+            "variable.parameter.bound.isabelle"
+          ],
+          "settings": {
+            "foreground": "#9CCC65"
+          }
+        },
+        {
+          "scope": [
+            "variable.other.constant.skolem.isabelle"
+          ],
+          "settings": {
+            "foreground": "#FFB454"
+          }
+        },
+        {
+          "scope": [
+            "string.quoted.double.isabelle",
+            "string.quoted.other.isabelle"
+          ],
+          "settings": {
+            "foreground": "#D4D4D4"
+          }
+        }
+      ]
+    },
+    "[Default Light Modern][Default Light+][Light+][Default High Contrast Light]": {
+      "textMateRules": [
+        {
+          "scope": [
+            "keyword.control.isabelle",
+            "keyword.operator.isabelle"
+          ],
+          "settings": {
+            "foreground": "#0000CC"
+          }
+        },
+        {
+          "scope": [
+            "variable.other.free.isabelle",
+            "entity.name.type.free.isabelle"
+          ],
+          "settings": {
+            "foreground": "#0000CC"
+          }
+        },
+        {
+          "scope": [
+            "variable.parameter.bound.isabelle"
+          ],
+          "settings": {
+            "foreground": "#087A28"
+          }
+        },
+        {
+          "scope": [
+            "variable.other.constant.skolem.isabelle"
+          ],
+          "settings": {
+            "foreground": "#A65300"
+          }
+        },
+        {
+          "scope": [
+            "string.quoted.double.isabelle",
+            "string.quoted.other.isabelle"
+          ],
+          "settings": {
+            "foreground": "#000000"
+          }
+        }
+      ]
+    }
+  }
+}

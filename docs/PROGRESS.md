@@ -753,3 +753,66 @@ Review of the 17 Oct work on branch `leo`: three jobs, one commit each.
 - **VSIX:** the 14:07 `dist/isabelle-revamp-0.1.0.vsix` did match the sources it
   was built from (newest source 13:45), so Codex's package was not stale. It is
   stale now that `ask.ts` has changed, and was rebuilt with `npm run package`.
+
+## Job 2 — demo folder split from the development root
+
+- **Found:** the repository root was both workspaces, and `scripts/demo_env.py`
+  pointed at `~/hack/demo`, an untracked folder outside the repository, while
+  explicitly refusing any destination inside it. Two things also stood in the
+  way of committing a demo folder: `demo_env.py` rewrote the destination's
+  `.vscode/settings.json` on every run, and `libraryFiles.ts:17` writes
+  `files.readonlyInclude` into **workspace** settings at activation — either
+  would show the prepared demo folder as a modification.
+- **Found, pre-existing break:** `scripts/check_demo_env.py` asserted that
+  `copy_theories` produces `Sqrt2.thy`, but since M14 added
+  `examples/card/Sqrt4.thy` the fallback branch no longer runs and the copy is
+  `Sqrt4.thy`. `bash scripts/check_m13b.sh` therefore failed before this
+  review. Fixed here rather than left for the demo.
+- **Interpretation, flagged:** "the four card theories" cannot be taken
+  literally — only `examples/card/Sqrt4.thy` exists under `examples/card/`, and
+  the judges' card theorem 3, "there are infinitely many primes", has **no
+  fixture anywhere in the repository**. The only satisfiable reading of "the
+  four card theories + Sqrt4, copied from examples/card and examples/" is the
+  four non-reference theories in `examples/` plus `Sqrt4` from
+  `examples/card/`. `demo/README.md` carries that mapping and names the gap;
+  no new fixture was invented. Card theorem 2 (√p irrational for prime p) is
+  served by `Cascade.thy`, which is its engine, not its statement.
+- **Changed:**
+  - `demo/` holds `Sqrt2.thy` (complete, beats 1–2), `Swarm.thy` (6
+    admissions), `Cascade.thy` (38), `Demo.thy` (3) and `Sqrt4.thy` (the red
+    flash), a `.vscode/settings.json`, and a `README.md`. No reference proofs,
+    no extension source, no tests, no scripts.
+  - `demo/.vscode/settings.json` holds only what VS Code honours per workspace
+    — pretty symbols, demo layout on activation, font size 16, no startup
+    editor, the Isar palette, the hidden `.demo`/reference globs — and is
+    pre-seeded with the `files.readonlyInclude` paths so the extension finds
+    nothing missing and never writes to it. Workspace trust, update and
+    extension suppression, telemetry, Chat and this machine's
+    `isabelleRevamp.executable` are user-level: they stay in the generated
+    Demo profile, and `demo/README.md` documents each one and why.
+  - `scripts/demo_env.py` defaults to `demo/`; `resolve_destination` allows
+    exactly `demo/`, a `.dev-host/` scratch directory, or anywhere outside the
+    repository, and still refuses the root. `write_json` leaves an unchanged
+    file alone, and `copy_theories` refuses to copy over `demo/` because its
+    theories are in git — `git checkout demo/` is the reset. A scratch
+    `--directory` keeps the old copy-and-preserve behaviour.
+  - the launch command now opens `Sqrt2.thy` when it exists and otherwise the
+    first theory present, instead of naming a file a scratch folder may lack.
+  - `.gitignore` adds `demo/.demo/` and `demo/.mcp.json`; `README.md` opens
+    with a ten-line Demo/Dev split; `docs/DEMO.md`'s pre-flight points at
+    `demo/` and separates user-level from workspace settings.
+- **Verified:** `bash scripts/check_m13b.sh` passes, including a real CLI
+  install into the ignored scratch folder. `scripts/check_demo_env.py` now also
+  checks that `demo/` is self-contained (five theories and a README, no
+  `_solution` files, no `extension/`), that `resolve_destination` accepts
+  `demo/` and rejects the root, `examples/`, `extension/` and `mcp/`, that the
+  committed settings survive a preparation run byte-for-byte, and that
+  trust/update/executable keys are absent from them. `bash scripts/demo-env.sh
+  --vsix dist/isabelle-revamp-0.1.0.vsix` was then run for real against
+  `demo/`: it installed only `hymanimy.isabelle-revamp-0.1.0` into
+  `demo/.demo/extensions/`, printed the single launch command, and left
+  `git status` showing nothing under `demo/` except the files committed here
+  (`git check-ignore` confirms `demo/.demo/` and `demo/.mcp.json`).
+- **Not done:** `~/hack/demo` still exists with a live Demo window from the
+  earlier environment. It is now superseded; close that window and relaunch
+  from the printed `demo/` command before the demo.
