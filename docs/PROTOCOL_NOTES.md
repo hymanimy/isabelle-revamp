@@ -49,8 +49,8 @@ isabelle vscode_server -n -l HOL \
   as a diagnostic flag in the probe.
 
 `vscode_pide_extensions` was left at its default (`false`). It was not needed for
-the `PIDE/dynamic_output` notification. Busy-state notifications and inline
-diagnostics have not been verified by this spike.
+the `PIDE/dynamic_output` notification. M1 did not verify busy-state notifications
+or inline diagnostics; see the M3 findings below.
 
 ## Framing and message sequence
 
@@ -171,3 +171,100 @@ are relative to `Isabelle2025-2.app/src/Tools/VSCode/`:
 No distribution files were changed. The client-only HTML-to-text workaround was
 approved and implemented. The original wire-level plaintext requirement has
 been replaced by plain text at the client boundary; the server bug remains.
+
+## M3: cursor freshness, busy state, and diagnostics
+
+Verified with the unmodified server, then through a real VS Code integration
+host. M3 adds `-o vscode_pide_extensions=true` to the M1 launch options.
+
+### Goal output is untagged and deduplicated
+
+`PIDE/dynamic_output` still contains only HTML content. Moving between commands
+with identical formatted output need not emit another notification. Clearing the
+caret with `PIDE/caret_update` params `{}` emitted empty output in the live probe,
+but this is also deduplicated and cannot serve as an unconditional reply barrier.
+
+To avoid treating an old reply as the new cursor's goal, the client uses the
+server's built-in state query to confirm each debounced caret selection:
+
+```json
+{"jsonrpc":"2.0","method":"PIDE/caret_update","params":{"uri":"FILE_URI","line":6,"character":4}}
+{"jsonrpc":"2.0","id":3,"method":"PIDE/state_init","params":{}}
+{"jsonrpc":"2.0","id":3,"result":{"state_id":-1}}
+{"jsonrpc":"2.0","method":"PIDE/state_output","params":{"id":-1,"content":"HTML_STRING","auto_update":true}}
+{"jsonrpc":"2.0","method":"PIDE/state_exit","params":{"id":-1}}
+```
+
+The IDs observed were **negative integers** (`-1`, `-2`, `-3`). A state query
+does not open a UI panel or invoke proof search; it asks the existing prover for
+`print_state`. Its goal text at `show ?thesis` matched the dynamic output:
+
+```text
+proof (prove)
+goal (1 subgoal):
+ 1. sqrt 2 ∉ ℚ
+```
+
+The extension increments a local generation on cursor/document changes, hides
+old text immediately, and sends the caret after 150 ms of quiet. It retires the
+previous state ID and ignores its late replies. Notifications received before
+the `state_init` response are buffered until their ID is known. Dynamic output
+is rendered when it matches the confirmed state; otherwise the tagged state
+provides the goal text, including when dynamic output was deduplicated. Error
+messages come from diagnostics. The webview receives escaped plain text with
+scripts disabled, never executable server HTML.
+
+### Busy decorations are deltas
+
+An in-memory test theory with `ML \<open>OS.Process.sleep (Time.fromReal 2.0)\<close>`
+produced this shape while the prover was running:
+
+```json
+{"jsonrpc":"2.0","method":"PIDE/decoration","params":{"uri":"FILE_URI","entries":[{"type":"background_running1","content":[{"range":[4,0,4,54]}]},{"type":"text_overview_unprocessed","content":[{"range":[5,0,9,3]},{"range":[11,0,11,3]}]}]}}
+```
+
+The example omits other entries from the same notification. Ranges use compact
+`[startLine,startCharacter,endLine,endCharacter]` arrays. Subsequent messages
+contained the same types with `content: []` when processing finished. Messages
+are **deltas**: an omitted type keeps its previous value. The sidebar tracks
+`background_running1`, `background_unprocessed1`, `background_canceled`,
+`text_overview_running`, and `text_overview_unprocessed` per URI. During pending
+cursor work or any of these busy ranges it displays `checking…` without old text.
+
+The client can request a full decoration snapshot using:
+
+```json
+{"jsonrpc":"2.0","method":"PIDE/decoration_request","params":{"uri":"FILE_URI"}}
+```
+
+The response is another `PIDE/decoration` notification, not a JSON-RPC response.
+
+### Diagnostics distinguish errors from incomplete proofs
+
+Replacing `sorry` with `by simp` produced this actual diagnostic payload (URI
+abbreviated; missing severity is intentional):
+
+```json
+{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"FILE_URI","diagnostics":[{"jsonrpc":"2.0","range":{"start":{"line":7,"character":7},"end":{"line":7,"character":11}},"message":"Failed to apply initial proof method\\<^here>:\ngoal (1 subgoal):\n 1. sqrt 2 \\<notin> \\<rat>"}]}}
+```
+
+The LanguageClient converts it into a VS Code error diagnostic at the correct
+range. A correct temporary `(2 :: real) = 2` / `by simp` control emitted
+`diagnostics: []` and `No subgoals!`. The real example was left unchanged for M4.
+
+Two traps were reproduced:
+
+- `background_bad` marks `sorry` too; it is **not** a reliable error flag.
+  Use actual diagnostics and `text_overview_error` for errors.
+- A failed method's state can contain `No subgoals!` from an enclosing proof
+  state. Errors take precedence: the sidebar hides that state and shows the
+  diagnostic instead. No string match is used to declare a theory checked.
+
+References inside the installed distribution: `src/Tools/VSCode/src/state_panel.scala`
+(state query lifecycle), `src/Tools/VSCode/src/lsp.scala` (message shapes),
+`src/Tools/VSCode/src/vscode_model.scala` (`publish` deltas), and
+`src/Tools/VSCode/src/vscode_resources.scala` (`force_decorations`).
+
+Reproduce the host checks with `bash scripts/check_m3.sh`. This runs the installed
+VS Code executable directly so its test exit status is captured; it adds no
+framework or downloaded editor. Results are written to `.dev-host/m3-results.json`.

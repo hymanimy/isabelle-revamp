@@ -146,3 +146,40 @@ should be.
   check manually: `Sqrt2.thy` has colored Isar keywords and **Output → Isabelle**
   shows `Isabelle language server ready (HOL).` This is a test-environment
   permission issue, not a theorem error or an Isabelle installation failure.
+
+## 12. Goal notifications cannot identify the cursor that produced them
+
+- **What happened.** `PIDE/dynamic_output` has no URI, document version, or cursor
+  ID, and identical goal text is not resent after a cursor move. A naive view can
+  show a previous goal as current or wait forever for an unchanged result.
+- **Experience.** Moving the cursor appears unreliable, and the user cannot know
+  whether the displayed goal belongs to the line they are editing.
+- **Fix needed.** Tag goal notifications with document/cursor identity upstream.
+  In this client, clear old text immediately and confirm the debounced cursor
+  using the existing `PIDE/state_init` / `PIDE/state_output` ID, retiring old IDs.
+  Keep `checking…` visible while current output is unconfirmed or the prover runs.
+
+## 13. Error-looking markup and "No subgoals" are ambiguous
+
+- **What happened.** `background_bad` highlighted the permitted `sorry`
+  placeholder. Separately, a failing `by simp` produced output containing both
+  `No subgoals!` and `Failed to apply initial proof method`. The first live M3
+  test caught the client mistakenly treating `background_bad` as a proof error.
+- **Experience.** A beginner could think an unfinished proof is broken or a
+  failing proof is complete, depending on which signal the editor trusts.
+- **Fix needed.** Give diagnostics precedence over goal text; use
+  `text_overview_error`, not `background_bad`, as the decoration error flag.
+  Hide misleading goal text on an error and show the actual diagnostic. Neither
+  absence of diagnostics nor "No subgoals" proves a theory has no `sorry`.
+
+## 14. The editor launcher can return before tests finish
+
+- **What happened.** Launching an Extension Development Host test through `code`
+  returned exit 0 before the test finished; a later assertion failed in the host.
+  Running VS Code's application executable directly exposed the failure and
+  returned the test's exit status.
+- **Experience.** A successful terminal command appears to certify a check that
+  has not actually finished, while the useful failure message is elsewhere.
+- **Fix needed.** Use the foreground app executable for the integration runner.
+  `scripts/check_m3.sh` does this and keeps the profile, fixture, and result files
+  inside the repository's ignored `.dev-host/` directory.

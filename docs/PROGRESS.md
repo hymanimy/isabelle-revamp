@@ -102,3 +102,37 @@
 - **Would do differently:** use a short manual acceptance check when app access
   is unavailable, clearly attributing the result to the person who observed it.
 - **Next:** M3, the goals sidebar with cursor updates, checking state, and errors.
+
+## 2026-10-17 — M3 implemented; live automated checks passed
+
+- **Changed:** added the **Isabelle Goals** WebviewView in the Explorer sidebar,
+  **Isabelle: Show Goals**, 150 ms caret debounce, client HTML-to-text conversion,
+  immediate hiding of old text on edits/moves, and checking/error states. Standard
+  LanguageClient diagnostics appear in the editor. New code uses only VS Code,
+  the existing LanguageClient, and standard libraries; Isabelle is unchanged.
+- **Passed:** `bash scripts/check_m3.sh` compiled and ran the real stock VS Code
+  host against Isabelle, exiting 0. It verified different cursor states,
+  identical-state refresh, rapid cursor changes, a failed `by simp` diagnostic at
+  the correct range, error precedence, and empty old output during a deliberately
+  slow command. A temporary `(2 :: real) = 2` / `by simp` control showed
+  `No subgoals!` and cleared diagnostics. The original `examples/Sqrt2.thy` was
+  verified unchanged and still contains its M1 `sorry`; its complete proof is M4.
+- **Also verified:** injected out-of-order and early state replies, changed
+  document versions, decoration deltas, and a busy command beyond the waiting
+  deadline. HTML conversion preserves whitespace/entities; the webview escapes
+  markup and disables scripts. The test reads the same model rendered by the view.
+- **Discovered:** dynamic output is untagged and deduplicated. Built-in state
+  query IDs confirm the cursor and permit identical goal refreshes. Busy ranges
+  require `vscode_pide_extensions=true` and arrive as deltas. `background_bad`
+  includes `sorry`, and a failed method can still return an enclosing
+  `No subgoals!` state. Diagnostics therefore take precedence. Exact shapes and
+  reference source paths are in [PROTOCOL_NOTES.md](PROTOCOL_NOTES.md).
+- **Would do differently:** probe duplicate output and error/busy semantics before
+  wiring the UI; these are protocol correctness concerns, not rendering details.
+  Use the VS Code app executable for integration tests so test failures propagate
+  to the shell rather than relying on the early-returning `code` launcher.
+- **Visual check pending:** the screen tool still returns `Computer Use was not
+  approved to use Code`. An updated development window is open at `show ?thesis`,
+  and its Isabelle log confirms startup. Leo has been asked to check cursor
+  movement and the wrong-tactic error using **Isabelle: Show Goals**. M4 has not
+  started; record M3 as fully passed after that confirmation.
