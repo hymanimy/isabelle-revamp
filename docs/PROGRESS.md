@@ -816,3 +816,38 @@ Review of the 17 Oct work on branch `leo`: three jobs, one commit each.
 - **Not done:** `~/hack/demo` still exists with a live Demo window from the
   earlier environment. It is now superseded; close that window and relaunch
   from the printed `demo/` command before the demo.
+
+## Job 3 — the duplicated MCP server
+
+- **Found:** there was never a second source. `extension/mcp/` was already a
+  build-time copy — `build.cjs:7–8` copies `server.py`, `requirements.txt` and
+  `launch.py` from `mcp/` before bundling, `.gitignore:7` excluded the
+  directory, and `git ls-files extension/mcp` returned nothing. All three files
+  were byte-identical to `mcp/`. So the requested restructuring was already in
+  place; what was missing was anything that *said* so, and the gitignore
+  exception needed to make a README possible.
+- **Found, a trap in the requested change:** git cannot re-include a file
+  underneath an excluded **directory**, so adding `!extension/mcp/README.md`
+  below `extension/mcp/` would have silently done nothing. The exclusion is now
+  `extension/mcp/*` with the negation after it.
+- **Changed:** `extension/mcp/README.md` (the only tracked file there) says the
+  directory is generated, names `build.cjs` as its producer and `mcp/` as the
+  source, and warns that an edit here is overwritten by the next build.
+  `mcp/README.md` gained the matching four lines at the top. `.gitignore`
+  switched to the contents form with the negation.
+- **Verified:**
+  - `git add --dry-run extension/mcp/` offers only `README.md`, and
+    `git add --dry-run extension/mcp/server.py` is refused as ignored.
+  - deleting all three copies and running `npm run build --prefix extension`
+    restores them byte-identical to `mcp/`, leaving `README.md` untouched. The
+    repackaged VSIX carries exactly `extension/mcp/{launch.py,
+    requirements.txt, server.py}` and does not ship the development README.
+  - **both registration commands in `mcp/README.md` were run as a real MCP
+    client against the live extension bridge.** The repository form
+    (`mcp/.venv/bin/python mcp/server.py`) and the installed-VSIX form
+    (`python3 <installed>/mcp/launch.py`, using the freshly installed
+    `demo/.demo/extensions/hymanimy.isabelle-revamp-0.1.0`) each advertised the
+    same eight tools and reached the extension through `status()`. The
+    installed copies were confirmed byte-identical to `mcp/`. No client
+    configuration was registered or changed: the probe starts the documented
+    command directly rather than running `claude mcp add` against Leo's config.
