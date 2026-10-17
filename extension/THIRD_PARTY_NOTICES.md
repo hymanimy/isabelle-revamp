@@ -72,3 +72,8 @@ notification shapes from `extension/src/lsp.ts` and `symbol_panel.ts`.
 CSS and grouping approach from `src/Tools/VSCode/extension/src/script_decorations.ts`
 (Denis Paluca, TU Muenchen). Token scanning is extended to ASCII spellings,
 Unicode code points and matched block delimiters; cursor reveal is client-side.
+
+M10 goal class names and their meanings follow `etc/isabelle.css` and
+`src/Tools/VSCode/extension/media/vscode.css`. The local stylesheet uses VS Code
+colours; `goalHtml.ts` is a client allowlist implementation, not copied browser
+code. It shares the ported script-control range parser with editor decorations.

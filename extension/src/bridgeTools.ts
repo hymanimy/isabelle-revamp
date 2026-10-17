@@ -125,7 +125,8 @@ export class BridgeTools {
       }
       const state = this.view.snapshot();
       if (['ready', 'unfinished', 'error'].includes(state.phase) && this.goals.processing(document).processed) {
-        return { ...identity(), line: position.line, col: position.character, ...state };
+        const { html: _html, ...plain } = state;
+        return { ...identity(), line: position.line, col: position.character, ...plain };
       }
       if (state.phase === 'unavailable') throw new Error('No goal state at this position; choose a proof command.');
       await pause(25);

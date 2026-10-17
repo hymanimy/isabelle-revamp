@@ -503,3 +503,14 @@ should be.
 - **Fix needed.** Port the CSS but walk complete Isabelle symbols at original
   UTF-16 offsets, including balanced script blocks and supplementary glyphs.
   Suppress the generic glyph replacement for controls that are being hidden.
+
+## 40. Server HTML keeps useful classes but also needs client-side formatting
+
+- **What happened.** Stripping the HTML erased semantic colours and entity
+  links. Rendering it directly would retain arbitrary attributes. Even the HTML
+  path emitted a literal `⇧2` script marker instead of a superscript element.
+- **Experience.** Goals lose familiar jEdit distinctions or show unexplained
+  arrows in powers, despite the prover having supplied structured markup.
+- **Fix needed.** Reconstruct a small HTML allowlist, retain class semantics,
+  render script controls across markup boundaries, and keep an independent
+  plain-text MCP path. Never pass source HTML attributes directly to the view.

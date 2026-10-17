@@ -2,11 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { WebviewView, WebviewViewProvider } from 'vscode';
 import { AskState } from './ask';
 import { escapeText } from './outputText';
+import { goalHtml } from './goalHtml';
 import { viewHeader, viewTheme } from './viewTheme';
 
 export interface GoalState {
   phase: 'idle' | 'checking' | 'ready' | 'unfinished' | 'error' | 'unavailable';
   text: string;
+  html?: string;
   errors: string[];
   theory?: string;
   checkStatus?: 'checking' | 'fully_checked' | 'unfinished' | 'error';
@@ -24,6 +26,7 @@ function presentation(state: GoalState) {
     unavailable: 'Goal state unavailable. Move the cursor to retry.',
   }[state.phase];
   return { theory: state.theory ?? 'Isabelle Goals', status, phase: state.phase,
+    html: checking ? undefined : state.html === undefined ? undefined : goalHtml(state.html),
     text: checking ? '' : state.text, errors: checking ? '' : state.errors.join('\n\n') };
 }
 
@@ -57,7 +60,7 @@ button:disabled { opacity: .5; cursor: default; }
 <div id="transcript" role="log" aria-label="Ask transcript"></div>
 </section>
 ${viewHeader(goal.theory, goal.status)}
-<pre id="goal" class="source" aria-label="Goal at cursor">${escapeText(goal.text)}</pre>
+<div id="goal" class="source" aria-label="Goal at cursor">${goal.html ?? escapeText(goal.text)}</div>
 <pre id="errors" class="errors" aria-label="Diagnostics">${escapeText(goal.errors)}</pre>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
@@ -86,7 +89,8 @@ window.addEventListener('message', event => {
     document.querySelector('h1').textContent = goal.theory;
     document.querySelector('.status').textContent = goal.status;
     document.body.classList.toggle('error', goal.phase === 'error');
-    document.getElementById('goal').textContent = goal.text;
+    if (goal.html === undefined) document.getElementById('goal').textContent = goal.text;
+    else document.getElementById('goal').innerHTML = goal.html;
     document.getElementById('errors').textContent = goal.errors;
   }
   if (message.type === 'askState') {

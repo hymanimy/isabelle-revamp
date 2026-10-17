@@ -693,3 +693,22 @@ balanced blocks. Both encoded and decoded forms use the installed symbol table.
 Malformed controls stay visible. A selected control reveals its source and
 suspends that group's formatting. No document edits occur. Generic glyph
 replacements exclude hidden controls so an extra ⇧/⇩ is not drawn.
+
+## M10.3 — coloured goal HTML
+
+A live probe at Sqrt2's square step returned `<pre class="source">` containing
+nested `state_message`, `text_fold`, `keyword1`, `subgoal`, `notation`, `typing`,
+`main`, and `const` spans. The exponent arrived as literal `⇧2` inside
+`<span class="main">`; a surrounding anchor pointed to `Power.thy#26`.
+This is actual server output, not text with colours inferred from spelling.
+Receipt: `.dev-host/m10-goal-source.html`.
+
+The sidebar reconstructs only `span`, `a`, `pre`, `br` and validated class names.
+Source attributes never pass through; scripts/styles/embedded content are
+removed, other tag wrappers dropped, and decoded text is escaped anew.
+Control tokens are interpreted across text nodes, rendered with generated
+sup/sub/bold span classes. CSS class names follow `etc/isabelle.css`, using
+VS Code light/dark colours. Tagged state confirmation still gates rich output:
+stale/unfinished processing hides it, and actual errors clear the goal.
+`outputText.ts` remains the plain-text path; `goals_at` explicitly omits HTML.
+Entity link routing is the later item 8, not enabled by raw href attributes.

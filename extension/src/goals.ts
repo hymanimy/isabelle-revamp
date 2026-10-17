@@ -30,6 +30,7 @@ export class Goals implements Disposable {
   private pending = 0;
   private earlyStates = new Map<number, string>();
   private confirmed?: string;
+  private confirmedHtml?: string;
   private dynamic = '';
   private available = false;
   private requestedAt = 0;
@@ -49,7 +50,7 @@ export class Goals implements Disposable {
         this.render();
       }),
       client.onNotification('PIDE/state_output', (message: StateOutput) => {
-        const text = outputText(message.content);
+        const text = message.content;
         if (message.id === this.panel) this.acceptState(text);
         else if (this.pending) this.earlyStates.set(message.id, text);
       }),
@@ -111,6 +112,7 @@ export class Goals implements Disposable {
     clearTimeout(this.decorationTimer);
     this.releasePanel();
     this.confirmed = undefined;
+    this.confirmedHtml = undefined;
     this.dynamic = '';
     this.requestedAt = Date.now();
     this.publish({ phase: next ? 'checking' : 'idle', text: '', errors: [] });
@@ -159,7 +161,8 @@ export class Goals implements Disposable {
   }
 
   private acceptState(text: string): void {
-    this.confirmed = text;
+    this.confirmed = outputText(text);
+    this.confirmedHtml = text;
     if (this.caret) this.confirmedVersions.set(this.caret.uri, this.caret.version);
     clearTimeout(this.deadline);
     this.render();
@@ -196,7 +199,7 @@ export class Goals implements Disposable {
     // A failed method can inherit a parent's "No subgoals!" state. Show its
     // diagnostic instead, never that misleading state under an error banner.
     const phase = failed ? 'error' : unfinished ? 'unfinished' : 'ready';
-    this.publish({ phase, text: failed ? '' : text, errors });
+    this.publish({ phase, text: failed ? '' : text, html: failed ? undefined : this.confirmedHtml, errors });
   }
 
   private publish(state: GoalState): void {
@@ -215,6 +218,7 @@ export class Goals implements Disposable {
     clearTimeout(this.deadline);
     clearTimeout(this.decorationTimer);
     this.confirmed = undefined;
+    this.confirmedHtml = undefined;
     this.confirmedVersions.clear();
     this.annotatedVersions.clear();
     this.publish({ phase: 'unavailable', text: '', errors: [] });

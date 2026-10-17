@@ -156,3 +156,12 @@ Capture the display, then move into a control spelling to show its ASCII source.
 Toggle Pretty Symbols off to see every control; saving with the default setting
 keeps all original ASCII spellings. Script blocks and non-Latin symbol arguments
 use CSS positioning rather than a limited Unicode superscript alphabet.
+
+### 3. Coloured goal state
+
+Open `Sqrt2.thy` at the `root_squared` step (the goal `(sqrt 2)² = 2`) and capture
+Goals: the `goal` keyword is coloured and the power is raised, with no ⇧ marker.
+Use the free/bound/fixed-variable scratch proof from item 4 to capture matching
+variable colours in the panel. Switch light/dark themes to check readability.
+The Ask draft and transcript stay in place while the goal updates. MCP
+`goals_at` continues to return readable plain text, without HTML.

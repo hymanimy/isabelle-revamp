@@ -457,3 +457,20 @@
 - **Would do differently:** keep symbol tokens and UTF-16 ranges explicit from
   the beginning instead of treating formatting markers as ordinary glyphs.
   Screenshot instructions are in the item 2 demo section.
+
+## M10.3 — coloured goal HTML and plain MCP output
+
+- **Passed:** `scripts/check_m10.sh` exited 0 with M3–M8 and previous M10 checks.
+  Allowlist tests reject active elements/attributes, preserve semantic classes,
+  escape entity text, and render script controls even across markup boundaries.
+  A live `root_squared` goal retained `keyword1` and displayed its exponent
+  through the superscript span while MCP's plain text stayed unchanged.
+- **Discovered:** server HTML contains literal control markers, and rich output
+  must wait for current processing status as well as the tagged state reply.
+  The first new test sampled before that gate; the corrected test waits for
+  full checking, and the full rerun passed. A targeted M1 probe captured the
+  square HTML, then hit its unrelated sqrt-irrationality-specific stop matcher;
+  it shut down normally after its timeout. Live host acceptance passed.
+- **Would do differently:** retain rich and plain representations together from
+  the beginning, sharing script-token interpretation but keeping the webview's
+  rendering boundary strict. Demo screenshot steps cover colours and powers.

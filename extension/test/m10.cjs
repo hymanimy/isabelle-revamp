@@ -42,6 +42,7 @@ async function run() {
   await checkColors(root,api);
   await checkSymbols(root,api);
   await checkScripts(root,api);
+  await checkGoalMarkup(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
@@ -138,4 +139,22 @@ z\<^bsup>n`).length,0);
   assert.equal(api.getScriptDecorations().length,5);
   assert.equal(doc.getText(),original);assert.equal(fs.readFileSync(file,'utf8'),original);
   console.log('PASS: ASCII/Unicode script controls, symbol arguments, nested-capable blocks, cursor reveal and unchanged bytes');
+}
+
+async function checkGoalMarkup(root,api) {
+  require('./goalHtml.cjs').checkGoalHtml();
+  const {goalsHtml}=require('../out/goalsView');
+  const file=path.join(root,'examples/Sqrt2.thy');
+  const doc=await vscode.workspace.openTextDocument(file),editor=await vscode.window.showTextDocument(doc);
+  editor.selection=new vscode.Selection(16,4,16,4);
+  for(let i=0;i<200;i++) { await pause(50);if(api.getGoalState().text.includes('(sqrt 2)²') && api.getGoalState().checkStatus==='fully_checked')break; }
+  const state=api.getGoalState(),html=goalsHtml(state);
+  assert(state.html.includes('class="keyword1"'));
+  assert(state.html.includes('⇧2'));
+  assert(html.includes('class="keyword1"'));
+  assert(html.includes('class="isabelle-script-sup">2'));
+  assert(!html.includes('href="file:'));
+  assert(state.text.includes('(sqrt 2)²'));
+  fs.writeFileSync(path.join(root,'.dev-host/m10-goal-rendered.html'),html);
+  console.log('PASS: real server goal classes and superscript render in sidebar while plain goal text remains unchanged');
 }
