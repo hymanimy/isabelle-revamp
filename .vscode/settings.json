@@ -1,8 +1,8 @@
 {
-  "isabelleRevamp.executable": "~/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle",
+  "isabelleRevamp.executable": "/home/alex-hyman/isabelle/Isabelle2025-2/bin/isabelle",
   "files.readonlyInclude": {
-    "/Users/leo/hack/isabelle-env/Isabelle2025-2.app/**": true,
-    "/Users/leo/.isabelle/**": true
+    "/home/alex-hyman/isabelle/Isabelle2025-2/**": true,
+    "/home/alex-hyman/.isabelle/**": true
   },
   "files.exclude": {
     "**/Swarm_solution.thy": true,
@@ -21,7 +21,67 @@
             "keyword.operator.isabelle"
           ],
           "settings": {
-            "foreground": "#82AAFF"
+            "foreground": "#89DDFF"
+          }
+        },
+        {
+          "scope": "storage.type.isabelle",
+          "settings": {
+            "foreground": "#C792EA",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": [
+            "keyword.other.proof.isabelle",
+            "support.function.method.isabelle"
+          ],
+          "settings": {
+            "foreground": "#7FDBCA"
+          }
+        },
+        {
+          "scope": [
+            "keyword.other.modifier.isabelle",
+            "meta.attribute.isabelle"
+          ],
+          "settings": {
+            "foreground": "#A6ACCD",
+            "fontStyle": "italic"
+          }
+        },
+        {
+          "scope": [
+            "entity.name.function.theorem.isabelle",
+            "entity.name.function.definition.isabelle",
+            "entity.name.namespace.isabelle"
+          ],
+          "settings": {
+            "foreground": "#FFCB6B",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": [
+            "entity.name.label.fact.isabelle",
+            "variable.other.fact.isabelle"
+          ],
+          "settings": {
+            "foreground": "#FFCB6B"
+          }
+        },
+        {
+          "scope": "invalid.illegal.admission.isabelle",
+          "settings": {
+            "foreground": "#FF5370",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": "comment.block.documentation.isabelle",
+          "settings": {
+            "foreground": "#8A94A6",
+            "fontStyle": "italic"
           }
         },
         {
@@ -68,7 +128,67 @@
             "keyword.operator.isabelle"
           ],
           "settings": {
-            "foreground": "#0000CC"
+            "foreground": "#0070C1"
+          }
+        },
+        {
+          "scope": "storage.type.isabelle",
+          "settings": {
+            "foreground": "#7B30D0",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": [
+            "keyword.other.proof.isabelle",
+            "support.function.method.isabelle"
+          ],
+          "settings": {
+            "foreground": "#00796B"
+          }
+        },
+        {
+          "scope": [
+            "keyword.other.modifier.isabelle",
+            "meta.attribute.isabelle"
+          ],
+          "settings": {
+            "foreground": "#6E7781",
+            "fontStyle": "italic"
+          }
+        },
+        {
+          "scope": [
+            "entity.name.function.theorem.isabelle",
+            "entity.name.function.definition.isabelle",
+            "entity.name.namespace.isabelle"
+          ],
+          "settings": {
+            "foreground": "#9A6700",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": [
+            "entity.name.label.fact.isabelle",
+            "variable.other.fact.isabelle"
+          ],
+          "settings": {
+            "foreground": "#9A6700"
+          }
+        },
+        {
+          "scope": "invalid.illegal.admission.isabelle",
+          "settings": {
+            "foreground": "#D32F2F",
+            "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": "comment.block.documentation.isabelle",
+          "settings": {
+            "foreground": "#57606A",
+            "fontStyle": "italic"
           }
         },
         {
@@ -107,5 +227,7 @@
         }
       ]
     }
-  }
+  },
+  "isabelleRevamp.showAsk": false,
+  "workbench.activityBar.location": "hidden"
 }

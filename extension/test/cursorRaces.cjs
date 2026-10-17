@@ -20,9 +20,9 @@ exports.checkCursorRaces = async function () {
   let state;
   const goals = new Goals(client, { update(value) { state = value; } });
   const uri = 'file:///fixture/Sqrt2.thy';
-  const editor = (line, version = 1) => ({
+  const editor = (line, version = 1, character = 4) => ({
     document: { languageId: 'isabelle', uri: { scheme: 'file', fsPath: '/fixture/Sqrt2.thy', toString: () => uri }, version },
-    selection: { active: { line, character: 4 } },
+    selection: { active: { line, character } },
   });
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   const emit = (name, params) => handlers.get(name)(params);
@@ -46,6 +46,10 @@ exports.checkCursorRaces = async function () {
     emit('PIDE/state_output', { id: -101, content: '<pre>LATE OLD</pre>' });
     emit('PIDE/dynamic_output', { content: '<pre>UNTAGGED OLD</pre>' });
     assert.equal(state.text, 'CURRENT');
+    // Caret output adds the command's messages, such as try0's suggestion.
+    emit('PIDE/dynamic_output', { content: '<pre>CURRENT<br><br>Try this: by simp</pre>' });
+    assert.equal(state.text, 'CURRENT\n\nTry this: by simp');
+    assert(state.html.includes('Try this'));
 
     emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [{}] }] });
     assert.equal(state.phase, 'checking');
@@ -55,8 +59,23 @@ exports.checkCursorRaces = async function () {
     emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [] }] });
     assert.equal(state.phase, 'ready');
 
-    goals.follow(editor(6, 2)); // Same cursor, changed document version.
-    emit('PIDE/state_output', { id: -102, content: '<pre>OLD VERSION</pre>' });
+    // The server sends unchanged caret output only once, so it must survive moves.
+    goals.follow(editor(6, 1, 9));
+    await pause(180);
+    emit('PIDE/state_output', { id: -103, content: '<pre>CURRENT</pre>' });
+    replies[2]({ state_id: -103 });
+    await pause(0);
+    assert.equal(state.text, 'CURRENT\n\nTry this: by simp');
+    // Stale caret output from another state never leaks into this one.
+    goals.follow(editor(8));
+    await pause(180);
+    emit('PIDE/state_output', { id: -104, content: '<pre>NEXT</pre>' });
+    replies[3]({ state_id: -104 });
+    await pause(0);
+    assert.equal(state.text, 'NEXT');
+
+    goals.follow(editor(8, 2)); // Same cursor, changed document version.
+    emit('PIDE/state_output', { id: -104, content: '<pre>OLD VERSION</pre>' });
     assert.equal(state.phase, 'checking');
     assert.equal(state.text, '');
     // A long-running command must not become "unavailable" at the wait deadline.
@@ -72,7 +91,7 @@ exports.checkCursorRaces = async function () {
     }
     goals.follow(undefined);
     assert.equal(state.phase, 'idle');
-    console.log('PASS: stale replies, early replies, version changes, and decoration deltas');
+    console.log('PASS: stale replies, early replies, caret messages, version changes, and decoration deltas');
   } finally {
     goals.dispose();
   }

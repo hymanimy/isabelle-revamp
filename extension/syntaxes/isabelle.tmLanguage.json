@@ -4,8 +4,18 @@
   "patterns": [
     { "include": "#comments" },
     { "include": "#strings" },
+    { "include": "#prose" },
     { "include": "#cartouches" },
-    { "name": "keyword.control.isabelle", "match": "(?<![\\p{L}\\p{N}_'.])(theory|imports|begin|end|lemma|theorem|proof|qed|by|have|show|from|then|hence|thus|obtain|assume|fix|using|unfolding|also|finally|sorry|oops|text|where|and|case|next|corollary|proposition|definition|fun|primrec|datatype|locale|context|interpretation|notepad|apply|done|prefer|defer|subgoal|let|note|with|ultimately|moreover)(?![\\p{L}\\p{N}_'.])" },
+    { "include": "#theory-header" },
+    { "include": "#theorem-declaration" },
+    { "include": "#definition-declaration" },
+    { "include": "#method-parenthesised" },
+    { "include": "#method-bare" },
+    { "include": "#fact-references" },
+    { "include": "#admissions" },
+    { "include": "#structure-keywords" },
+    { "include": "#step-keywords" },
+    { "include": "#fact-labels" },
     { "include": "#symbols" },
     { "name": "constant.numeric.isabelle", "match": "\\b[0-9]+\\b" }
   ],
@@ -30,6 +40,120 @@
       "begin": "‹|\\\\<open>",
       "end": "›|\\\\<close>",
       "patterns": [{ "include": "#cartouches" }, { "include": "#symbols" }]
+    },
+    "prose": {
+      "comment": "Document text such as text ‹…› reads as prose, not as a term.",
+      "begin": "(?<![\\p{L}\\p{N}_'.])(text|txt|text_raw|chapter|section|subsection|subsubsection|paragraph)(?![\\p{L}\\p{N}_'.])\\s*(‹|\\\\<open>)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.isabelle storage.type.isabelle" },
+        "2": { "name": "string.quoted.other.isabelle comment.block.documentation.isabelle" }
+      },
+      "end": "›|\\\\<close>",
+      "endCaptures": { "0": { "name": "string.quoted.other.isabelle comment.block.documentation.isabelle" } },
+      "contentName": "string.quoted.other.isabelle comment.block.documentation.isabelle",
+      "patterns": [{ "include": "#prose-nested" }]
+    },
+    "prose-nested": {
+      "begin": "‹|\\\\<open>",
+      "end": "›|\\\\<close>",
+      "patterns": [{ "include": "#prose-nested" }]
+    },
+    "theory-header": {
+      "match": "(?<![\\p{L}\\p{N}_'.])(theory)(?![\\p{L}\\p{N}_'.])(?:\\s+([\\p{L}][\\p{L}\\p{N}_'.]*))?",
+      "captures": {
+        "1": { "name": "keyword.control.isabelle storage.type.isabelle" },
+        "2": { "name": "entity.name.namespace.isabelle" }
+      }
+    },
+    "theorem-declaration": {
+      "comment": "The name is only taken when a colon (after optional attributes) follows it.",
+      "match": "(?<![\\p{L}\\p{N}_'.])(lemma|theorem|corollary|proposition|schematic_goal)(?![\\p{L}\\p{N}_'.])(?:\\s+([\\p{L}][\\p{L}\\p{N}_'.]*)(?=\\s*(?:\\[[^\\]]*\\]\\s*)?:(?!:)))?",
+      "captures": {
+        "1": { "name": "keyword.control.isabelle storage.type.isabelle" },
+        "2": { "name": "entity.name.function.theorem.isabelle" }
+      }
+    },
+    "definition-declaration": {
+      "match": "(?<![\\p{L}\\p{N}_'.])(definition|abbreviation|fun|function|primrec|inductive|inductive_set|datatype|codatatype|type_synonym|typedef|record|locale|class|instantiation)(?![\\p{L}\\p{N}_'.])(?:\\s+(?!where(?![\\p{L}\\p{N}_'.]))([\\p{L}][\\p{L}\\p{N}_'.]*))?",
+      "captures": {
+        "1": { "name": "keyword.control.isabelle storage.type.isabelle" },
+        "2": { "name": "entity.name.function.definition.isabelle" }
+      }
+    },
+    "method-parenthesised": {
+      "begin": "(?<![\\p{L}\\p{N}_'.])(by|apply|proof|qed)(?![\\p{L}\\p{N}_'.])\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.isabelle keyword.other.proof.isabelle" },
+        "2": { "name": "punctuation.section.method.begin.isabelle" }
+      },
+      "end": "\\)",
+      "endCaptures": { "0": { "name": "punctuation.section.method.end.isabelle" } },
+      "patterns": [{ "include": "#method-body" }]
+    },
+    "method-bare": {
+      "match": "(?<![\\p{L}\\p{N}_'.])(by|apply|proof|qed|done)(?![\\p{L}\\p{N}_'.])(?:\\s+([\\p{L}][\\p{L}\\p{N}_']*))?",
+      "captures": {
+        "1": { "name": "keyword.control.isabelle keyword.other.proof.isabelle" },
+        "2": { "name": "support.function.method.isabelle" }
+      }
+    },
+    "method-body": {
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#cartouches" },
+        { "begin": "\\(", "end": "\\)", "patterns": [{ "include": "#method-body" }] },
+        { "include": "#attributes" },
+        {
+          "name": "support.function.method.isabelle",
+          "match": "(?<![\\p{L}\\p{N}_'.])(simp|simp_all|auto|force|fastforce|fast|blast|best|slow|metis|meson|linarith|arith|presburger|algebra|argo|smt|order|approximation|sos|rule|erule|drule|frule|rule_tac|erule_tac|drule_tac|case_tac|induct_tac|subgoal_tac|intro|elim|induct|induction|coinduct|coinduction|cases|ind_cases|subst|clarsimp|clarify|safe|fact|assumption|iprover|standard|unfold_locales|intro_classes|eval|code_simp|normalization|unfold|fold|insert|use|transfer|atomize|eventually_elim|measurable)(?![\\p{L}\\p{N}_'.]|:(?!:))"
+        },
+        {
+          "match": "([\\p{L}][\\p{L}\\p{N}_']*)(:)(?!:)",
+          "captures": {
+            "1": { "name": "keyword.other.modifier.isabelle" },
+            "2": { "name": "punctuation.separator.modifier.isabelle" }
+          }
+        },
+        { "name": "variable.other.fact.isabelle", "match": "[\\p{L}][\\p{L}\\p{N}_'.]*" },
+        { "include": "#symbols" }
+      ]
+    },
+    "fact-references": {
+      "comment": "Facts after using/from/with run to the next command, string or end of line.",
+      "begin": "(?<![\\p{L}\\p{N}_'.])(using|from|with|unfolding|note)(?![\\p{L}\\p{N}_'.])",
+      "beginCaptures": { "1": { "name": "keyword.control.isabelle" } },
+      "end": "(?=(?<![\\p{L}\\p{N}_'.])(?:by|apply|proof|qed|done|sorry|oops|have|show|hence|thus|obtain|then|assume|fix|also|finally|moreover|ultimately|next|case|let|where|and|from|using|with|unfolding|note|define|consider|presume|lemma|theorem|corollary|proposition|text|end|try0|try|sledgehammer|nitpick|quickcheck|value|thm|term|typ|find_theorems)(?![\\p{L}\\p{N}_'.])|\"|‹|\\\\<open>|\\(\\*)|$",
+      "patterns": [
+        { "include": "#attributes" },
+        { "name": "string.quoted.other.isabelle", "begin": "`", "end": "`", "patterns": [{ "include": "#symbols" }] },
+        { "name": "variable.other.fact.isabelle", "match": "[\\p{L}][\\p{L}\\p{N}_'.]*" },
+        { "include": "#symbols" }
+      ]
+    },
+    "attributes": {
+      "name": "meta.attribute.isabelle",
+      "begin": "\\[",
+      "end": "\\]",
+      "patterns": [{ "include": "#symbols" }]
+    },
+    "admissions": {
+      "comment": "Unfinished proofs stand out.",
+      "name": "keyword.control.isabelle invalid.illegal.admission.isabelle",
+      "match": "(?<![\\p{L}\\p{N}_'.])(sorry|oops)(?![\\p{L}\\p{N}_'.])"
+    },
+    "structure-keywords": {
+      "name": "keyword.control.isabelle storage.type.isabelle",
+      "match": "(?<![\\p{L}\\p{N}_'.])(imports|begin|end|context|notepad|interpretation|sublocale|lemmas|declare|text|txt|chapter|section|subsection|subsubsection|paragraph|value|thm|term|typ|find_theorems|try0|try|sledgehammer|nitpick|quickcheck)(?![\\p{L}\\p{N}_'.])"
+    },
+    "step-keywords": {
+      "name": "keyword.control.isabelle",
+      "match": "(?<![\\p{L}\\p{N}_'.])(have|show|from|then|hence|thus|obtain|assume|fix|using|unfolding|also|finally|where|and|case|next|with|let|note|ultimately|moreover|subgoal|prefer|defer|fixes|assumes|shows|obtains|define|consider|presume)(?![\\p{L}\\p{N}_'.])"
+    },
+    "fact-labels": {
+      "comment": "A name before a single colon (after optional attributes) labels a fact.",
+      "name": "entity.name.label.fact.isabelle",
+      "match": "(?<![\\p{L}\\p{N}_'.])[\\p{L}][\\p{L}\\p{N}_'.]*(?=\\s*(?:\\[[^\\]]*\\]\\s*)?:(?!:))"
     },
     "symbols": {
       "patterns": [

@@ -33,7 +33,9 @@ export class Goals implements Disposable {
   private earlyStates = new Map<number, string>();
   private confirmed?: string;
   private confirmedHtml?: string;
+  // Mirrors the server's caret panel, which only sends changed output.
   private dynamic = '';
+  private dynamicHtml = '';
   private available = false;
   private requestedAt = 0;
   private decorations = new Map<string, Map<string, boolean>>();
@@ -49,6 +51,7 @@ export class Goals implements Disposable {
     this.subscriptions.push(
       client.onNotification('PIDE/dynamic_output', ({ content }: { content: string }) => {
         this.dynamic = outputText(content);
+        this.dynamicHtml = content;
         this.render();
       }),
       client.onNotification('PIDE/state_output', (message: StateOutput) => {
@@ -117,7 +120,6 @@ export class Goals implements Disposable {
     this.releasePanel();
     this.confirmed = undefined;
     this.confirmedHtml = undefined;
-    this.dynamic = '';
     this.requestedAt = Date.now();
     this.publish({ phase: next ? 'checking' : 'idle', text: '', errors: [] });
     if (!this.available) return;
@@ -241,9 +243,11 @@ export class Goals implements Disposable {
       this.publish({ phase, text: '', errors: [] });
       return;
     }
-    // Only accept untagged dynamic output if it agrees with the current state.
-    // Rich messages that disagree (e.g. a failed tactic) stay in diagnostics.
-    const text = this.dynamic === this.confirmed ? this.dynamic : this.confirmed;
+    // Untagged dynamic output prints the state plus the command's messages
+    // (e.g. try0's "Try this"). Accept it only if it contains the tagged state.
+    const messages = this.confirmed !== '' && this.dynamic.includes(this.confirmed);
+    const text = messages ? this.dynamic : this.confirmed;
+    const html = messages ? this.dynamicHtml : this.confirmedHtml;
     // Isabelle marks an admitted command as background_bad. Match its actual
     // source range: mentions in comments/quoted text are not admissions, and
     // other bad markup must not be mistaken for `sorry`.
@@ -252,7 +256,7 @@ export class Goals implements Disposable {
     // A failed method can inherit a parent's "No subgoals!" state. Show its
     // diagnostic instead, never that misleading state under an error banner.
     const phase = failed ? 'error' : unfinished ? 'unfinished' : 'ready';
-    this.publish({ phase, text: failed ? '' : text, html: failed ? undefined : this.confirmedHtml, errors });
+    this.publish({ phase, text: failed ? '' : text, html: failed ? undefined : html, errors });
   }
 
   private publish(state: GoalState): void {
@@ -272,6 +276,8 @@ export class Goals implements Disposable {
     clearTimeout(this.decorationTimer);
     this.confirmed = undefined;
     this.confirmedHtml = undefined;
+    this.dynamic = '';
+    this.dynamicHtml = '';
     this.confirmedVersions.clear();
     this.annotatedVersions.clear();
     this.publish({ phase: 'unavailable', text: '', errors: [] });
