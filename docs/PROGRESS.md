@@ -1042,7 +1042,17 @@ that as its own checklist item.
   interactive approval gate, so a `-p` probe does not by itself prove the
   interactive session is unprompted; the committed approval key is what covers
   that, and only an interactive launch can confirm it.
-- **Not done:** `isabelleRevamp.showAsk` does not exist in this extension
-  version, and `demoLayout` opens the Ask panel unconditionally, so the demo
-  leaves Ask as an unfocused background tab and the pre-flight selects the
-  Terminal tab instead. Suppressing it needs an extension change.
+- **Review correction:** commit `212c509` already adds `isabelleRevamp.showAsk`,
+  suppresses Ask provider registration when false, and makes Demo Layout open
+  Terminal without opening Ask. The earlier note does not match current source.
+
+## Demo Ask default — explicit workspace setting
+
+- Added `isabelleRevamp.showAsk=false` to `demo/.vscode/settings.json`, so
+  opening the demo disables Ask before Demo Layout runs. Its isolated profile
+  and setup script already set false; normal extension defaults stay true.
+- Verified the existing demo setup check, the saved JSON, and that Demo Layout
+  contains no Ask-opening command. No extension source change was needed.
+- Do differently: keep demo-specific defaults in the committed workspace as
+  well as the generated profile, and check current source before reporting
+  a feature absent.

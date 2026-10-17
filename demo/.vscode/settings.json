@@ -1,6 +1,7 @@
 {
   "isabelleRevamp.prettySymbols": true,
   "isabelleRevamp.demoLayoutOnStartup": true,
+  "isabelleRevamp.showAsk": false,
   "editor.fontSize": 16,
   "workbench.startupEditor": "none",
   "files.exclude": {
