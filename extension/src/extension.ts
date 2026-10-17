@@ -20,6 +20,7 @@ import { Swarm } from './swarm';
 import { Ask, openSteps } from './ask';
 import { findIsabelle, setupReport } from './setup';
 import { ProofGraph } from './proofGraph';
+import type { GraphViewOptions } from './proofGraphPanel';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -39,7 +40,13 @@ export async function activate(context: ExtensionContext) {
     ? theoryEditor : undefined;
   const serverRoot = existsSync(resolve(context.extensionPath, 'src/extension.ts'))
     ? resolve(context.extensionPath, '..') : context.extensionPath;
-  ask = new Ask(serverRoot, state => askView.update(state));
+  let askActive = false;
+  let startProofTimer = () => {};
+  ask = new Ask(serverRoot, state => {
+    if (state.active && !askActive) startProofTimer();
+    askActive = state.active;
+    askView.update(state);
+  });
   const sendAsk = async (text: string) => {
     const editor = visibleTheory();
     const folder = editor && workspace.getWorkspaceFolder(editor.document.uri);
@@ -151,6 +158,7 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(semanticColors);
   const swarm = new Swarm(goals);
   const graph = new ProofGraph(goals, context.extensionPath);
+  startProofTimer = () => graph.resetTimer(visibleTheory()?.document);
   const proofStatus = new ProofStatus(graph);
   context.subscriptions.push(swarm,
     proofStatus,
@@ -163,6 +171,7 @@ export async function activate(context: ExtensionContext) {
   swarm.follow(window.activeTextEditor);
   graph.follow(window.activeTextEditor);
   context.subscriptions.push(goals,
+    workspace.onDidOpenTextDocument(document => graph.resetTimer(document)),
     window.onDidChangeTextEditorSelection(event => {
       if (event.textEditor === window.activeTextEditor) { goals?.follow(event.textEditor); swarm.follow(event.textEditor); graph.follow(event.textEditor); }
     }),
@@ -213,7 +222,7 @@ export async function activate(context: ExtensionContext) {
     hoverProofNode: (uri: string, version: number, id: string) => graph.hover(uri, version, id),
     getProofStatus: () => proofStatus.snapshot(),
     getAskView: () => askView.snapshot(),
-    inspectProofGraph: (action: 'snapshot' | 'benchmark' | 'replay') => graph.panel.inspect(action),
+    inspectProofGraph: (action: 'snapshot' | 'benchmark' | 'replay', options?: GraphViewOptions) => graph.panel.inspect(action, options),
     fullscreenProofGraph: () => graph.panel.fullscreen(),
     selectProofNode: (uri: string, version: number, id: string) => graph.select(uri, version, id),
     getGoalLinks: () => view.linkSnapshot(),

@@ -966,3 +966,29 @@ requests an independent structured counter-lemma after the original, no changes
 to that theorem, no prose argument, and errors/status/graph checks before the
 one-sentence report. It permits stopping at `refuted` even though the deliberately
 unchanged admission prevents `fully_checked`.
+
+
+## Proof Graph demo revision — names, replay and clocks
+
+No Isabelle wire message changes. `proof_graph` now projects every explicitly
+named nested `have`/`show`/`obtain` as well as the theorem and named outer
+steps. It retains source-derived ids, parents, one-based `line` and zero-based
+UTF-16 ranges. Unnamed commands remain in their named owner's acceptance range.
+Four formerly unnamed parity commands in `examples/Sqrt2.thy` were named to
+make the requested 17-node fixture; `Swarm.thy` still has seven nodes. The
+protected `demo/` copies and Ask's outer-obligation admission summary were not
+changed. This revises the earlier compact nested-node projection described above.
+
+A PIDE update can accept multiple nodes at once; it provides no ordering within
+that batch. The replay timeline preserves inter-update order and orders ties by
+nesting depth (children first), then source line. It expands batched transitions
+with at least 400 ms between greens at ×1, scaled once by the selected speed.
+Default ×2 is a presentation choice, not an Isabelle processing speed. Actual
+webview delivery is also paced so a delayed frame does not cause a catch-up
+burst. The node/edge pulse remains 400 ms at every speed.
+
+The host gives each file-open/switch or new Ask run a fresh clock epoch and
+recording. The webview cancels an old replay when that epoch changes. The clock
+stops when the existing document check says `fully_checked`, or an accepted
+counter-lemma establishes the existing refutation state. The optional fold
+control affects presentation only; MCP retains every graph node.

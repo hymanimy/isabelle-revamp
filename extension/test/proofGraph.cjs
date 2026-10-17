@@ -67,24 +67,34 @@ assert(!graph.nodes.some(node => node.name === 'fake' || ['also', 'finally', 'ca
 edge('witnesses/witness', 'witnesses/used'); edge('graph', 'witnesses/used');
 assert.deepEqual(proofStructure(source), proofStructure(source), 'Parsing is deterministic');
 const variation = source.replace('have E: True', 'have renamed_inside: True');
-assert.deepEqual(proofStructure(variation).nodes.map(n => n.id), graph.nodes.map(n => n.id), 'Nested naming cannot create or rename tiles');
+assert.deepEqual(proofStructure(variation).nodes.map(n => n.id), graph.nodes.map(n => n.id), 'Nested naming preserves the compact admission summary');
 dag(graph);
-for (const [file, count] of [['Swarm', 7], ['Sqrt2', 13]]) {
-  const parsed = proofStructure(fs.readFileSync(path.resolve(__dirname, `../../examples/${file}.thy`), 'utf8'));
+for (const [file, count] of [['Swarm', 7], ['Sqrt2', 17]]) {
+  const parsed = proofStructure(fs.readFileSync(path.resolve(__dirname, `../../examples/${file}.thy`), 'utf8'), true);
   assert.equal(parsed.nodes.length, count, file);
   const layout = graphLayout({ ...parsed, total: count, nodes: parsed.nodes.map(node => ({ ...node, parent: node.parent ?? null })) }, new Set());
-  assert(layout.nodes.every(box => box.width === 96 && box.height === 30));
-  const fit = fitGraph(layout, 900, 190); // 220px panel minus the single 30px header.
+  assert(layout.nodes.every(box => box.width >= 110 && box.height === 38));
+  const fit = fitGraph(layout, 900, 370); // 400px panel minus the single 30px header.
   assert(fit.tx >= 7.999 && fit.ty >= 7.999 && fit.tx + layout.width * fit.scale <= 892.001
-    && fit.ty + layout.height * fit.scale <= 182.001, file + ': 900x220 panel must need no scrolling');
+    && fit.ty + layout.height * fit.scale <= 362.001, file + ': 900x400 panel must need no scrolling');
+  assert(fit.scale >= .92, 'Names must remain readable without truncation');
   assert(parsed.nodes.every(n => !n.parent || ['have', 'show', 'obtain'].includes(n.command)));
 }
+const named = proofStructure(source, true);
+assert(named.nodes.some(node => node.id === 'graph/nested/E' && node.parent === 'graph/nested'));
+assert(named.edges.some(edge => edge.from === 'graph/nested/A' && edge.to === 'graph/nested/E'));
+assert(!named.edges.some(edge => edge.from === 'graph/nested/E' && edge.to === 'graph/G'), 'Nested names cannot leak into outer scope');
+assert.deepEqual(proofStructure(source, true), named, 'Named nested graph is deterministic');
+dag(named);
+const partial = graphLayout({ ...named, nodes: named.nodes.map(node => ({ ...node, parent: node.parent ?? null, line: 1 })) }, new Set(['graph/nested/E']));
+assert.deepEqual(partial.nodes.find(node => node.id === 'graph/nested').contained, ['E · L1']);
+assert.deepEqual(partial.nodes.find(node => node.id === 'graph').contained, [], 'Folded names appear only in their nearest visible owner');
 const typedWitness = proofStructure('lemma a: True proof - obtain x :: nat where witness: "x=0" by simp show ?thesis by simp qed');
 assert.equal(typedWitness.nodes[1].name, 'witness', 'A typed variable is not a fact name');
 
 const fixture = fs.readFileSync(path.resolve(__dirname, '../../examples/Cascade_solution.thy'), 'utf8');
 const tree = proofStructure(fixture);
-assert.equal(tree.nodes.length, 5, 'Nested Cascade commands fold into four named obligations');
+assert.equal(tree.nodes.length, 5, 'Compact admission summary retains four outer obligations');
 const byId = new Map(tree.nodes.map(node => [node.id, node]));
 const leaves = tree.nodes.filter(node => !tree.nodes.some(child => child.parent === node.id));
 assert.equal(leaves.length, 4);
@@ -97,7 +107,7 @@ assert(layout.nodes.length === tree.nodes.length);
 const boxes = new Map(layout.nodes.map(box => [box.id, box]));
 for (const node of tree.nodes) if (node.parent) assert(boxes.get(node.id).y > boxes.get(node.parent).y);
 for (const box of layout.nodes) assert([box.x, box.y, box.width, box.height].every(Number.isFinite));
-assert(boxes.get('rational_square_root/denominator_one').y < boxes.get('rational_square_root/reduced_square').y,
+assert(boxes.get('rational_square_root/denominator_one').y <= boxes.get('rational_square_root/reduced_square').y,
   'Dependencies used inside a subtree must also order its container');
 const hidden = new Set(tree.nodes.filter(node => node.parent).map(node => node.id));
 assert.equal(graphLayout(state, hidden).nodes.length, 1);

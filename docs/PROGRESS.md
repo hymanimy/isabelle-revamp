@@ -888,3 +888,75 @@ that as its own checklist item.
     installed copies were confirmed byte-identical to `mcp/`. No client
     configuration was registered or changed: the probe starts the documented
     command directly rather than running `claude mcp add` against Leo's config.
+
+
+## Proof Graph demo fixes — visible names, replay and fresh clocks
+
+- **Scope:** checked `leo` and the five local commits through `2445780`, then
+  read **Claude review** before editing. The working tree started clean. The
+  Ask implementation, `demo/` source/configuration and `mcp/` are unchanged.
+- **Changed:** named steps stay visible, including named nested obligations;
+  “Fold proved” is off by default and folded boxes list every contained name
+  and line. Root tiles retain theorem names; completion belongs in the header.
+  Dagre orders subtree groups, which wrap to fit readable full labels. Every
+  layout and completed replay Fits. Replay defaults to ×2 with ×1/×2/×4/×8,
+  preserves recorded acceptance order, and paces green transitions at least
+  400 ms apart at ×1. File open/switch and Ask start create a fresh clock and
+  recording; kernel acceptance freezes the clock.
+- **Fixture decision:** the supplied `examples/Sqrt2.thy` had 13 named graph
+  steps and four unnamed inner parity commands. Those four commands now have
+  explicit names, bringing the graph to the requested 17 without changing the
+  mathematics or line numbers. Ask's existing outer-obligation summary remains
+  unchanged. The protected `demo/Sqrt2.thy` remains its original 13-node copy.
+- **Passed:** strict `process_theories -D examples -O Sqrt2`; parser/replay/Ask
+  units; `scripts/check_graph_demo.sh` in actual VS Code. The 900×400 webview
+  has all 17 names/line labels visible at an effective 11.42 px font, no clipped
+  labels, no default folds, and a frozen completed clock. Optional folding
+  lists all 16 child names. Measured green spacing was ≥401 ms at ×1, ≥202 ms
+  at ×2, ≥102 ms at ×4, and ≥53 ms at ×8. Swarm shows seven open nodes.
+  File reopen and Ask start reset the clock; a refused concurrent Ask does not.
+  The lifecycle test uses a fake CLI, not a paid/model proof run.
+- **Graph/layout regression:** focused M12 and M13 checks passed. Real Isabelle
+  accepts/rejects hand replacements, names/lines/navigation remain linked,
+  optional named folding and recorded replay complete, and Demo Layout/status
+  bar remain working. The 200-node SVG benchmark measured 194 frames, baseline
+  16.7 ms, maximum gap 18.6 ms, zero dropped frames and zero status-only layouts.
+- **Discovered:** processing-complete can precede admission annotations; the
+  first Swarm test sampled too early. It now waits for the seven annotated
+  open nodes and the existing 150 ms publication debounce. Batched acceptance
+  has no finer server ordering, so replay uses child-first/source-line ties.
+- **Would do differently:** preserve readable names as the default from the
+  beginning, measure actual rendered text/available space, and make animation
+  pacing and clock ownership explicit rather than inferring them from edits.
+- **Other regressions:** both broad attempts passed M3–M8, including real MCP
+  columns/goals/graph consistency and six-card Swarm completion, but stopped at
+  M10's suggestion-widget acceptance. Focused M10 passed after strengthening
+  its editor-focus/accepted-edit wait and using a fresh goal-link revision after
+  hover. A subsequent broad retry still hit the widget check; this is retained
+  as an intermittent test limitation, not represented as a full-chain pass.
+  Focused M14 passed kernel rejection/refutation, MCP parity, red-node retention
+  and retraction. No new real-Claude rehearsal was run for these display fixes.
+- **Fresh-window broad run:** the same M14 integration entry point then passed
+  the complete M3–M8/M10/M14 chain in a new isolated VS Code user-data directory
+  (`.dev-host/graph-regression-fresh-user`), exit 0. This includes accepted
+  symbol completions and current/stale goal-link navigation. The earlier
+  reusable-profile failures remain in the log; a fresh profile passing does
+  not establish their cause. M12/M13 were checked separately as above.
+- **Final targeted rerun:** `scripts/check_graph_demo.sh` passed again after the
+  last renderer adjustments. Folded names belong only to their nearest visible
+  owner, line changes refresh the listing, and same-row arrows fit inside the
+  graph margin. The final Sqrt2/Swarm, replay-speed/order/Fit and timer checks
+  all passed, exit 0. Screen-tool access to Code was refused; the visual
+  evidence is the actual webview's rendered measurements, not screenshots.
+- **Package/install:** `scripts/check_m11.sh` passed; the VSIX is 231,048 bytes,
+  contains only the required host/webview bundles and assets, and has no runtime
+  node_modules. SHA-256:
+  `447121b08cd1f59d45c963660c4bd5dd8263a411310b7c673175514a0843107e`.
+  Installed with the real CLI into `demo/.demo/extensions/`, private user-data
+  and profile **Demo**. The profile lists only `hymanimy.isabelle-revamp@0.1.0`;
+  host JS, graph JS/CSS and all bundled MCP files match the VSIX byte-for-byte.
+  Opened the existing metadata launch command without a development host.
+  Its read-only bridge check reports 13/13 proved for the protected demo copy,
+  `fully_checked=true`, zero errors, new clock epoch 1 and frozen 3,726 ms.
+  Source bytes and every protected tracked file remain unchanged. The VSIX and
+  runtime/receipts remain ignored; nothing was pushed.

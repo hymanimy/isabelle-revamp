@@ -229,44 +229,54 @@ are ignored by git.
 
 ## Proof Graph (M12)
 
-The M12 named-step amendment supersedes the earlier 52-tile recursive display.
-The underlying Cascade proof still has all its commands; it now displays five
-named obligations. Named steps inside a nested proof belong to its outer tile.
+Named proof steps stay visible by default, including named nested steps. The
+root always shows its theorem name. The completed proof summary belongs in the
+header and status bar, so the audience can still read the proof afterwards.
 
-1. Open `examples/Swarm.thy`; run **Isabelle: Demo Layout**. Source stays in one
-   editor column. **Isabelle** at the bottom contains Ask and Proof Graph side
-   by side, while the sidebar is hidden. Capture seven grey dashed nodes,
-   each labelled with its name and `L<number>`. The one-line graph header and
-   right status bar agree. Sqrt2 has thirteen nodes; its final show is explicitly
-   named `contradiction`. For a tall graph, use **Open in editor column**, then
-   **Fit**. Drag pans; scroll zooms. Layout always fits the available bounds.
-2. Hover `base` for its statement and live goal text (the source cursor stays put), click it and capture the cursor on its source
-   line, the one-second line highlight, the focus ring and the grey gutter dot.
-   Move the cursor into another named step: its tile acquires the focus ring.
-   Replace the `base` admission with `by simp`; capture its green dot/tile and
-   pulse, then its delayed fold. Use `by (rule TrueI)` instead: it stays red.
-   Restore the admission after the demonstration. Source coordinates remain
-   zero-based UTF-16 in MCP ranges; tile/MCP `line` labels are one-based.
-3. In `Cascade.thy`, filling only an inner admission does **not** turn its owning
-   named obligation green. All inner commands must be accepted first. Four
-   named steps plus the root remain the same nodes when nested proof formatting
-   or inner names change. The unnamed final show belongs to the root.
-4. **Isabelle: Ask** focuses the bottom input. Enter sends, Shift+Enter adds a
-   newline, Stop interrupts, and the streaming transcript stays below the input.
-   Ask uses the same MCP bridge and named graph, one ready obligation per edit.
-   **Isabelle: Demo Layout** is repeatable; `isabelleRevamp.demoShowGoals=true`
-   also exposes Goals. The compact Swarm sidebar remains available separately.
-5. After all commands check, capture the single large proved root, the kernel
-   mark, and frozen elapsed time. **Replay ×8** repeats recorded states without
-   changing source or calling Isabelle. Reduced motion disables CSS animation.
+1. Open `examples/Sqrt2.thy`; run **Isabelle: Demo Layout**. Source stays in one
+   editor column; Ask and Proof Graph share the bottom panel. Give the graph
+   900×400 pixels: all **17** nodes should show their full name and `L<number>`
+   in green, including the four named inner parity steps. **Fit** runs after
+   every layout or resize. Drag pans; scroll zooms. **Open in editor column**
+   is available for larger graphs. The protected `demo/Sqrt2.thy` copy still
+   has 13 named nodes because its four inner steps remain unnamed.
+2. Open `examples/Swarm.thy`: capture seven grey dashed nodes. Hover `base`
+   for its statement and live goal text; click it for the source cursor,
+   one-second line highlight, focus ring and gutter dot. Replace its admission
+   with `by simp`: the tile pulses green and **stays visible**. A wrong
+   `by (rule TrueI)` stays red. Restore the admission afterwards. Tile/MCP
+   `line` labels are one-based; MCP ranges remain zero-based UTF-16.
+3. **Fold proved** starts off. Enable it to fold accepted subtrees after the
+   pulse/delay. Every folded box lists the names and line numbers it contains;
+   the root keeps the theorem name. Disable it to restore every node. Red
+   nodes never fold. Nested unnamed commands still contribute to their named
+   owner's status, which turns green only after its complete range checks.
+4. **Replay** defaults to **×2**; choose **×1 / ×2 / ×4 / ×8** in the picker.
+   At ×1, green transitions are spaced by at least 400 ms. Recorded acceptance
+   order is preserved; nodes accepted in the same server batch are shown
+   children first, then by source line. Edges pulse too. Replay changes no
+   source and sends no prover requests; it automatically Fits when finished.
+   Reduced motion disables CSS animation.
+5. The elapsed clock starts fresh when opening/switching theory files and when
+   a new Ask run starts. It freezes at `kernel ✓`. A completed Sqrt2 header is
+   `Sqrt2 · proved · 17 steps · kernel ✓ · T s`; no tile changes its name to
+   “proved”. **Isabelle: Ask** still focuses the bottom input. Ask's existing
+   transcript, tool path and admission summary are unchanged.
 
-`bash scripts/check_m12.sh` checks the reference theory, named parser, M3–M8/M10
-regressions, live colours/navigation/folding/replay and the 200-node SVG timing
-benchmark. `bash scripts/check_m13.sh` checks the bottom Ask/layout/status bar.
-`M12_ONLY=1` / `M13_ONLY=1` run focused checks. Receipts live in ignored
-`.dev-host/`. Direct screen inspection remains unavailable because the screen
-tool refused Code access; the steps above are screenshot-able checks, not a
-claim that screenshots were taken.
+`bash scripts/check_graph_demo.sh` kernel-checks Sqrt2 and checks the actual
+VS Code webview at 900×400, all four replay speeds, named folding, Swarm and
+file/Ask clock resets. Its Ask lifecycle check uses the fake CLI and makes no
+model request. `M12_ONLY=1 bash scripts/check_m12.sh` checks graph
+colours/navigation/folding/replay and the 200-node SVG timing benchmark;
+`M13_ONLY=1 bash scripts/check_m13.sh` checks the bottom layout/status bar.
+Receipts live in ignored `.dev-host/`. These are rendered-webview measurements,
+not a claim that a screenshot was taken.
+
+The current graph-fix VSIX is also installed in `demo/.demo/` (profile **Demo**).
+A regular window using its installed bundle reached `fully_checked=true`, zero
+errors and a frozen timer on the unchanged 13-node `demo/Sqrt2.thy`. Use
+`examples/Sqrt2.thy` in the development workspace for the 17-node check above.
+Ask/MCP sources and the tracked demo folder were preserved during this update.
 
 The earlier M12 commit's live Claude run stalled before editing; it is not a
 successful AI rehearsal. Card runs will record live success/failure separately.

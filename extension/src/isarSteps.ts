@@ -106,7 +106,7 @@ export interface ProofStructure { nodes: ProofNode[]; edges: ProofEdge[] }
 
 // The graph is a source-level explanation, not a kernel dependency certificate.
 // Its colours are supplied separately by current-version PIDE annotations.
-export function proofStructure(source: string): ProofStructure {
+export function proofStructure(source: string, namedNested = false): ProofStructure {
   type Node = ProofNode & { own: Token[]; previous?: string; implicit: boolean; displayed: boolean };
   type Frame = { owner: Node; current?: Node; caseNode?: Node; prefix: Token[]; brace?: boolean };
   const nodes: Node[] = [], frames: Frame[] = [];
@@ -142,7 +142,7 @@ export function proofStructure(source: string): ProofStructure {
       closed: ['case', 'also', 'finally'].includes(token.text), abandoned: false,
       own: [...prefix, token], previous: previous?.id,
       displayed: !parent || Boolean(named && ['have', 'show', 'obtain'].includes(token.text)
-        && frames.filter(frame => !frame.brace).length === 2),
+        && (namedNested || frames.filter(frame => !frame.brace).length === 2)),
       implicit: ['hence', 'thus', 'also', 'finally'].includes(token.text) || prefix.some(item => ['then', 'with'].includes(item.text)) };
     nodes.push(node); return node;
   }
@@ -256,9 +256,9 @@ export function proofStructure(source: string): ProofStructure {
       ?? Math.min(node.end, source.indexOf('\n', node.start) < 0 ? source.length : source.indexOf('\n', node.start));
     node.statement = source.slice(node.start, headerEnd).trim();
   }
-  // Project structural commands onto the explicitly named outer obligations.
-  // Nested proof commands remain in their owner's source range/status, never
-  // become tiles. Unnamed chains forward their dependencies, not made-up names.
+  // The compact admission summary retains its outer-obligation policy. The
+  // graph opts into all named nested steps; unnamed commands still belong to
+  // their owner. Unnamed chains forward dependencies, never invented labels.
   const owner = (node: Node): Node => node.displayed || !node.parent ? node : owner(byId.get(node.parent)!);
   const sources = (id: string, seen = new Set<string>()): string[] => {
     if (seen.has(id)) return [];

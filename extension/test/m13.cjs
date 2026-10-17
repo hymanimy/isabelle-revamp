@@ -55,7 +55,13 @@ exports.run = async function () {
     assert.equal(api.getProofStatus().text, graphSummary(api.getProofGraph()));
     const stopped = api.getProofStatus().text; await pause(2200); assert.equal(api.getProofStatus().text, stopped, 'Completion freezes elapsed time');
     let graphView = await api.inspectProofGraph('snapshot');
-    assert.equal(graphView.nodes.length, 1, 'Completion folds to the root');
+    assert.equal(graphView.nodes.length, 2, 'Completion keeps both named nodes visible by default');
+    assert.equal(graphView.names.ready, 'ready');
+    await api.inspectProofGraph('snapshot', { fold: true });
+    await pause(2200);
+    graphView = await api.inspectProofGraph('snapshot');
+    assert.equal(graphView.nodes.length, 1, 'Optional folding leaves the named root');
+    assert.deepEqual(graphView.contained.ready, ['first · L4']);
     editor = await vscode.window.showTextDocument(doc);
     editor.selection = new vscode.Selection(1, 0, 1, 0); await pause(250);
     editor.selection = new vscode.Selection(3, 5, 3, 5); await pause(250);

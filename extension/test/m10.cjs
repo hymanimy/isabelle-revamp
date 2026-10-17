@@ -96,9 +96,17 @@ async function checkSymbols(root,api) {
     const completions=await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',doc.uri,position);
     assert(completions.items.some(item=>(item.textEdit?.newText??item.insertText)===expected),JSON.stringify(completions));
     assert(completions.items.every(item=>!/[≠⟹⋀]/.test(item.textEdit?.newText??item.insertText??'')));
-    await vscode.commands.executeCommand('editor.action.triggerSuggest');await pause(200);
-    await vscode.commands.executeCommand('acceptSelectedSuggestion');
-    assert(doc.getText().includes(expected),doc.getText());
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    await vscode.commands.executeCommand('editor.action.triggerSuggest');
+    // The provider result can precede the suggestion widget. Wait for an actual
+    // accepted edit instead of assuming it renders within a fixed 200 ms.
+    const deadline = Date.now() + 3000;
+    while (!doc.getText().includes(expected) && Date.now() < deadline) {
+      await pause(100);
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    }
+    assert(doc.getText().includes(expected),JSON.stringify({ text:doc.getText(), focused:vscode.window.state.focused,
+      editor:vscode.window.activeTextEditor?.document.uri.fsPath, selection:vscode.window.activeTextEditor?.selection }));
     receipts.push({abbr,inserted:doc.lineAt(1).text});
   }
   assert(api.getAbbreviations().some(pair=>pair[0]==='hence' && pair[1]==='then have'));
@@ -222,7 +230,10 @@ async function checkGoalLinks(root,api) {
   const before=vscode.window.activeTextEditor.document.uri.toString();
   await api.followGoalLink(index,snapshot.revision-1);
   assert.equal(vscode.window.activeTextEditor.document.uri.toString(),before);
-  await api.followGoalLink(index,snapshot.revision);
+  // Opening/hovering a library can publish new goal markup. Click the current
+  // revision, after checking that the intentionally stale one was rejected.
+  const current=api.getGoalLinks();
+  await api.followGoalLink(current.links.findIndex(item=>item.label==='sqrt'),current.revision);
   assert.equal(vscode.window.activeTextEditor.document.uri.fsPath,link.file);
   assert(vscode.window.activeTextEditor.selection.start.isEqual(target.range.start));
   const bytes=target.document.getText();await vscode.commands.executeCommand('type',{text:'X'});

@@ -778,3 +778,48 @@ should be.
   post-edit range; explicitly require goals, errors, status and graph before the
   final report. Log the failed acceptance separately from its successful kernel
   and visual-state transition.
+
+## 63. A completed graph disappeared before its steps could be read
+
+- **What happened:** automatic folding replaced the proof with a generic proved
+  root; fitting a long dependency chain made its remaining names tiny.
+- **Experience:** the audience lost the named steps and their source lines just
+  when it wanted to inspect what Isabelle had accepted.
+- **Fix needed:** keep named steps visible by default, wrap Dagre-ordered
+  subtrees into readable rows, and fit every layout. Make folding an explicit
+  toggle and list contained names. Put completion text in the header, preserving
+  the theorem's name. The 17-node Sqrt2 check measures the rendered labels in a
+  900×400 panel rather than relying only on a parser count.
+
+## 64. Batched acceptance made replay jump, and old clocks survived new runs
+
+- **What happened:** PIDE can report several accepted commands together; replay
+  at a fixed ×8 could turn the graph green in one flash. A per-file clock could
+  retain an earlier run's duration when returning to the file.
+- **Experience:** neither the proof order nor the elapsed time was dependable
+  during a rehearsal.
+- **Fix needed:** preserve recorded order, expand simultaneous acceptances in
+  deterministic child-first/source-line order, and allow ×1/×2/×4/×8 with ×2
+  default and at least 400 ms per green transition at ×1. Reset the clock and
+  timeline on file open/switch and Ask start; freeze at kernel acceptance.
+  The Swarm integration check must also wait for admission annotations, which
+  can arrive after the initial processing-complete notification.
+
+
+## 65. UI regression checks assumed fixed delays and reusable goal links
+
+- **What happened:** the broad run and an isolated M10 run both offered the
+  `\noteq` completion but failed to accept it after the test's fixed 200 ms
+  delay. With explicit editor focus and a bounded wait for the accepted edit,
+  all four symbol insertions passed. The next check reused a goal-link revision
+  after a library hover had allowed the Goals markup to refresh, so navigation
+  correctly ignored it as stale.
+- **Experience:** unrelated UI test timing obscured whether the graph change
+  preserved working completion/navigation.
+- **Fix needed:** check the actual accepted edit with a three-second limit,
+  and fetch a current link revision immediately before a valid click. Keep the
+  deliberate stale-click rejection assertion. Production completion and goal
+  navigation code remain unchanged; log the initial failures as well as reruns.
+  The same bounded completion check still failed in a reused broad-test
+  profile; a fresh isolated profile subsequently passed the entire chain.
+  That difference is an observation, not a proven explanation for the flake.

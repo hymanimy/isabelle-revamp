@@ -12,6 +12,7 @@ async function run() {
   const skeleton = fs.readFileSync(path.join(root, 'examples/Cascade.thy'), 'utf8');
   const solution = fs.readFileSync(path.join(root, 'examples/Cascade_solution.thy'), 'utf8');
   const reference = proofStructure(solution);
+  const visibleNodes = proofStructure(skeleton, true).nodes;
   const leaves = reference.nodes.filter(node => !reference.nodes.some(child => child.parent === node.id));
   const file = path.join(root, '.dev-host/m12-fixture/Cascade.thy');
   fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, skeleton);
@@ -53,12 +54,12 @@ async function run() {
     return start;
   }
   await vscode.commands.executeCommand('isabelleRevamp.showProofGraph');
-  await until('Cascade has five named obligations with four open leaves', () => graph().complete && graph().total === 5
+  await until('Cascade exposes every named nested obligation', () => graph().complete && graph().total === visibleNodes.length
     && leaves.every(leaf => node(leaf.id)?.status === 'open'));
   assert.equal(graph().proved, 0);
-  let view = await rendered(view => view.dashed.length === 5);
-  assert.equal(view.nodes.length, 5); assert.equal(view.dashed.length, 5);
-  assert(view.containers === 1 && view.edges >= 4, JSON.stringify(view)); receipts.push({ check: 'open graph', view, model: graph() });
+  let view = await rendered(view => view.dashed.length === visibleNodes.length);
+  assert.equal(view.nodes.length, visibleNodes.length); assert.equal(view.dashed.length, visibleNodes.length);
+  assert(view.containers >= 1 && view.edges >= 4, JSON.stringify(view)); receipts.push({ check: 'open graph', view, model: graph() });
   const beforeHover = { text: doc.getText(), version: doc.version, selection: editor.selection, goal: api.getGoalState().text };
   const preview = await api.hoverProofNode(graph().uri, graph().version, leaves[0].id);
   assert(preview.includes('goal (1 subgoal)') && preview.includes('coprime'), preview);
@@ -133,7 +134,7 @@ async function run() {
       assert(observed.some(item => item.ask.entries.some(entry => entry.kind === 'tool' && entry.text === 'proof_graph Cascade.thy')));
       assert(edits.length >= 4 && edits.every(edit => edit.leaf && edit.dependencies?.every(node => node.status === 'proved')),
         'Each MCP edit must target one dependency-ready leaf: ' + JSON.stringify(edits));
-      assert.deepEqual(graph().nodes.map(node => node.id), reference.nodes.map(node => node.id));
+      assert.deepEqual(graph().nodes.map(node => node.id), proofStructure(solution, true).nodes.map(node => node.id));
       receipts.push({ check: 'real Claude bottom-up proof', transcript: api.getAskState(), graph: graph(), edits });
       fs.writeFileSync(path.join(root, '.dev-host/m12-live-stream.json'), JSON.stringify(observed, null, 2));
     } finally {
@@ -156,15 +157,22 @@ async function run() {
     await until('reference leaves kernel check the full tree', () => graph().fully_checked);
   }
   assert(!/\bsorry\b/.test(doc.getText()));
+  view = await api.inspectProofGraph('snapshot');
+  assert.equal(view.foldProved, false); assert.equal(view.replaySpeed, 2);
+  assert.equal(view.nodes.length, graph().total, 'Named steps stay visible by default');
+  await api.inspectProofGraph('snapshot', { fold: true });
   await pause(6000);
   view = await rendered(view => view.nodes.length === 1, 15000);
-  assert.equal(view.nodes.length, 1, JSON.stringify(view)); assert(view.rootText.includes('kernel-checked ✓'));
+  assert.equal(view.nodes.length, 1, JSON.stringify(view)); assert(view.header.includes('kernel ✓'));
+  assert.equal(view.names[graph().nodes[0].id], 'rational_square_root');
+  assert.equal(view.contained[graph().nodes[0].id].length, graph().total - 1);
   receipts.push({ check: 'folded root', view });
   const version = doc.version, before = doc.getText();
-  const replay = await api.inspectProofGraph('replay');
+  const replay = await api.inspectProofGraph('replay', { speed: 8 });
   assert.equal(replay.nodes.length, 1, JSON.stringify(replay)); assert.equal(doc.version, version); assert.equal(doc.getText(), before);
   receipts.push({ check: 'offline replay', replay }); console.log('PASS: replay reaches the proved root without editing or querying the prover');
   await api.fullscreenProofGraph();
+  await api.inspectProofGraph('snapshot', { fold: false });
   const benchmark = await api.inspectProofGraph('benchmark');
   receipts.push({ check: '200-node SVG animation', benchmark });
   fs.writeFileSync(path.join(root, '.dev-host/m12-results.json'), JSON.stringify(receipts, null, 2));

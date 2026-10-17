@@ -1,6 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { commands, Disposable, Uri, ViewColumn, Webview, WebviewPanel, WebviewView, WebviewViewProvider, window } from 'vscode';
 import { GraphFrame, GraphState } from './graphTypes';
+import { replaySpeed, replayTimeline } from './graphReplay';
+
+export interface GraphViewOptions { fold?: boolean; speed?: number; width?: number; height?: number; frames?: GraphFrame[] }
 
 // One renderer/model, hosted either in the bottom view or the optional editor tab.
 export class ProofGraphPanel implements Disposable, WebviewViewProvider {
@@ -56,7 +59,9 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'">
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${style}"></head>
 <body><header><p id="status" role="status">Open a theory to follow its proof.</p>
-<nav><button id="fit">Fit</button><button id="replay">Replay ×8</button><button id="fullscreen">Open in editor column</button></nav></header>
+<nav><label><input id="fold" type="checkbox">Fold proved</label><button id="fit">Fit</button><button id="replay">Replay</button>
+<select id="speed" aria-label="Replay speed"><option value="1">×1</option><option value="2" selected>×2</option><option value="4">×4</option><option value="8">×8</option></select>
+<button id="fullscreen">Open in editor column</button></nav></header>
 <main><svg id="graph" aria-label="Proof dependencies" role="img"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z"/></marker></defs><g id="viewport"><g id="containers"></g><g id="edges"></g><g id="nodes"></g></g></svg></main>
 <script nonce="${nonce}" src="${script}"></script></body></html>`;
   }
@@ -68,15 +73,16 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
   private publish(): void {
     if (this.state) for (const webview of this.ready) void webview.postMessage({ type: 'state', state: this.state });
   }
-  inspect(action: 'snapshot' | 'benchmark' | 'replay'): Promise<any> {
+  inspect(action: 'snapshot' | 'benchmark' | 'replay', options?: GraphViewOptions): Promise<any> {
     const target = this.panel?.active ? this.panel.webview : this.view?.webview;
     if (!target) this.show();
     const request = ++this.sequence;
     return new Promise((resolve, reject) => {
-      const limit = action === 'replay' ? Math.max(30000, (this.frames.at(-1)?.at ?? 0) / 8 + 15000) : 30000;
+      const frames = options?.frames ?? this.frames;
+      const limit = action === 'replay' ? Math.max(30000, (replayTimeline(frames).at(-1)?.at ?? 0) / replaySpeed(options?.speed) + 15000) : 30000;
       const timeout = setTimeout(() => { this.replies.delete(request); reject(new Error('Proof Graph webview did not reply')); }, limit);
       this.replies.set(request, value => { clearTimeout(timeout); resolve(value); });
-      const message = { type: 'inspect', action, request, frames: action === 'replay' ? this.frames : undefined };
+      const message = { type: 'inspect', action, request, options, frames: action === 'replay' ? frames : undefined };
       if (target && this.ready.has(target)) void target.postMessage(message); else this.pending.push(message);
     });
   }

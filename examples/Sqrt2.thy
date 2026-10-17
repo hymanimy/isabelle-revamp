@@ -26,8 +26,8 @@ proof
   text \<open>An even square has an even root, so write the numerator as twice k.\<close>
   have numerator_even: "even m"
   proof -
-    have "even (m ^ 2)" using squared by simp
-    then show ?thesis by simp
+    have numerator_square_even: "even (m ^ 2)" using squared by simp
+    then show even_numerator: ?thesis by simp
   qed
   then obtain k :: nat where numerator: "m = 2 * k"
     by (auto elim: evenE)
@@ -37,8 +37,8 @@ proof
     using squared numerator by (simp add: power2_eq_square)
   have denominator_even: "even n"
   proof -
-    have "even (n ^ 2)" using denominator_squared by simp
-    then show ?thesis by simp
+    have denominator_square_even: "even (n ^ 2)" using denominator_squared by simp
+    then show even_denominator: ?thesis by simp
   qed
 
   text \<open>But a common factor of two contradicts the fraction being reduced.\<close>

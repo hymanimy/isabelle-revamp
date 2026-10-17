@@ -4,32 +4,41 @@ import type * as Dagre from '@dagrejs/dagre' with { 'resolution-mode': 'import' 
 const { graphlib, layout }: typeof Dagre = require('@dagrejs/dagre');
 import type { GraphNode, GraphState } from './graphTypes';
 
-export interface Box { id: string; x: number; y: number; width: number; height: number }
+export interface Box { id: string; x: number; y: number; width: number; height: number; contained?: string[] }
 export interface GraphLayout { nodes: Box[]; containers: Box[]; width: number; height: number }
 
 // Lay out sibling subtrees with Dagre, then place their parent above them.
 // Each nested proof has a real bounding box: no overlapping compound endpoints.
-export function graphLayout(state: GraphState, hidden: Set<string>): GraphLayout {
+export function graphLayout(state: GraphState, hidden: Set<string>, availableWidth = 884): GraphLayout {
   const visible = state.nodes.filter(node => !hidden.has(node.id));
-  const byId = new Map(visible.map(node => [node.id, node]));
+  const byId = new Map(state.nodes.map(node => [node.id, node]));
   const children = new Map<string | null, GraphNode[]>();
   for (const node of visible) {
     const parent = node.parent && byId.has(node.parent) ? node.parent : null;
     children.set(parent, [...(children.get(parent) ?? []), node]);
   }
-  const width = 96, height = 30, gap = 24, padding = 8;
+  const height = 38, gap = 24, padding = 8;
+  const widthOf = (name: string) => Math.max(110, name.length * 7.2 + 20);
+  function containedNames(id: string): string[] {
+    return state.nodes.filter(node => {
+      if (!hidden.has(node.id)) return false;
+      let parent = node.parent;
+      while (parent && hidden.has(parent)) parent = byId.get(parent)?.parent ?? null;
+      return parent === id;
+    }).map(node => `${node.name} · L${node.line}`);
+  }
   function subtree(node: GraphNode): GraphLayout {
     const descendants = children.get(node.id) ?? [];
+    const contained = containedNames(node.id), width = Math.max(widthOf(node.name), ...contained.map(widthOf));
+    const tileHeight = height + contained.length * 16;
     if (!descendants.length) {
-      const w = !node.parent && state.fully_checked ? 480 : width;
-      const h = !node.parent && state.fully_checked ? 84 : height;
-      return { nodes: [{ id: node.id, x: 0, y: 0, width: w, height: h }], containers: [], width: w, height: h };
+      return { nodes: [{ id: node.id, x: 0, y: 0, width, height: tileHeight, contained }], containers: [], width, height: tileHeight };
     }
     const inside = siblings(descendants);
-    const boxWidth = Math.max(width, inside.width + padding * 2), boxHeight = height + gap + inside.height + padding;
-    const dx = (boxWidth - inside.width) / 2, dy = height + gap;
+    const boxWidth = Math.max(width, inside.width + padding * 2), boxHeight = tileHeight + gap + inside.height + padding;
+    const dx = (boxWidth - inside.width) / 2, dy = tileHeight + gap;
     return { width: boxWidth, height: boxHeight,
-      nodes: [{ id: node.id, x: (boxWidth - width) / 2, y: 0, width, height },
+      nodes: [{ id: node.id, x: (boxWidth - width) / 2, y: 0, width, height: tileHeight, contained },
         ...inside.nodes.map(box => ({ ...box, x: box.x + dx, y: box.y + dy }))],
       containers: [{ id: node.id, x: 0, y: height / 2, width: boxWidth, height: boxHeight - height / 2 },
         ...inside.containers.map(box => ({ ...box, x: box.x + dx, y: box.y + dy }))] };
@@ -55,18 +64,31 @@ export function graphLayout(state: GraphState, hidden: Set<string>): GraphLayout
       if (from && to && from !== to) graph.setEdge(to, from);
     }
     layout(graph);
-    const result: GraphLayout = { nodes: [], containers: [], width: graph.graph().width ?? 0, height: graph.graph().height ?? 0 };
-    for (const [id, piece] of pieces) {
-      const position = graph.node(id), dx = position.x - piece.width / 2, dy = position.y - piece.height / 2;
-      result.nodes.push(...piece.nodes.map(box => ({ ...box, x: box.x + dx, y: box.y + dy })));
-      result.containers.push(...piece.containers.map(box => ({ ...box, x: box.x + dx, y: box.y + dy })));
+    // Wrap Dagre's ordered subtrees into readable rows. A long dependency
+    // chain must not reduce every label to a few pixels when Fit is applied.
+    // Nesting stays intact; arrows retain their direction across row breaks.
+    const ordered = [...pieces].sort(([a], [b]) => graph.node(a).y - graph.node(b).y || graph.node(a).x - graph.node(b).x);
+    const result: GraphLayout = { nodes: [], containers: [], width: 0, height: 0 };
+    let x = 0, y = 0, rowHeight = 0;
+    const rowWidth = Math.max(240, availableWidth - padding * 4);
+    for (const [, piece] of ordered) {
+      if (x && x + piece.width > rowWidth) { x = 0; y += rowHeight + gap; rowHeight = 0; }
+      result.nodes.push(...piece.nodes.map(box => ({ ...box, x: box.x + x, y: box.y + y })));
+      result.containers.push(...piece.containers.map(box => ({ ...box, x: box.x + x, y: box.y + y })));
+      result.width = Math.max(result.width, x + piece.width);
+      rowHeight = Math.max(rowHeight, piece.height); x += piece.width + 12;
     }
+    result.height = y + rowHeight;
     return result;
   }
   return siblings(children.get(null) ?? []);
 }
 
 export function edgePath(from: Box, to: Box): string {
+  if (from.y === to.y) {
+    const channel = from.y - 6; // Keep root-to-root edges inside Fit's 8 px margin.
+    return `M${from.x + from.width / 2},${from.y} V${channel} H${to.x + to.width / 2} V${to.y}`;
+  }
   const upward = from.y > to.y;
   const x1 = from.x + from.width / 2, x2 = to.x + to.width / 2;
   const y1 = from.y + (upward ? 0 : from.height), y2 = to.y + (upward ? to.height : 0);

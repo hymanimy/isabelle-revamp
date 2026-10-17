@@ -15,6 +15,8 @@ export class ProofGraph implements Disposable {
   private cache = new Map<string, { version: number; structure: ProofStructure }>();
   private starts = new Map<string, number>();
   private finishes = new Map<string, number>();
+  private epochs = new Map<string, number>();
+  private epoch = 0;
   private updates = new EventEmitter<GraphState | undefined>();
   readonly onDidUpdate = this.updates.event;
   private clock: ReturnType<typeof setInterval>;
@@ -36,13 +38,23 @@ export class ProofGraph implements Disposable {
     }, 1000);
   }
   follow(editor?: TextEditor): void {
-    if (editor?.document.languageId === 'isabelle') this.editor = editor;
+    if (editor?.document.languageId === 'isabelle') {
+      if (this.editor?.document.uri.toString() !== editor.document.uri.toString()) this.resetTimer(editor.document);
+      this.editor = editor;
+    }
+    this.schedule();
+  }
+  resetTimer(document?: TextDocument): void {
+    if (!document || document.languageId !== 'isabelle') return;
+    const uri = document.uri.toString();
+    this.starts.set(uri, Date.now()); this.finishes.delete(uri);
+    this.epochs.set(uri, ++this.epoch);
+    this.logs.delete(uri); this.signatures.delete(uri);
     this.schedule();
   }
   changed(document: TextDocument): void {
     if (document.languageId !== 'isabelle') return;
-    if (!this.starts.has(document.uri.toString())) this.starts.set(document.uri.toString(), Date.now());
-    this.finishes.delete(document.uri.toString());
+    if (!this.starts.has(document.uri.toString()) || this.finishes.has(document.uri.toString())) this.resetTimer(document);
     this.hoverCache.clear();
     this.schedule();
   }
@@ -68,14 +80,13 @@ export class ProofGraph implements Disposable {
   private structure(document: TextDocument): ProofStructure {
     const key = document.uri.toString(), cached = this.cache.get(key);
     if (cached?.version === document.version) return cached.structure;
-    const structure = proofStructure(document.getText());
+    const structure = proofStructure(document.getText(), true);
     this.cache.set(key, { version: document.version, structure }); return structure;
   }
   snapshot(document = this.editor?.document): GraphState | undefined {
     if (!document || document.isClosed) return;
     const uri = document.uri.toString(), source = this.structure(document);
     const processing = this.goals.processing(document), checked = this.goals.documentStatus(document).fully_checked;
-    if (checked && this.starts.has(uri) && !this.finishes.has(uri)) this.finishes.set(uri, Date.now());
     const offsets = (range: SourceRange): [number, number] => [document.offsetAt(new Position(range[0], range[1])), document.offsetAt(new Position(range[2], range[3]))];
     const keywords = ['text_keyword1', 'text_keyword2', 'text_keyword3', 'text_improper']
       .flatMap(type => this.goals.decorationRanges(document, type)).map(offsets);
@@ -107,10 +118,11 @@ export class ProofGraph implements Disposable {
         agent: tag && tag.until > Date.now() ? tag.name : undefined };
     });
     const { nodes, edges } = refutationGraph(acceptedNodes, source.edges, checked);
+    if ((checked || nodes.some(node => node.status === 'refuted')) && this.starts.has(uri) && !this.finishes.has(uri)) this.finishes.set(uri, Date.now());
     const cursor = this.editor?.document === document ? document.offsetAt(this.editor.selection.active) : -1;
     const focused = source.nodes.filter(node => node.start <= cursor && cursor < node.end).at(-1)?.id;
     return { focused, file: document.uri.fsPath, uri, version: document.version, theory: basename(document.uri.fsPath, '.thy'),
-      nodes, edges, complete: processing.processed, fully_checked: checked,
+      nodes, edges, complete: processing.processed, fully_checked: checked, epoch: this.epochs.get(uri),
       proved: nodes.filter(node => node.status === 'proved').length, total: nodes.length,
       elapsed: this.starts.has(uri) ? (this.finishes.get(uri) ?? Date.now()) - this.starts.get(uri)! : 0 };
   }

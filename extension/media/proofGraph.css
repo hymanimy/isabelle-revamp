@@ -7,7 +7,8 @@ header { display: flex; align-items: center; justify-content: space-between; gap
   height: 30px; flex: none; padding: 3px 8px; border-bottom: 1px solid var(--vscode-panel-border); }
 #status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 nav { display: flex; gap: 4px; flex: none; }
-button { padding: 3px 5px; font: inherit; font-size: 10px; white-space: nowrap; color: var(--vscode-button-foreground);
+label { display: flex; align-items: center; white-space: nowrap; font-size: 11px; }
+button, select { padding: 3px 5px; font: inherit; font-size: 10px; white-space: nowrap; color: var(--vscode-button-foreground);
   background: var(--vscode-button-background); border: 0; border-radius: 3px; cursor: pointer; }
 button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
 main { flex: 1; min-height: 0; overflow: hidden; }
@@ -23,8 +24,8 @@ footer { padding: 8px 18px; color: var(--vscode-descriptionForeground); border-t
 .tile { transform-box: fill-box; transform-origin: center; }
 .node rect { rx: 7; fill: var(--vscode-editor-background); stroke: var(--vscode-descriptionForeground);
   stroke-width: 1.5; transition: stroke 300ms, fill 300ms; }
-.node text { fill: var(--vscode-editor-foreground); text-anchor: middle; pointer-events: none; font-size: 10px; }
-.node .detail { font-size: 10px; fill: var(--vscode-descriptionForeground); }
+.node text { fill: var(--vscode-editor-foreground); text-anchor: middle; pointer-events: none; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+.node .detail { font-size: 11px; fill: var(--vscode-descriptionForeground); }
 .node.open rect { stroke-dasharray: 6 4; }
 .node.checking rect { stroke: var(--vscode-editorWarning-foreground); }
 .node.proved rect { stroke: var(--vscode-testing-iconPassed); fill: color-mix(in srgb, var(--vscode-testing-iconPassed) 12%, var(--vscode-editor-background)); }
@@ -39,10 +40,6 @@ footer { padding: 8px 18px; color: var(--vscode-descriptionForeground); border-t
 .key.checking { background: var(--vscode-editorWarning-foreground); }
 .key.proved { background: var(--vscode-testing-iconPassed); }
 .key.error { background: var(--vscode-errorForeground); }
-.finished .name { font-size: 16px; font-weight: 600; }
-.finished .detail { font-size: 12px; }
-.replaying .pulse .tile, .replaying .edge.pulse { animation-duration: 50ms; }
-.replaying .node, .replaying .node rect { transition-duration: 37.5ms; }
 @keyframes accepted { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @keyframes accepted-edge { 50% { stroke: var(--vscode-testing-iconPassed); stroke-width: 3; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
