@@ -1,4 +1,5 @@
 import { homedir } from 'node:os';
+import { resolve } from 'node:path';
 import { commands, ExtensionContext, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
@@ -7,6 +8,7 @@ import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
 import { unicodeSymbols } from './symbols';
 import { Swarm } from './swarm';
+import { Ask } from './ask';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -14,14 +16,36 @@ import { Swarm } from './swarm';
 let client: LanguageClient | undefined;
 let goals: Goals | undefined;
 let bridge: Bridge | undefined;
+let ask: Ask | undefined;
 
 export async function activate(context: ExtensionContext) {
   const output = window.createOutputChannel('Isabelle', { log: true });
   const view = new GoalsView();
+  let theoryEditor = window.activeTextEditor;
+  const visibleTheory = () => theoryEditor && window.visibleTextEditors.includes(theoryEditor) ? theoryEditor : undefined;
+  ask = new Ask(resolve(context.extensionPath, '..'), state => view.updateAsk(state));
+  const sendAsk = async (text: string) => {
+    const editor = visibleTheory();
+    const folder = editor && workspace.getWorkspaceFolder(editor.document.uri);
+    if (!editor || editor.document.isClosed || editor.document.languageId !== 'isabelle' || !folder) {
+      ask?.notice('Open a theory in this workspace before asking Isabelle.');
+      view.updateAsk(ask!.snapshot()); return false;
+    }
+    if (!bridge) { ask?.notice('The Isabelle MCP bridge is unavailable. See Output → Isabelle.'); return false; }
+    return ask!.send({ file: editor.document.uri.fsPath, line: editor.selection.active.line + 1,
+      cwd: folder.uri.fsPath, portFile: bridge.portFile }, text);
+  };
+  view.onAsk = text => { void sendAsk(text); };
+  view.onStop = () => ask?.stop();
   context.subscriptions.push(output,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
     commands.registerCommand('isabelleRevamp.showGoals', () =>
-      commands.executeCommand('isabelleRevamp.goals.focus')));
+      commands.executeCommand('isabelleRevamp.goals.focus')),
+    commands.registerCommand('isabelleRevamp.ask', async () => {
+      view.focusAsk();
+      await commands.executeCommand('isabelleRevamp.goals.focus');
+      view.focusAsk();
+    }));
 
   const configured = workspace.getConfiguration('isabelleRevamp')
     .get<string>('executable', 'isabelle');
@@ -58,14 +82,17 @@ export async function activate(context: ExtensionContext) {
     window.onDidChangeTextEditorSelection(event => {
       if (event.textEditor === window.activeTextEditor) { goals?.follow(event.textEditor); swarm.follow(event.textEditor); }
     }),
-    window.onDidChangeActiveTextEditor(editor => { goals?.follow(editor); swarm.follow(editor); }),
+    window.onDidChangeActiveTextEditor(editor => {
+      if (editor) theoryEditor = editor;
+      goals?.follow(editor ?? visibleTheory()); swarm.follow(editor);
+    }),
     workspace.onDidChangeTextDocument(event => {
       goals?.observe(event.document);
       if (event.contentChanges.length) swarm.changed(event.document);
       if (event.document === window.activeTextEditor?.document) goals?.follow(window.activeTextEditor);
     }),
     client.onDidChangeState(event => {
-      if (event.newState === State.Running) goals?.ready(window.activeTextEditor);
+      if (event.newState === State.Running) goals?.ready(window.activeTextEditor ?? visibleTheory());
       else goals?.unavailable();
     }));
 
@@ -93,10 +120,13 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(),
     selectSwarmStep: (uri: string, version: number, id: string) => swarm.select(uri, version, id) };
 }
 
 export async function deactivate(): Promise<void> {
+  ask?.dispose();
+  ask = undefined;
   await bridge?.close();
   bridge = undefined;
   goals?.dispose();

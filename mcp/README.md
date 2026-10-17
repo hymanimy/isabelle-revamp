@@ -30,6 +30,11 @@ These forms were checked against the installed CLI help and the official
 [Codex MCP documentation](https://developers.openai.com/codex/mcp) and
 [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
 Registration is left to you; the test runner does not change client configuration.
+For **Isabelle: Ask**, Claude Code must also be signed in and on VS Code's PATH.
+Ask checks `claude mcp get isabelle` from the workspace root, then supplies the
+bundled server and this extension's discovery file explicitly to that child.
+It changes no registration and allows only these seven tools; a run occupies
+one of the two client slots. See [the Ask demo](../docs/DEMO.md#ask-isabelle).
 M7 supports two simultaneous clients; a third connection is refused. Each client
 runs its own stdio server and shares the extension's prover. Restart the MCP
 connections after reloading the extension.

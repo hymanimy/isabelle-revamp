@@ -151,6 +151,9 @@ should be.
   tokenizer/live-host checks separately from the still-unverified screen view.
   The M7 screen retry returned the same denial; its card rendering/message
   tests and live editor checks are recorded separately from screen inspection.
+  M8's retry using that same inventory identifier was also denied. Its real
+  Claude/editor acceptance and webview keyboard/message tests do not claim a
+  direct screen review of the Ask box.
 
 ## 12. Goal notifications cannot identify the cursor that produced them
 
@@ -360,3 +363,67 @@ should be.
 - **Fix needed.** Keep `Swarm_solution.thy` tracked and use repository-local
   `files.exclude` and `search.exclude` settings for the demo. Direct paths still
   allow the reference checker and presenter to access it.
+
+## 29. Claude's advertised JSON stream requires a second flag
+
+- **What happened.** The installed Claude Code 2.1.236 rejects
+  `-p --output-format stream-json` with
+  `Error: When using --print, --output-format=stream-json requires --verbose`.
+  Putting the prompt immediately after variadic `--mcp-config` also made it a
+  purported configuration filename: `MCP config file not found: .../Reply OK`.
+- **Experience.** The obvious command fails before the mathematician gets a
+  response, and a prompt can appear to be a missing file.
+- **Fix needed.** Use the verified flags `--verbose --include-partial-messages`,
+  an argument array, and stdin for the prompt. Record observed stream shapes;
+  test split JSON/Unicode and duplicate complete-message events.
+
+## 30. Refreshing a goal can erase a question being typed
+
+- **What happened.** The M6 Goals view replaced its whole HTML on every prover
+  update. An interactive textarea would lose its draft, focus and transcript.
+  Moving focus into a webview can also leave `activeTextEditor` undefined.
+- **Experience.** A user starts asking about a proof and the changing proof state
+  interrupts the question or loses the active theory.
+- **Fix needed.** Keep a persistent webview and send separate goal/Ask updates.
+  Preserve the visible theory as the request context, save the draft with webview
+  state, and retain the transcript in the extension session. Tests exercise
+  typing, newlines, focus, re-opening and live goal updates.
+
+## 31. MCP registration is not the same as a running proof connection
+
+- **What happened.** `claude mcp get isabelle` returned exit 0 for the registered
+  local server even when its status said `Failed to connect` because the
+  extension was closed. The default discovery file can also belong to another
+  development window.
+- **Experience.** Re-registering an already registered tool does not make the
+  proof visible, and the wrong window can appear to own the edit.
+- **Fix needed.** Check registration, start the extension bridge, and pass an
+  explicit configuration for this instance's discovery file to the child.
+  Missing CLI/registration each has one actionable line containing the exact
+  registration command from `mcp/README.md`. Do not change global client config.
+
+## 32. A cached editor handle can expire during agent navigation
+
+- **What happened.** The first real Ask acceptance run proved all three steps and
+  reached `fully_checked`, but the harness then failed with
+  `TextEditor#edit not possible on closed editors`. It had kept an editor object
+  from before the agent's MCP navigation. The same stale handle prevented its
+  initial cleanup attempt.
+- **Experience.** A successful proof can look like a failed demo because the
+  test's subsequent manual bad-tactic insertion addresses an obsolete editor.
+- **Fix needed.** Reacquire the visible editor before test edits and restoration,
+  while keeping the current document text/version as the source of coordinates.
+  Restore the test-owned skeleton explicitly and rerun both live requests.
+
+## 33. Claude repeats a completed text block with a different array index
+
+- **What happened.** The live diagnostic explanation appeared twice. A fresh
+  real stream probe showed thinking at stream block index 0 and text at index 1,
+  but the completed `assistant` event contained only the text block at array
+  index 0, with the same message ID.
+- **Experience.** A correctly streamed answer suddenly repeats itself on
+  completion, making a short mathematical explanation look much longer.
+- **Fix needed.** Reconcile pending text blocks in order within their message
+  ID, rather than equating stream indices with the complete message's array.
+  Replay the captured stream and include its thinking/text sequence in the
+  subprocess fixture. The live acceptance also rejects duplicate replies.

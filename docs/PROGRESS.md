@@ -319,3 +319,61 @@
 - **Next:** reload the development host and run the Swarm demo with
   `docs/SWARM_PROMPT.md`. The requested M7 implementation and automated stopping
   conditions are complete; no later milestone was started.
+
+## 2026-10-17 — M8 passed: Ask Isabelle
+
+- **Changed:** added the Ask box above Goals and **Isabelle: Ask** to focus it.
+  Enter sends, Shift+Enter inserts a line, and streamed text/tool-call summaries
+  append to the session transcript. The box disables during a request. Stop
+  terminates Claude and its MCP process group; a ten-minute deadline does the
+  same. Existing submitted edits remain in the editor.
+- **Backend:** uses installed Claude Code 2.1.236 only, with verified print/JSON
+  streaming flags, stdin prompts, the requested fixed preamble, and explicit
+  coordinate/current-buffer guidance. Built-in tools, skills and hooks are
+  disabled for the child. Exactly the seven Isabelle MCP tools are allowed;
+  an explicit configuration selects this extension's bridge after checking the
+  existing registration. No model HTTP API, new prover, dependency, automatic
+  registration or global configuration change was introduced.
+- **View:** Goals now keeps its webview DOM and receives goal/transcript messages
+  separately, so live checking preserves the draft, focus and conversation.
+  A script nonce and text-only rendering keep proof/model output inert. The
+  active visible theory is retained when focus moves into the Ask box. Every
+  Ask proof edit goes through MCP, retaining the existing version checks,
+  diagnostics, save/undo behavior and Claude Swarm tags.
+- **Passed:** `bash scripts/check_m8.sh` exited 0. The final
+  `M8_LIVE=1 bash scripts/check_m8.sh` also exited 0 with the final parser fix.
+  It checked the reference theory, TypeScript, spawn/flags, split UTF-8/JSON,
+  partial text, tool summaries, session history, concurrent-send refusal,
+  Stop/escalation/descendant cleanup, timeout, malformed/error output, and both
+  exact one-line help messages. Webview-script checks cover Enter/newline/IME,
+  focus, disabled controls, Stop messages, draft/transcript retention and safe
+  rendering. All M3–M7 live editor, highlighting and MCP regressions passed.
+- **Real Claude acceptance:** with `examples/Demo.thy` open, `prove this` replaced
+  the admitted arithmetic proof through MCP. Goals changed during the run,
+  Claude tags appeared, and all three cards reached kernel-checked completion.
+  A deliberately inserted `by (rule TrueI)` then produced a real inline error;
+  `why does this fail?` named **Failed to apply initial proof method**, explained
+  the mismatched `True` conclusion, and made no edit. The final run also checked
+  that the streamed explanation appears only once. The test restored the three
+  original `sorry` bodies afterward. Receipts and the generated complete theory
+  are under `.dev-host/m8-results.json`, `m8-live-stream.json`, and `m8-checked/`.
+  Independently, `isabelle process_theories -D .dev-host/m8-checked -O Demo`
+  exited 0 on the generated proof, which contains zero admissions.
+- **Discovered:** `stream-json` requires `--verbose`; variadic CLI arguments can
+  consume a positional prompt; registration and connection health are separate.
+  A complete assistant event can contain just one content block, whose array
+  index differs from its stream index after a thinking block. A real captured
+  stream exposed the duplicate-answer bug and now replays as one answer. The
+  live harness also needed fresh editor handles after MCP navigation. Protocol
+  notes and PAINPOINTS entries 29–33 record these findings and fixes.
+- **Visual limitation:** the screen tool again returned **Computer Use was not
+  approved to use Code**. Actual host/model and webview-script checks passed;
+  no direct screenshot or physical typing acceptance is claimed.
+- **Would do differently:** capture a thinking-plus-text stream at the start,
+  test retained DOM/focus before connecting the backend, and reacquire editor
+  handles after agent navigation. Keep deterministic checks separate from the
+  opt-in signed-in Claude acceptance so ordinary verification spends no model
+  requests.
+- **Next:** reload the development host and follow **Ask Isabelle** in
+  `docs/DEMO.md` with `examples/Demo.thy`. M8 implementation and automated/live
+  backend checks are complete; no later milestone was started.

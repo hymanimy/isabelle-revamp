@@ -22,6 +22,7 @@
       ]
     },
     "commands": [
+      { "command": "isabelleRevamp.ask", "title": "Isabelle: Ask" },
       { "command": "isabelleRevamp.showGoals", "title": "Isabelle: Show Goals" },
       { "command": "isabelleRevamp.showSwarm", "title": "Isabelle: Show Swarm" }
     ],

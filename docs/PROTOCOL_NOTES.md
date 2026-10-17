@@ -483,3 +483,108 @@ The live test starts two real FastMCP clients with `Implementation` names
 a stale second-client edit was refused, and the six-card completed proof matched
 whole-theory completion. The test clients submit fixed proofs; no model inference
 or actual Claude/Codex CLI session is claimed by this automated check.
+
+## M8 — Claude Code stream and Ask lifecycle (2026-10-17)
+
+The installed `claude --version` reports **2.1.236 (Claude Code)**. We read
+`claude --help`, `claude mcp --help` and `claude mcp get --help`, then ran a real
+print-mode probe. `claude mcp get isabelle` reports registration separately from
+connection health: an existing local registration returned exit 0 and
+`Status: ✘ Failed to connect` while the extension was closed. An absent name
+returned exit 1 with `No MCP server named "isabelle-missing-m8". Configured servers: isabelle`.
+No registration or global settings were changed.
+
+Actual print-mode requirement, tested without `--verbose`:
+
+```text
+Error: When using --print, --output-format=stream-json requires --verbose
+```
+
+Ask launches the installed executable with an argument array, without a shell:
+
+```text
+claude -p --output-format stream-json --verbose --include-partial-messages
+  --tools ""
+  --allowedTools mcp__isabelle__open mcp__isabelle__edit mcp__isabelle__goals_at
+    mcp__isabelle__errors mcp__isabelle__status mcp__isabelle__sorry_positions
+    mcp__isabelle__processing_status
+  --permission-mode dontAsk --strict-mcp-config --mcp-config <JSON>
+  --disable-slash-commands --settings '{"disableAllHooks":true}'
+  --no-session-persistence --system-prompt <fixed preamble and coordinate guidance>
+```
+
+The user's text is written to stdin and stdin closes. This also avoids the
+variadic `--mcp-config` option consuming a trailing positional prompt as a
+configuration filename. The preamble names the absolute active theory path and
+**one-based** cursor line, then explains that MCP uses **zero-based UTF-16**
+positions. It requests structured Isar, current diagnostics/status after edits,
+and an explicit fully-checked or stuck outcome. Explanation requests inspect
+errors without editing. The host retains the visible theory when focus enters
+the webview. Later messages include the session's earlier user/assistant text as
+context; each run reads the current editor buffer anew.
+
+Built-in tools are disabled with `--tools ""`; the explicit seven MCP permissions
+avoid an interactive permission prompt. Skills and hooks are disabled for this
+child. `--strict-mcp-config` limits discovery to the bundled `isabelle` server:
+`mcp/.venv/bin/python mcp/server.py --port-file <this bridge's discovery file>`.
+It is passed as JSON after verifying the user's existing `isabelle` registration
+in the workspace root. This routes edits to the correct extension window and
+loads no other MCP servers. It does not install/register anything, bypass all
+permissions, or call a model HTTP API from the extension. Claude uses its own
+installed authentication and model selection.
+
+Observed stream: newline-delimited JSON, UTF-8. This is **not** Content-Length
+framing. A real minimal response included the following shapes (extra metadata
+omitted):
+
+```json
+{"type":"system","subtype":"init","tools":[],"mcp_servers":[]}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_...","content":[]}}}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Stream ready."}}}
+{"type":"assistant","message":{"id":"msg_...","content":[{"type":"text","text":"Stream ready."}]}}
+{"type":"result","subtype":"success","is_error":false,"result":"Stream ready.","permission_denials":[]}
+```
+
+Text deltas update a retained transcript item immediately. Complete assistant
+messages reconcile pending text blocks within their message ID instead of
+duplicating them. Tool-use blocks are keyed by their `id`; their `name` and decoded `input`
+produce one-line labels. Partial `input_json_delta.partial_json` fragments are
+assembled before displaying coordinates. `edit Demo.thy 7:4–9:10` and
+`goals_at 12:6` deliberately use the MCP's zero-based coordinates. Tool results,
+thinking, credentials and raw protocol metadata are not dumped into the panel.
+`result.is_error`, permission denials, malformed JSON and nonzero exit without
+completion produce transcript notices. Split UTF-8 code points/JSON records
+are handled across stdout chunks; a record is limited to 2 MiB.
+
+One request owns the child through preflight, streaming and termination. Stop
+signals the child's process group on macOS/Linux, including its MCP subprocess,
+then escalates to SIGKILL after 1.5 seconds. The application under test is macOS;
+Windows currently uses Node's direct-child `kill` fallback. The ten-minute timer
+includes preflight. Submitted edits remain in VS Code; Stop never rolls them
+back and never signals the independent Isabelle language server. A second
+request is refused until the child closes. Deactivation also stops the child.
+
+Goals now uses a nonce-restricted persistent webview. Goal and transcript updates
+are separate `postMessage` messages and render through `textContent`; they never
+replace the textarea, draft or transcript DOM. The webview saves only its draft
+with VS Code's webview state; the extension holds the transcript for the window's
+extension session. Reloading the extension starts a new transcript.
+
+The first real `prove this` acceptance run exercised the tool path as well:
+`open`, `sorry_positions`, another `open`, `edit Demo.thy 10:0–15:9`,
+`goals_at 14:2`, `errors`, `status`. The decoded stream yielded one item per tool
+and the final `fully_checked: true` reply without duplicated text. Actual MCP
+edits showed **Claude** badges and all three cards became green. The independent
+board completion flag, not Claude's prose, supplied the acceptance assertion.
+
+A second real stream probe explained why `TrueI` fails on an arithmetic equality.
+It exposed a subtle block-index mismatch: Claude emitted `content_block_start`
+for **thinking at index 0**, an `assistant` message containing only that thinking
+block, then **text at index 1**, followed by another `assistant` message with the
+same message ID whose `content` array contained **only the text block** (array
+index 0). The complete-block message arrived before `content_block_stop`.
+Matching array indices therefore duplicated a long final reply. The decoder now
+reconciles pending text blocks in order within each message ID; thinking remains
+undisplayed. Replaying that captured real stream produces exactly one answer,
+and the deterministic subprocess fixture includes this observed sequence.

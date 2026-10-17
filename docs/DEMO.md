@@ -63,3 +63,45 @@ proof bodies from the committed skeleton after preserving anything you need.
 `bash scripts/check_m7.sh` checks the reference proof and runs the live board/MCP
 acceptance tests in a disposable host. It leaves both committed example files
 unchanged. The test uses two named MCP clients, without running a language model.
+
+## Ask Isabelle
+
+First install/register the MCP server using [mcp/README.md](../mcp/README.md).
+Claude Code must be installed, signed in, and on the PATH inherited by VS Code.
+Run `claude mcp get isabelle` from this repository to check registration. Compile
+and reload an older development host before the demo.
+
+1. Open **examples/Demo.thy**, the three-step skeleton proving that two
+   consecutive odd numbers sum to a multiple of four. Click its first `sorry`.
+   Open **Isabelle: Show Swarm**: the three cards start grey. Close other
+   unfinished theory tabs so aggregate `status()` can become fully checked.
+2. Run **Isabelle: Ask** from the Command Palette. It opens Goals and focuses
+   the box at the top. Type **prove this** and press **Enter**. **Shift+Enter**
+   inserts a newline. Keep Goals and Swarm expanded in the Explorer sidebar.
+3. Watch streamed text and one-line tool calls. Claude reads and edits through
+   the same seven MCP tools; edited cards show **Claude** for ten seconds and
+   turn green as Isabelle checks them. Wait for **3/3 proved · kernel-checked ✓**
+   and the completion reply. The proof is saved through MCP. **Stop** terminates
+   the request and its MCP child; edits already submitted remain in the editor.
+4. Replace the justification below `have expand` with **by (rule TrueI)**. Wait
+   for a red card and an inline diagnostic, then ask **why does this fail?**.
+   The answer should name **Failed to apply initial proof method** and explain
+   that `TrueI` proves `True`, while this goal is an arithmetic equality. The
+   explanation leaves the file unchanged and appends to the transcript.
+5. Undo the bad tactic, or ask Claude to fix it; wait for whole-theory completion
+   again. New messages append within this extension session. Reloading the
+   window clears the transcript. A run disables the box until it finishes or is
+   stopped; after ten minutes it stops automatically and says so.
+
+If the CLI or registration is missing, the panel gives one line with the exact
+`claude mcp add` command. Run it from the repository root after installing Claude
+Code/the MCP Python dependencies. It does not register anything automatically.
+Ask uses Claude Code's configured account/model, with no direct HTTP model API.
+Tool-call coordinates in the transcript are zero-based, like MCP.
+
+`bash scripts/check_m8.sh` checks spawn/streaming/Stop/timeout/help, the actual
+webview script, and all M3–M7 regressions without a model request. To exercise the
+two real Claude requests above using the installed signed-in CLI, run
+`M8_LIVE=1 bash scripts/check_m8.sh`. This temporarily edits `examples/Demo.thy`
+and restores its captured skeleton afterward; use it when the example has no
+unsaved work. Receipts and the generated checked proof go under `.dev-host/`.

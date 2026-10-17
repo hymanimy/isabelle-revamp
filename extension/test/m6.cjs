@@ -23,9 +23,10 @@ exports.run = async function () {
   const view = new GoalsView();
   const state = { theory: 'Sqrt2', phase: 'ready', checkStatus: 'fully_checked', text: 'm² = 2 * n²', errors: [] };
   view.update(state);
-  const fake = { webview: {}, onDidDispose() {} };
+  const fake = { webview: { onDidReceiveMessage() { return { dispose() {} }; }, postMessage() {} }, onDidDispose() {} };
   view.resolveWebviewView(fake);
-  assert.equal(fake.webview.options.enableScripts, false);
+  assert.equal(fake.webview.options.enableScripts, true);
+  assert(fake.webview.html.includes("script-src 'nonce-"));
   assert(fake.webview.html.includes('<h1>Sqrt2</h1>'));
   assert(fake.webview.html.includes('fully checked') && fake.webview.html.includes('m² = 2 * n²'));
   for (const variable of ['foreground', 'sideBar-background', 'editor-font-family', 'errorForeground', 'contrastBorder']) {

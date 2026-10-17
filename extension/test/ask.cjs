@@ -1,0 +1,73 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { Ask, AskStream, helpLine, registrationCommand } = require('../out/ask');
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+exports.checkAsk = async function () {
+  const root = path.resolve(__dirname, '../..');
+  fs.mkdirSync(path.join(root, '.dev-host'), { recursive: true });
+  const context = { file: path.join(root, 'examples/Demo.thy'), line: 12, cwd: root, portFile: path.join(root, '.dev-host/m8-port') };
+  const capture = path.join(root, '.dev-host/m8-spawn.json');
+  const pidFile = path.join(root, '.dev-host/m8-child-pid');
+  function runner(mode, options = {}, changed = () => {}) {
+    return new Ask(root, changed, { executable: path.join(__dirname, 'fakeClaude.cjs'),
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', M8_SCENARIO: mode, M8_CAPTURE: capture, M8_PID_FILE: pidFile }, ...options });
+  }
+  const observed = [];
+  const ask = runner('stream', {}, state => observed.push(state));
+  const first = ask.send(context, 'prove this `literal` $(also literal)');
+  assert.equal(await ask.send(context, 'second concurrent request'), false);
+  await first;
+  assert(observed.some(state => state.active && state.entries.some(entry => entry.text === 'Checking ')), 'Partial text must arrive before completion');
+  assert.equal(ask.snapshot().active, false);
+  assert.equal(ask.snapshot().entries.filter(e => e.text === 'Checking √2.').length, 1);
+  assert.equal(ask.snapshot().entries.filter(e => e.text === 'Fully checked.').length, 1);
+  assert(ask.snapshot().entries.some(e => e.text === 'edit Demo.thy 7:4–9:10'));
+  assert(ask.snapshot().entries.some(e => e.text === 'goals_at 12:6'));
+  let invocation = JSON.parse(fs.readFileSync(capture));
+  for (const flag of ['-p', '--verbose', '--include-partial-messages', '--strict-mcp-config', '--disable-slash-commands']) assert(invocation.args.includes(flag));
+  assert.equal(invocation.args[invocation.args.indexOf('--tools') + 1], '');
+  assert.equal(invocation.args[invocation.args.indexOf('--permission-mode') + 1], 'dontAsk');
+  assert(!invocation.args.includes('--dangerously-skip-permissions'));
+  assert(invocation.args.at(-1).includes('cursor at line 12'));
+  assert(invocation.prompt.includes('$(also literal)'));
+  await ask.send(context, 'why?');
+  invocation = JSON.parse(fs.readFileSync(capture));
+  assert(invocation.prompt.includes('Earlier conversation') && invocation.prompt.includes('Fully checked.'));
+  assert.equal(ask.snapshot().entries.filter(e => e.kind === 'user').length, 2);
+  const missing = runner('stream', { executable: path.join(root, '.dev-host/no-such-claude') });
+  await missing.send(context, 'prove this');
+  assert.equal(missing.snapshot().entries.at(-1).text, helpLine('claude'));
+  const noMcp = runner('missing'); await noMcp.send(context, 'prove this');
+  assert.equal(noMcp.snapshot().entries.at(-1).text, helpLine('MCP'));
+  assert(fs.readFileSync(path.join(root, 'mcp/README.md'), 'utf8').includes(registrationCommand));
+  assert(!helpLine('claude').includes('\n') && !helpLine('MCP').includes('\n'));
+  for (const mode of ['bad-json', 'exit-error']) {
+    const failure = runner(mode); await failure.send(context, 'prove this');
+    assert(failure.snapshot().entries.some(e => e.kind === 'notice'));
+    assert.equal(failure.snapshot().active, false);
+  }
+  fs.rmSync(pidFile, { force: true });
+  const stopped = runner('hold'); const running = stopped.send(context, 'prove this');
+  const deadline = Date.now() + 5000;
+  while (!fs.existsSync(pidFile) && Date.now() < deadline) await pause(20);
+  assert(fs.existsSync(pidFile)); const pid = Number(fs.readFileSync(pidFile, 'utf8'));
+  stopped.stop(); stopped.stop();
+  assert.equal(await stopped.send(context, 'too soon'), false);
+  await running;
+  await pause(50);
+  assert.throws(() => process.kill(pid, 0), /ESRCH/);
+  assert.equal(stopped.snapshot().entries.filter(e => e.kind === 'notice').length, 1);
+  assert.equal(stopped.snapshot().active, false);
+  const timeout = runner('preflight-stop', { timeoutMs: 150 });
+  await timeout.send(context, 'prove this');
+  assert(timeout.snapshot().entries.at(-1).text.includes('10-minute time limit'));
+  assert.equal(timeout.snapshot().active, false);
+  const entries = [];
+  const stream = new AskStream((kind, text) => { const entry = { kind, text }; entries.push(entry); return entry; });
+  stream.accept({ type: 'result', is_error: true, errors: ['Actual model error'], permission_denials: [{}] });
+  assert(entries.some(e => e.text === 'Actual model error'));
+  assert(entries.some(e => e.text.includes('denied')));
+  console.log('PASS: Ask spawn, flags, UTF-8 streaming, tool summaries, transcript, Stop/process tree, timeout, failures, and exact help lines');
+};
+if (require.main === module) exports.checkAsk().catch(error => { console.error(error); process.exitCode = 1; });

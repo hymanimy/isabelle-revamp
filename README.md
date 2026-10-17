@@ -7,6 +7,7 @@ fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
 `sorry`. M5 connects AI agents to that same editor through seven MCP tools.
 M6 adds a theme-aware sidebar, Unicode output and a theory/check-status header.
 M7 adds **Isabelle Swarm**, a live card board for six proof steps filled through MCP.
+M8 adds **Ask Isabelle**: streamed Claude Code replies and proof edits through those same tools.
 
 ## Try the extension in under five minutes
 
@@ -97,6 +98,21 @@ Run `bash scripts/check_m7.sh` for the reference proof, all earlier regression
 checks, live card transitions, two named MCP clients, stale-edit rejection and
 badge expiry. The reference solution is committed but hidden in the demo's
 Explorer/search through workspace settings.
+
+## Ask Isabelle (M8)
+
+With Claude Code installed, signed in and registered using [mcp/README.md](mcp/README.md),
+open `examples/Demo.thy` and run **Isabelle: Ask**. Type **prove this** and press
+Enter. Claude fills the three named proof steps through MCP while the Goals and
+Swarm panels update. Ask **why does this fail?** to inspect an actual diagnostic.
+Shift+Enter adds a line; Stop cancels the child process. The session transcript
+appends, and requests stop automatically after ten minutes.
+
+Follow the [Ask demo](docs/DEMO.md#ask-isabelle). `bash scripts/check_m8.sh` checks
+streaming, Stop, missing-tool help, webview behavior and earlier regressions.
+`M8_LIVE=1 bash scripts/check_m8.sh` also runs the two real Claude acceptance
+requests with your configured account/model, temporarily editing and restoring
+`Demo.thy`. Ask uses only the installed Claude Code CLI and the seven MCP tools.
 
 ## Run the goal probe
 
