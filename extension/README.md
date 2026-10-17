@@ -10,8 +10,9 @@ Claude Code. The original ASCII theory stays on disk by default.
 2. In Extensions, choose **… → Install from VSIX…** and select
    `isabelle-revamp-0.1.0.vsix`.
 3. Open a folder containing your `.thy` files, then open a theory. Goals opens
-   automatically. **Isabelle: Demo Layout** puts Ask and the named Proof Graph
-   together at the bottom; **Open in editor column** expands the graph.
+   automatically. **Isabelle: Demo Layout** puts the source on the left, Goals
+   above the named Proof Graph on the right, and Terminal across the bottom.
+   It hides the sidebars and Ask view; run Claude Code in Terminal.
 4. If Isabelle is not found, choose **Locate…** and select its `bin/isabelle`.
    **Isabelle Revamp: Setup check** prints checks and fixes in Output → Isabelle.
 
@@ -21,14 +22,15 @@ macOS/home installation locations. To build a missing HOL heap, run
 `isabelle build -b HOL` once.
 
 Named graph tiles show their source line. Click to navigate, hover for the goal,
-and follow matching editor gutter dots. Nested proof commands belong to their
-outer named step. Fit and Replay work without changing the theory. The right
+and follow matching editor gutter dots. Named nested steps have their own tiles;
+unnamed commands contribute to the enclosing named step. Fit and Replay work without changing the theory. The right
 status bar follows the graph; **Isabelle: Show Swarm** retains the compact board.
 
 ## Ask Isabelle (optional)
 
 Install and sign in to Claude Code, and install Python 3.11+. Run
-**Isabelle: Ask**. If MCP is not registered, copy the one-line registration
+**Isabelle: Ask** (`isabelleRevamp.showAsk` must be enabled; Demo Layout
+turns it off). If MCP is not registered, copy the one-line registration
 command shown in the panel into a terminal in your theory folder. It points
 to this extension's bundled `mcp/launch.py`, not a source checkout.
 

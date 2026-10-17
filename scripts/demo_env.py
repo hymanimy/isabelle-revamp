@@ -27,6 +27,8 @@ SETTINGS = {
     'editor.fontSize': 16,
     'isabelleRevamp.prettySymbols': True,
     'isabelleRevamp.demoLayoutOnStartup': True,
+    'isabelleRevamp.showAsk': False,
+    'workbench.activityBar.location': 'hidden',
 }
 # Kept out of the stage window; demo/.vscode/settings.json is seeded with these.
 HIDDEN = {'**/.demo': True, '**/*_solution.thy': True, '**/*_reference.thy': True}

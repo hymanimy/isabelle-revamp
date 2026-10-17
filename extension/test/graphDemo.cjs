@@ -9,6 +9,8 @@ exports.run = async function () {
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
   const receipts = [];
+  const settings = [['isabelleRevamp', 'showAsk'], ['isabelleRevamp', 'prettySymbols'], ['workbench.activityBar', 'location']]
+    .map(([section, key]) => ({ section, key, value: vscode.workspace.getConfiguration(section).inspect(key).workspaceValue }));
   const graph = () => api.getProofGraph();
   async function until(label, predicate, limit = 45000) {
     const end = Date.now() + limit;
@@ -27,6 +29,7 @@ exports.run = async function () {
     assert(b.tx >= 0 && b.ty >= 0 && b.tx + b.scale * b.graphWidth <= b.width + 1
       && b.ty + b.scale * b.graphHeight <= b.height + 1, JSON.stringify(b));
   }
+  try {
   const sqrt = await open('Sqrt2');
   await until('Sqrt2 fully checked', () => graph().fully_checked);
   await pause(2200);
@@ -39,6 +42,17 @@ exports.run = async function () {
   assert(view.readable && view.fontPixels >= 11, JSON.stringify(view)); fitted(view);
   for (const node of graph().nodes) { assert.equal(view.names[node.id], node.name); assert.equal(view.labels[node.id], 'L' + node.line); assert.equal(view.statuses[node.id], 'proved'); }
   receipts.push({ check: 'Sqrt2 seventeen names and line numbers visible, green and readable at 900x400', view });
+  // Real renderer at the right-column sizes implied by the two stage windows.
+  // These are viewport measurements, not screenshots of the outer window.
+  for (const [windowWidth, windowHeight] of [[1440,900], [1920,1080]]) {
+    const width = Math.floor(windowWidth * .38);
+    const height = Math.floor((windowHeight * .72 - 60) * .6 - 35);
+    const stage = await api.inspectProofGraph('snapshot', {width, height});
+    assert.equal(stage.nodes.length, 17); assert.equal(stage.hidden.length, 0);
+    assert(stage.readable && stage.fontPixels >= 9.5, JSON.stringify(stage)); fitted(stage);
+    receipts.push({check: `Sqrt2 stage graph viewport for ${windowWidth}x${windowHeight}`, view:stage});
+  }
+  view = await api.inspectProofGraph('snapshot', {width:900,height:400});
   const elapsed = graph().elapsed; await pause(1200); assert.equal(graph().elapsed, elapsed);
   await api.inspectProofGraph('snapshot', { fold: true }); await pause(6200);
   view = await api.inspectProofGraph('snapshot');
@@ -91,4 +105,8 @@ exports.run = async function () {
   view = await api.inspectProofGraph('snapshot', { width: 0, height: 0 }); fitted(view);
   fs.writeFileSync(path.join(root, '.dev-host/graph-demo-results.json'), JSON.stringify(receipts, null, 2));
   console.log('PASS: Sqrt2 17 visible names at 900x400, optional named fold, all replay speeds/order/spacing/Fit, Swarm and file/Ask clocks');
+  } finally {
+    for (const {section, key, value} of settings) await vscode.workspace.getConfiguration(section).update(key,value,vscode.ConfigurationTarget.Workspace);
+    await vscode.commands.executeCommand('setContext', 'isabelleRevamp.demoLayout', false);
+  }
 };

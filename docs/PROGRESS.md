@@ -960,3 +960,55 @@ that as its own checklist item.
   `fully_checked=true`, zero errors, new clock epoch 1 and frozen 3,726 ms.
   Source bytes and every protected tracked file remain unchanged. The VSIX and
   runtime/receipts remain ignored; nothing was pushed.
+
+## Final demo layout — implemented and installed; screenshots pending
+
+- **Changed:** Demo Layout now makes a 62:38 source/right split, Goals above
+  Graph in a 40:60 split, with full-width Terminal at the bottom near 28%.
+  It hides both sidebars/activity bar, disables Ask registration through the
+  default-true `isabelleRevamp.showAsk` setting, and preserves source tabs and
+  unsaved contents. Goals reuses the live HTML model and shows graph counts;
+  MCP state/coordinates are unchanged. Demo Graph retains all named nodes,
+  disables folding, defaults Replay to ×2, and Fits after layouts/replay.
+- **Passed:** the fresh-host M3–M8/M10/M13 chain logged **83 PASS lines**, exit
+  0. It checked the actual three editor columns, their proportions, repeat
+  layout, live Goals, no horizontal overflow, Ask provider removal/re-enable,
+  status and existing prover/MCP/Unicode paths. `check_graph_demo.sh` passed
+  Sqrt2's 17 names, Swarm's seven nodes, four replay speeds and file/Ask clocks.
+  Sqrt2 labels fit the stage-derived 547×317 and 729×395 graph panels at about
+  10 px and 12 px respectively, with no truncation. These are renderer
+  measurements, not outer-window screenshots.
+- **Performance:** initial M12 functional checks passed but its benchmark
+  recorded three dropped frames. A focused series had one initial stall,
+  followed by two zero-drop runs. SVG labels now survive status-only updates
+  instead of being rebuilt. The subsequent complete M12 run passed, including
+  200 nodes, 194 measured frames, zero drops, 17.8 ms maximum gap and zero
+  status-only layouts. The timing observations do not prove a sole cause for
+  the earlier stalls. Both failed and successful runs remain in `.dev-host/`.
+- **Packaged:** `check_m11.sh` passed after updating its activation mock for
+  the configuration listener; it also checks no Ask registration on a first
+  activation with `showAsk=false`. VSIX size **233,200 bytes**; SHA-256
+  `4b6b0faaf6cda1a6fa3826af74a56e6b83aaaf375bbeae5701f286db2da4dac4`.
+  The CLI successfully reinstalled it into `demo/.demo/`, profile Demo.
+  Installed host/webview bundles and CSS match the archive, and the manifest
+  matches after excluding VS Code's installer-added `__metadata` field.
+  Only this extension is listed in that isolated profile. Its ignored profile
+  settings seed `showAsk=false` and a hidden activity bar.
+- **Discovered / do differently:** public editor-layout queries return pixel
+  sizes, and tab groups are not column-sorted. Joining groups can dispose
+  preview webviews; capture handles before disposal and recreate only our
+  panels. Terminal-specific resizing works without OS focus. Check compact
+  column sizes early: default webview padding wasted 40 pixels. Keep the
+  optional Ask implementation untouched and gate its provider in activation.
+- **Remaining visual check:** after Leo enabled Code access, the screen tool
+  still returned `Computer Use was not approved to use Code`, including after
+  resetting its session. No screenshots were fabricated or captured via a
+  bypass. `docs/demo-layout-1440x900.png` and `docs/demo-layout-1920x1080.png`
+  remain outstanding. The CLI's fresh-window request reused the already-open
+  Demo workspace (no new bridge appeared); a Demo **Developer: Reload Window**
+  is requested to load the newly installed bundle before visual acceptance.
+- **Scope:** no changes to `ask.ts`, `askView.ts`, tracked `demo/`, `mcp/` or
+  any `CLAUDE.md`. Unrelated demo/Claude registration edits appeared during
+  this work; they are preserved and excluded from the layout commit. The
+  only `scripts/demo_env.py` change in this commit is the two layout settings.
+  Nothing is pushed.

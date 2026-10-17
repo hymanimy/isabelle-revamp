@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-import { commands, ConfigurationTarget, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, Disposable, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
@@ -34,6 +34,16 @@ export async function activate(context: ExtensionContext) {
   const output = window.createOutputChannel('Isabelle', { log: true });
   const view = new GoalsView();
   const askView = new AskView();
+  let askRegistration: Disposable | undefined;
+  const registerAsk = () => {
+    if (workspace.getConfiguration('isabelleRevamp').get<boolean>('showAsk', true)) {
+      askRegistration ??= window.registerWebviewViewProvider('isabelleRevamp.ask', askView,
+        { webviewOptions: { retainContextWhenHidden: true } });
+    } else { askRegistration?.dispose(); askRegistration = undefined; }
+  };
+  registerAsk();
+  context.subscriptions.push({ dispose: () => askRegistration?.dispose() },
+    workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration('isabelleRevamp.showAsk')) registerAsk(); }));
   let theoryEditor = window.activeTextEditor;
   const visibleTheory = () => theoryEditor && !theoryEditor.document.isClosed && window.tabGroups.all.some(group =>
     group.tabs.some(tab => tab.input instanceof TabInputText && tab.input.uri.toString() === theoryEditor!.document.uri.toString()))
@@ -62,12 +72,12 @@ export async function activate(context: ExtensionContext) {
   askView.onAsk = text => { void sendAsk(text); };
   askView.onStop = () => ask?.stop();
   askView.onClear = () => ask?.clear();
-  context.subscriptions.push(output,
+  context.subscriptions.push(output, view,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
-    window.registerWebviewViewProvider('isabelleRevamp.ask', askView, { webviewOptions: { retainContextWhenHidden: true } }),
     commands.registerCommand('isabelleRevamp.showGoals', () =>
       commands.executeCommand('isabelleRevamp.goals.focus')),
     commands.registerCommand('isabelleRevamp.ask', async () => {
+      if (!askRegistration) return;
       askView.focus();
       await commands.executeCommand('isabelleRevamp.ask.focus');
       askView.focus();
@@ -162,7 +172,8 @@ export async function activate(context: ExtensionContext) {
   const proofStatus = new ProofStatus(graph);
   context.subscriptions.push(swarm,
     proofStatus,
-    commands.registerCommand('isabelleRevamp.demoLayout', () => demoLayout(visibleTheory(), graph)),
+    graph.onDidUpdate(state => view.updateGraph(state)),
+    commands.registerCommand('isabelleRevamp.demoLayout', () => demoLayout(visibleTheory(), graph, view)),
     graph,
     window.registerWebviewViewProvider('isabelleRevamp.proofGraph', graph.panel, { webviewOptions: { retainContextWhenHidden: true } }),
     window.registerWebviewViewProvider('isabelleRevamp.swarm', swarm.view),
@@ -213,7 +224,7 @@ export async function activate(context: ExtensionContext) {
     await window.showErrorMessage('The MCP bridge could not start. See Output → Isabelle.');
   }
   if (workspace.getConfiguration('isabelleRevamp').get<boolean>('demoLayoutOnStartup', false)) {
-    await demoLayout(visibleTheory(), graph);
+    await demoLayout(visibleTheory(), graph, view);
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
@@ -222,6 +233,8 @@ export async function activate(context: ExtensionContext) {
     hoverProofNode: (uri: string, version: number, id: string) => graph.hover(uri, version, id),
     getProofStatus: () => proofStatus.snapshot(),
     getAskView: () => askView.snapshot(),
+    isAskRegistered: () => askRegistration !== undefined,
+    inspectGoals: () => view.inspect(),
     inspectProofGraph: (action: 'snapshot' | 'benchmark' | 'replay', options?: GraphViewOptions) => graph.panel.inspect(action, options),
     fullscreenProofGraph: () => graph.panel.fullscreen(),
     selectProofNode: (uri: string, version: number, id: string) => graph.select(uri, version, id),

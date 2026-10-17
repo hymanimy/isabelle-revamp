@@ -39,16 +39,17 @@ async function run() {
   assert.equal(config.command, 'python3'); assert(config.args[0].startsWith(installed));
 
   // Missing Isabelle must stop before the language client or bridge is created.
-  const notices = [], commands = new Map(), called = [], state = new Map();
+  const notices = [], commands = new Map(), called = [], state = new Map(), providers = [];
   const disposable = { dispose() {} };
   const vscode = {
     SemanticTokensLegend: class {},
     window: { visibleTextEditors: [], createOutputChannel: () => ({ ...disposable, show() {}, appendLine() {} }),
-      registerWebviewViewProvider: () => disposable,
+      registerWebviewViewProvider: name => { providers.push(name); return disposable; },
       showInformationMessage: async (...args) => { notices.push(args); },
       showErrorMessage: () => { throw new Error('Unexpected error notification'); } },
     workspace: { textDocuments: [{ languageId: 'isabelle' }], onDidOpenTextDocument: () => disposable,
-      getConfiguration: () => ({ get: () => 'missing' }) },
+      onDidChangeConfiguration: () => disposable,
+      getConfiguration: () => ({ get: (key, fallback) => key === 'executable' ? 'missing' : key === 'showAsk' ? false : fallback }) },
     commands: { registerCommand: (name, action) => { commands.set(name, action); return disposable; },
       executeCommand: async name => { called.push(name); } },
   };
@@ -67,6 +68,7 @@ async function run() {
     assert.deepEqual(notices[0], ['Isabelle not found', 'Locate…', 'Download']);
     assert(called.includes('isabelleRevamp.showGoals'));
     assert(commands.has('isabelleRevamp.setupCheck'));
+    assert(!providers.includes('isabelleRevamp.ask'), 'showAsk=false must not register Ask, even on first activation');
     await extension.deactivate();
   } finally { Module._load = load; }
   console.log('PASS: discovery priority, setup fixes, absolute bundled MCP command, one missing-Isabelle notification and first-theory Goals');

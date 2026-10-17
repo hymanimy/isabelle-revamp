@@ -25,7 +25,9 @@ exports.run = async function () {
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
   const config = vscode.workspace.getConfiguration('isabelleRevamp');
   const previousPretty = config.inspect('prettySymbols').workspaceValue;
-  const previousGoals = config.inspect('demoShowGoals').workspaceValue;
+  const previousAsk = config.inspect('showAsk').workspaceValue;
+  const activity = vscode.workspace.getConfiguration('workbench.activityBar');
+  const previousActivity = activity.inspect('location').workspaceValue;
   async function until(label, predicate, timeout = 15000) {
     const end = Date.now() + timeout;
     while (Date.now() < end) { if (predicate()) { console.log('PASS: ' + label); return; } await pause(25); }
@@ -33,15 +35,28 @@ exports.run = async function () {
   }
   try {
     await config.update('prettySymbols', false, vscode.ConfigurationTarget.Workspace);
-    await config.update('demoShowGoals', false, vscode.ConfigurationTarget.Workspace);
+    await config.update('showAsk', true, vscode.ConfigurationTarget.Workspace);
+    await until('Ask provider registered when enabled', () => api.isAskRegistered());
     assert(await vscode.commands.executeCommand('isabelleRevamp.demoLayout'));
-    await until('Ask is visible in its bottom-panel view', () => api.getAskView().visible);
+    await until('Demo unregisters Ask', () => !api.isAskRegistered());
+    assert.equal(vscode.workspace.getConfiguration('isabelleRevamp').get('showAsk'), false);
+    assert.equal(vscode.workspace.getConfiguration('workbench.activityBar').get('location'), 'hidden');
+    assert(vscode.window.activeTerminal, 'Terminal is available for Claude Code');
     const initialView = await api.inspectProofGraph('snapshot');
-    assert.equal(initialView.visible, 'visible', 'Graph and Ask must both be visible in the bottom container');
+    assert.equal(initialView.visible, 'visible', 'Graph must stay visible while Terminal has focus');
     const layout = await vscode.commands.executeCommand('vscode.getEditorLayout');
-    assert.equal(layout.orientation, 0); assert.equal(layout.groups.length, 1);
+    assert.equal(layout.orientation, 0); assert.equal(layout.groups.length, 2);
+    assert.equal(layout.groups[1].groups.length, 2);
+    assert(Math.abs(layout.groups[0].size / (layout.groups[0].size + layout.groups[1].size) - .62) < .02, JSON.stringify(layout));
+    const tabs = vscode.window.tabGroups.all.map(group => ({ column: group.viewColumn, labels: group.tabs.map(tab => tab.label), active: group.activeTab?.label })).sort((a,b) => a.column - b.column);
+    assert.equal(tabs[1].active, 'Isabelle Goals', JSON.stringify(tabs));
+    assert.equal(tabs[2].active, 'Isabelle Proof Graph', JSON.stringify(tabs));
+    const goalsView = await api.inspectGoals();
+    assert.equal(goalsView.visible, 'visible');
+    assert(goalsView.scrollWidth <= goalsView.width, JSON.stringify(goalsView));
+    console.log('LAYOUT METRICS', JSON.stringify({layout,tabs,goalsView,graph:initialView.window}));
     assert(vscode.window.tabGroups.all[0].tabs.some(tab => tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === doc.uri.toString()));
-    assert.equal(config.get('prettySymbols'), true);
+    assert.equal(vscode.workspace.getConfiguration('isabelleRevamp').get('prettySymbols'), true);
     assert.equal(doc.getText(), source); assert.equal(fs.readFileSync(file, 'utf8'), source);
     await until('status bar follows open graph counts', () => api.getProofGraph()?.complete && api.getProofStatus().text.includes('0/2 proved'));
     assert.equal(api.getProofStatus().alignment, vscode.StatusBarAlignment.Right);
@@ -71,14 +86,19 @@ exports.run = async function () {
     assert(bounds.tx >= 0 && bounds.ty >= 0 && bounds.tx + bounds.scale * bounds.graphWidth <= bounds.width + 1
       && bounds.ty + bounds.scale * bounds.graphHeight <= bounds.height + 1, JSON.stringify(bounds));
     await vscode.commands.executeCommand('isabelleRevamp.demoLayout');
-    await until('Demo Layout is repeatable and keeps Ask visible', () => api.getAskView().visible && vscode.window.tabGroups.all.length === 1);
-    await config.update('demoShowGoals', true, vscode.ConfigurationTarget.Workspace);
-    assert(await vscode.commands.executeCommand('isabelleRevamp.demoLayout'));
+    await until('Demo Layout is repeatable with exactly three editor groups', () => !api.isAskRegistered() && vscode.window.tabGroups.all.length === 3);
+    graphView = await api.inspectProofGraph('snapshot');
+    assert.equal(graphView.foldProved, false); assert.equal(graphView.replaySpeed, 2);
+    assert((await api.inspectGoals()).header.includes('2/2 proved · kernel ✓'));
+    await config.update('showAsk', true, vscode.ConfigurationTarget.Workspace);
+    await until('Ask can be re-enabled without reloading', () => api.isAskRegistered());
     assert(await vscode.commands.executeCommand('isabelleRevamp.ask') === undefined);
     fs.writeFileSync(path.join(root, '.dev-host/m13-results.json'), JSON.stringify({ layout, graph: api.getProofGraph(), status: api.getProofStatus(), ask: api.getAskView() }, null, 2));
-    console.log('PASS: one editor column, bottom Graph and Ask, optional Goals, Unicode display, status click command, preserved source and repeatable Demo Layout');
+    console.log('PASS: source left, live Goals above Graph right, Terminal bottom, Ask registration gate, preserved source and repeatable Demo Layout');
   } finally {
     await config.update('prettySymbols', previousPretty, vscode.ConfigurationTarget.Workspace);
-    await config.update('demoShowGoals', previousGoals, vscode.ConfigurationTarget.Workspace);
+    await config.update('showAsk', previousAsk, vscode.ConfigurationTarget.Workspace);
+    await activity.update('location', previousActivity, vscode.ConfigurationTarget.Workspace);
+    await vscode.commands.executeCommand('setContext', 'isabelleRevamp.demoLayout', false);
   }
 };

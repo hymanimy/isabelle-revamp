@@ -22,6 +22,8 @@ with tempfile.TemporaryDirectory(dir=ROOT / '.dev-host', prefix='demo-setup-chec
     demo.write_json(custom, settings)
     demo.prepare_profile(data, demo.SETTINGS)
     assert demo.read_json(custom)['editor.lineNumbers'] == 'relative'
+    assert demo.read_json(custom)['isabelleRevamp.showAsk'] is False
+    assert demo.read_json(custom)['workbench.activityBar.location'] == 'hidden'
     assert demo.read_json(data / 'User/globalStorage/storage.json') == storage
     # A scratch destination still gets the card fixtures, with an edited proof
     # preserved. examples/card/ has supplied Sqrt4 since M14.

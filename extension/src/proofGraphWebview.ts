@@ -135,18 +135,27 @@ function render(next: GraphState): void {
       const rect = item.querySelector('rect')!; rect.setAttribute('width', String(box.width)); rect.setAttribute('height', String(box.height));
       for (const text of item.querySelectorAll('text')) text.setAttribute('x', String(box.width / 2));
       item.querySelector('.name')!.setAttribute('y', '15');
-      item.querySelector('.detail')!.setAttribute('y', '30');
+      item.querySelector('.detail')!.setAttribute('y', String(box.height - (box.contained?.length ?? 0) * 16 - 6));
     }
     const contained = box.contained ?? [];
-    const paint = JSON.stringify([node.status, node.line, next.focused === node.id, node.name, node.statement, node.agent, contained, fades.has(node.id)]);
+    const paint = JSON.stringify([node.status, node.line, next.focused === node.id, node.name, node.statement, node.agent, contained, box.nameLines, box.width, fades.has(node.id)]);
     if (painted.get(node.id) === paint) continue;
     painted.set(node.id, paint);
     item.setAttribute('class', `node ${node.status}${pulsed.has(node.id) && item.classList.contains('pulse') ? ' pulse' : ''}${fades.has(node.id) ? ' fading' : ''}${next.focused === node.id ? ' focused' : ''}`);
     item.querySelector('title')!.textContent = `${node.statement}\n${node.status}${node.agent ? ' · ' + node.agent : ''}`;
-    item.querySelector('.name')!.textContent = node.name;
+    const name = item.querySelector('.name') as SVGTextElement;
+    const nameLayout = JSON.stringify([box.width, box.nameLines ?? [node.name]]);
+    // Status updates recolour existing labels. Rebuilding SVG text during
+    // each acceptance batch needlessly repeats font shaping and layout.
+    if (name.dataset.layout !== nameLayout) {
+      name.dataset.layout = nameLayout;
+      name.replaceChildren(...(box.nameLines ?? [node.name]).map((text, index) => {
+        const line = element('tspan', { x: box.width / 2, y: 14 + index * 13 }); line.textContent = text; return line;
+      }));
+    }
     item.querySelector('.detail')!.textContent = `L${node.line}${node.status === 'refuted' ? ' · refuted' : ''}`;
     item.querySelector('.contains')!.replaceChildren(...contained.map((name, index) => {
-      const line = element('tspan', { x: box.width / 2, y: 46 + index * 16 }); line.textContent = name; return line;
+      const line = element('tspan', { x: box.width / 2, y: box.height - contained.length * 16 + 8 + index * 16 }); line.textContent = name; return line;
     }));
   }
   const boxes = new Map(positions.nodes.map(box => [box.id, box])), wanted = new Set<string>();
@@ -174,8 +183,9 @@ function snapshot() {
     labels: Object.fromEntries([...elements].map(([id, item]) => [id, item.querySelector('.detail')!.textContent])),
     names: Object.fromEntries([...elements].map(([id, item]) => [id, item.querySelector('.name')!.textContent])),
     contained: Object.fromEntries([...elements].map(([id, item]) => [id, [...item.querySelectorAll('.contains tspan')].map(line => line.textContent)])),
-    readable: [...elements].every(([, item]) => { const text = item.querySelector('.name') as SVGTextElement; return text.getComputedTextLength() + 12 <= Number(item.querySelector('rect')!.getAttribute('width')); }),
-    fontPixels: 12 * scale, header: status.textContent, rootText: layers.nodes.textContent, playing, visible: document.visibilityState };
+    readable: [...elements].every(([, item]) => [...item.querySelectorAll<SVGTSpanElement>('.name tspan')].every(text => text.getComputedTextLength() + 12 <= Number(item.querySelector('rect')!.getAttribute('width')))),
+    fontPixels: 12 * scale, header: status.textContent, rootText: layers.nodes.textContent, playing, visible: document.visibilityState,
+    window: { width: innerWidth, height: innerHeight, outerWidth, outerHeight } };
 }
 async function replay(frames: GraphFrame[]): Promise<ReturnType<typeof snapshot>> {
   const current = ++generation; playing = true; speed = replaySpeed(Number(speedControl.value)); reset();
@@ -266,6 +276,12 @@ svg.addEventListener('wheel', event => {
 window.addEventListener('resize', () => { if (state) render(state); fit(); });
 window.addEventListener('message', event => {
   const message = event.data;
+  if (message.type === 'demo') {
+    document.body.classList.add('demo');
+    foldControl.checked = false; foldProved = false; speedControl.value = '2';
+    reset(); if (state) render(state); fit();
+    return;
+  }
   if (message.type === 'state') {
     if (playing && live && (live.uri !== message.state.uri || live.epoch !== message.state.epoch)) {
       generation++; playing = false; speed = 1; reset();

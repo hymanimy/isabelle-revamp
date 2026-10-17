@@ -15,15 +15,18 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
   private pending: unknown[] = [];
   private replies = new Map<number, (result: any) => void>();
   private sequence = 0;
-  get active(): boolean { return this.panel?.active === true || this.view?.visible === true; }
+  private demo = false;
+  get active(): boolean { return this.panel?.visible === true || this.view?.visible === true; }
   constructor(private extensionPath: string, private select: (uri: string, version: number, id: string) => Promise<void>,
     private hover: (uri: string, version: number, id: string) => Promise<string>) {}
   resolveWebviewView(view: WebviewView): void {
-    this.view = view; this.prepare(view.webview);
-    view.onDidDispose(() => { this.ready.delete(view.webview); this.view = undefined; });
+    const webview = view.webview;
+    this.view = view; this.prepare(webview);
+    view.onDidDispose(() => { this.ready.delete(webview); this.view = undefined; });
   }
   show(column?: ViewColumn): void {
     if (column !== undefined) { this.openEditor(column); return; }
+    if (this.panel) { this.panel.reveal(); return; }
     void commands.executeCommand('isabelleRevamp.proofGraph.focus');
     void commands.executeCommand('workbench.action.closeSidebar');
   }
@@ -31,8 +34,14 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
     if (this.panel) { this.panel.reveal(column); return; }
     const panel = this.panel = window.createWebviewPanel('isabelleRevamp.proofGraph', 'Isabelle Proof Graph', column,
       { enableScripts: true, retainContextWhenHidden: true });
-    this.prepare(panel.webview);
-    panel.onDidDispose(() => { this.ready.delete(panel.webview); this.panel = undefined; });
+    const webview = panel.webview;
+    this.prepare(webview);
+    panel.onDidDispose(() => { this.ready.delete(webview); if (this.panel === panel) this.panel = undefined; });
+  }
+  closeEditor(): void { const panel = this.panel; this.panel = undefined; panel?.dispose(); }
+  configureDemo(): void {
+    this.demo = true;
+    for (const webview of this.ready) void webview.postMessage({ type: 'demo' });
   }
   private prepare(webview: Webview): void {
     const media = Uri.joinPath(Uri.file(this.extensionPath), 'media');
@@ -40,6 +49,7 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
     webview.onDidReceiveMessage(message => {
       if (message?.type === 'ready') {
         this.ready.add(webview); this.publish();
+        if (this.demo) void webview.postMessage({ type: 'demo' });
         for (const request of this.pending) void webview.postMessage(request);
         this.pending = [];
       } else if (message?.type === 'select' && typeof message.id === 'string') void this.select(message.uri, message.version, message.id);
@@ -58,7 +68,7 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
     webview.html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'">
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${style}"></head>
-<body><header><p id="status" role="status">Open a theory to follow its proof.</p>
+<body class="${webview === this.panel?.webview ? 'editor' : ''}"><header><p id="status" role="status">Open a theory to follow its proof.</p>
 <nav><label><input id="fold" type="checkbox">Fold proved</label><button id="fit">Fit</button><button id="replay">Replay</button>
 <select id="speed" aria-label="Replay speed"><option value="1">×1</option><option value="2" selected>×2</option><option value="4">×4</option><option value="8">×8</option></select>
 <button id="fullscreen">Open in editor column</button></nav></header>
@@ -74,7 +84,7 @@ export class ProofGraphPanel implements Disposable, WebviewViewProvider {
     if (this.state) for (const webview of this.ready) void webview.postMessage({ type: 'state', state: this.state });
   }
   inspect(action: 'snapshot' | 'benchmark' | 'replay', options?: GraphViewOptions): Promise<any> {
-    const target = this.panel?.active ? this.panel.webview : this.view?.webview;
+    const target = this.panel?.webview ?? this.view?.webview;
     if (!target) this.show();
     const request = ++this.sequence;
     return new Promise((resolve, reject) => {

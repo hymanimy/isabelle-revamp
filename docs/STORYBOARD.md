@@ -6,16 +6,32 @@ The demo is a story with one surprising beat. Everything on screen serves beat 3
 | --- | --- | --- | --- |
 | 1 The problem | 0:00–0:15 | Sqrt2.thy in Isabelle/jEdit | "Every Isabelle user has used this editor for twenty years. Nobody under thirty wants to." |
 | 2 The makeover | 0:15–0:30 | Same file in stock VS Code: ∑ ℚ rendered, goals follow cursor, Cmd-click into HOL | "Same prover, same kernel, not one line of Isabelle changed. We only built the window." |
-| 3 The money shot | 0:30–1:15 | Judge picks a theorem from the card. One English sentence in Ask Isabelle. Proof Graph fills bottom-up and folds to one green node. Nobody speaks. | "That is a proof a mathematician can read. Lean can't give you that." |
+| 3 The money shot | 0:30–1:15 | Judge picks a theorem from the card. One English sentence in Claude Code in the Terminal. Named Proof Graph nodes turn green and remain visible. Nobody speaks. | "That is a proof a mathematician can read. Lean can't give you that." |
 | 4 The reveal | 1:15–1:30 | PAINPOINTS.md scrolls | "We hit every one of these so a mathematician doesn't have to." |
 
 ## Beat 3 screen layout (fixed for the demo)
 
-- Editor: centre, the theory file, Unicode rendering on.
-- Proof Graph: bottom panel beside Ask by default (M12 amendment). Use **Open in editor column** for the full-height stage moment.
-- Isabelle Goals: hidden by default when the graph opens; hover tiles for their statements and live goal text.
-- Ask Isabelle + Claude transcript: **bottom panel** (where Terminal/Output live), not the sidebar. One line of input, streaming transcript beneath it.
-- Status bar: `Theory · N/M proved · T s · kernel ✓` on the right.
+Run **Isabelle: Demo Layout** before walking on stage. Its fixed arrangement is:
+
+```text
+┌──────────────────────┬───────────────────┐
+│ .thy editor          │ Isabelle Goals    │
+│                      ├───────────────────┤
+│                      │ Proof Graph       │
+├──────────────────────┴───────────────────┤
+│ Terminal — Claude Code CLI              │
+└──────────────────────────────────────────┘
+```
+
+- Editor left: about 62% width, Unicode display on; source stays ASCII.
+- Right editor column: about 38% width, Goals above Graph in a 40:60 split.
+- Terminal: bottom, full width, about 28% height. Start Claude Code here.
+- Primary/secondary sidebars and activity bar: hidden. Ask view: unregistered
+  while `isabelleRevamp.showAsk=false` (Demo Layout sets this).
+- Goals header: `Theory · N/M proved · kernel ✓`; its live text follows the cursor.
+- Graph: every named step visible, full name and line number; no folding in
+  Demo Layout. Fit on layout; Replay starts at ×2, with ×1/×2/×4/×8 available.
+- Status bar: proof counts and frozen kernel-checked elapsed time on the right.
 
 ## Theorem card for judges
 

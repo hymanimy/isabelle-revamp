@@ -823,3 +823,45 @@ should be.
   The same bounded completion check still failed in a reused broad-test
   profile; a fresh isolated profile subsequently passed the entire chain.
   That difference is an observation, not a proven explanation for the flake.
+
+## 66. A repeatable stage layout needs several public workbench commands
+
+- **What happened:** joining editor groups could dispose preview webviews;
+  reading `panel.webview` during disposal threw. Editor-layout queries return
+  pixel sizes and tab groups are not sorted by column. The generic resize
+  command also did nothing when the test window lacked OS focus.
+- **Experience:** a second press of Demo Layout could leave a missing graph,
+  while tests appeared to disagree with a correctly positioned right column.
+- **Fix needed:** recreate and pin only our read-only panels, retain their
+  models, compare actual column numbers and size ratios, and use Terminal's
+  explicit resize commands with measured feedback. Keep the setup inside the
+  workspace/isolated Demo profile; do not alter the normal user profile.
+
+## 67. Narrow graph columns and blocked screenshot capture
+
+- **What happened:** VS Code's default webview body padding consumed 40 pixels;
+  a layout designed for a wide bottom panel made graph names too small in the
+  new right column. After Leo enabled Code access, the screen tool still
+  returned `Computer Use was not approved to use Code`, including after a
+  tool-session reset.
+- **Experience:** label checks could pass at 900×400 while the stage layout
+  was harder to read; the two requested full-window screenshots could not be
+  captured to verify the final appearance.
+- **Fix needed:** remove unused graph padding, wrap long identifiers without
+  truncating characters, fit the compact layout and measure rendered labels
+  at both target graph sizes. Resolve the screen-tool permission before
+  capturing `docs/demo-layout-1440x900.png` and
+  `docs/demo-layout-1920x1080.png`; viewport metrics are not screenshots.
+
+## 68. Status changes need not rebuild SVG labels
+
+- **What happened:** the first full 200-node benchmark recorded three dropped
+  frames (216.6 ms maximum gap). A focused series recorded one initial long
+  gap, then two zero-drop runs. Status painting rebuilt unchanged SVG label
+  spans, including their font layout, on every acceptance batch.
+- **Experience:** a proof animation can hesitate just as steps turn green;
+  one timing result does not establish the cause of a stall.
+- **Fix needed:** retain label spans until the name or geometry changes. The
+  subsequent complete M12 run passed with 194 measured frames, zero dropped,
+  17.8 ms maximum gap and zero status-only layouts. Keep the earlier failures
+  in the record; this measured pass is not a guarantee under all machine load.

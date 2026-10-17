@@ -234,8 +234,9 @@ root always shows its theorem name. The completed proof summary belongs in the
 header and status bar, so the audience can still read the proof afterwards.
 
 1. Open `examples/Sqrt2.thy`; run **Isabelle: Demo Layout**. Source stays in one
-   editor column; Ask and Proof Graph share the bottom panel. Give the graph
-   900×400 pixels: all **17** nodes should show their full name and `L<number>`
+   editor group on the left; Goals and Graph occupy the upper/lower right
+   editor groups, with Terminal across the bottom. At a standalone graph size
+   of 900×400 pixels: all **17** nodes should show their full name and `L<number>`
    in green, including the four named inner parity steps. **Fit** runs after
    every layout or resize. Drag pans; scroll zooms. **Open in editor column**
    is available for larger graphs. The protected `demo/Sqrt2.thy` copy still
@@ -246,7 +247,7 @@ header and status bar, so the audience can still read the proof afterwards.
    with `by simp`: the tile pulses green and **stays visible**. A wrong
    `by (rule TrueI)` stays red. Restore the admission afterwards. Tile/MCP
    `line` labels are one-based; MCP ranges remain zero-based UTF-16.
-3. **Fold proved** starts off. Enable it to fold accepted subtrees after the
+3. **Fold proved** starts off outside Demo Layout (the demo hides this control). Enable it to fold accepted subtrees after the
    pulse/delay. Every folded box lists the names and line numbers it contains;
    the root keeps the theorem name. Disable it to restore every node. Red
    nodes never fold. Nested unnamed commands still contribute to their named
@@ -260,15 +261,16 @@ header and status bar, so the audience can still read the proof afterwards.
 5. The elapsed clock starts fresh when opening/switching theory files and when
    a new Ask run starts. It freezes at `kernel ✓`. A completed Sqrt2 header is
    `Sqrt2 · proved · 17 steps · kernel ✓ · T s`; no tile changes its name to
-   “proved”. **Isabelle: Ask** still focuses the bottom input. Ask's existing
-   transcript, tool path and admission summary are unchanged.
+   “proved”. Outside the demo, enable `isabelleRevamp.showAsk` to use
+   **Isabelle: Ask**. Its existing transcript, tool path and admission summary
+   are unchanged. The demo uses Claude Code in Terminal.
 
 `bash scripts/check_graph_demo.sh` kernel-checks Sqrt2 and checks the actual
 VS Code webview at 900×400, all four replay speeds, named folding, Swarm and
 file/Ask clock resets. Its Ask lifecycle check uses the fake CLI and makes no
 model request. `M12_ONLY=1 bash scripts/check_m12.sh` checks graph
 colours/navigation/folding/replay and the 200-node SVG timing benchmark;
-`M13_ONLY=1 bash scripts/check_m13.sh` checks the bottom layout/status bar.
+`M13_ONLY=1 bash scripts/check_m13.sh` checks the three editor groups, Terminal, Ask registration and status bar.
 Receipts live in ignored `.dev-host/`. These are rendered-webview measurements,
 not a claim that a screenshot was taken.
 
@@ -315,11 +317,12 @@ Before walking on stage:
 
 - [ ] **DND on** in macOS; silence phone and calendar notifications.
 - [ ] Open the printed **Demo** command on `demo/`; no banners or popups.
-- [ ] **Chat closed**; source visible, Ask and Proof Graph at the bottom.
+- [ ] Sidebars/activity bar hidden; source left, Goals above Graph right,
+      Terminal across the bottom.
 - [ ] Sqrt2 checks, and the active card is restored to its intended skeleton
       (`git checkout demo/` after a rehearsal).
-- [ ] Claude is signed in; Ask can reach the demo's MCP bridge, and the Ask
-      transcript is **Clear**ed from the previous rehearsal.
+- [ ] Claude is signed in and running in Terminal in `demo/`; `/mcp` shows
+      the Isabelle tools. The Ask view is disabled for this layout.
 - [ ] **Replay tested** on the current rehearsal timeline.
 - [ ] **Backup video ready** and reachable without searching for a file.
 
@@ -367,3 +370,46 @@ Verified rehearsal: [Sqrt4 run 3](card-runs/Sqrt4-3.md) rendered the kernel-back
 refutation in **15.476 s**; the final sentence arrived at **30.858 s**. Earlier
 failed attempts are retained beside it. These are actual VS Code webview/MCP
 receipts, not a claimed manual screenshot check.
+
+## Final demo layout — Terminal on stage
+
+Run **Isabelle: Demo Layout** with the theory active. It preserves source tabs
+and unsaved edits, opens Goals and Graph as editor panels, and is repeatable:
+
+```text
+┌──────────────────────┬───────────────────┐
+│ .thy editor          │ Isabelle Goals    │
+│       62%            ├───────────────────┤
+│                      │ Proof Graph       │
+├──────────────────────┴───────────────────┤
+│ Terminal — Claude Code CLI              │
+└──────────────────────────────────────────┘
+```
+
+The right column is about 38% wide, divided 40:60 between Goals and Graph.
+Terminal spans the bottom at about 28% height (within one terminal resize step).
+Both sidebars and the activity bar are hidden. The command sets
+`isabelleRevamp.showAsk=false`, so no Ask view provider is registered. Re-enable
+that setting to use **Isabelle: Ask** outside this stage arrangement. The demo
+profile seeds the setting without changing the tracked `demo/` files.
+
+1. Open only the demo theory, run Demo Layout, then start `claude` in Terminal.
+   The layout command opens the terminal but does not launch a model request.
+2. Move the cursor through a named step. Goals stays live above Graph, with
+   `Theory · N/M proved · kernel ✓` after checking. Long output wraps; no
+   horizontal scroll should be needed.
+3. All named graph steps stay visible. Long names wrap without truncation;
+   clicking still targets the same source line. The demo hides Fold proved.
+   Replay starts at ×2, retains the speed picker, and Fits on completion.
+4. Check at 1440×900 and 1920×1080. With `examples/Sqrt2.thy`, all **17** nodes
+   must remain visible; the protected `demo/Sqrt2.thy` has **13**. Check Swarm's
+   seven open nodes too. Save whole-window screenshots as
+   `docs/demo-layout-1440x900.png` and `docs/demo-layout-1920x1080.png`.
+
+Automated evidence: the live host reports source in column One, Goals in Two,
+Graph in Three, repeatable 62:38 / 40:60 groups, Ask unregistered, and no Goals
+horizontal overflow. The graph renderer passes at the stage-derived viewports:
+547×317 (about 10 px names) and 729×395 (12 px names), with all 17 full names
+visible. These are **viewport measurements**, not full-window screenshots.
+Screenshot capture is still pending: after approval and a screen-tool reset,
+the tool continued returning `Computer Use was not approved to use Code`.

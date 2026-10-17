@@ -1,12 +1,18 @@
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
-body { margin: 0; height: 100vh; display: flex; flex-direction: column;
+body { margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column;
   color: var(--vscode-editor-foreground); background: var(--vscode-editor-background);
   font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
 header { display: flex; align-items: center; justify-content: space-between; gap: 8px;
   height: 30px; flex: none; padding: 3px 8px; border-bottom: 1px solid var(--vscode-panel-border); }
 #status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 nav { display: flex; gap: 4px; flex: none; }
+.editor #fullscreen, .demo label { display: none; }
+/* The right editor column is narrow: keep the complete header above its tools. */
+@media (max-width: 700px) {
+  body:not(.demo) header { height: auto; min-height: 48px; flex-wrap: wrap; gap: 3px; }
+  body:not(.demo) #status { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; }
+}
 label { display: flex; align-items: center; white-space: nowrap; font-size: 11px; }
 button, select { padding: 3px 5px; font: inherit; font-size: 10px; white-space: nowrap; color: var(--vscode-button-foreground);
   background: var(--vscode-button-background); border: 0; border-radius: 3px; cursor: pointer; }

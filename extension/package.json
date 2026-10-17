@@ -50,12 +50,14 @@
         {
           "id": "isabelleRevamp.ask",
           "name": "Ask Isabelle",
-          "type": "webview"
+          "type": "webview",
+          "when": "config.isabelleRevamp.showAsk"
         },
         {
           "id": "isabelleRevamp.proofGraph",
           "name": "Proof Graph",
-          "type": "webview"
+          "type": "webview",
+          "when": "!isabelleRevamp.demoLayout"
         }
       ]
     },
@@ -146,17 +148,17 @@
           "scope": "resource",
           "description": "Save recognised Isabelle symbols as Unicode. Off by default: completions and saved source use ASCII Isabelle spellings."
         },
-        "isabelleRevamp.demoShowGoals": {
-          "type": "boolean",
-          "default": false,
-          "description": "Also show the Goals sidebar in Demo Layout. Off leaves more space for the proof graph.",
-          "scope": "window"
-        },
         "isabelleRevamp.demoLayoutOnStartup": {
           "type": "boolean",
           "default": false,
           "scope": "window",
-          "description": "Arrange the source, bottom Ask and Proof Graph automatically when this window starts (used by the isolated Demo profile)."
+          "description": "Open the source left, Goals above Proof Graph right, and Terminal across the bottom when this window starts."
+        },
+        "isabelleRevamp.showAsk": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Register the Ask Isabelle view. Demo Layout turns this off and uses the Terminal for Claude Code."
         }
       }
     },

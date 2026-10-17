@@ -4,7 +4,7 @@ import type * as Dagre from '@dagrejs/dagre' with { 'resolution-mode': 'import' 
 const { graphlib, layout }: typeof Dagre = require('@dagrejs/dagre');
 import type { GraphNode, GraphState } from './graphTypes';
 
-export interface Box { id: string; x: number; y: number; width: number; height: number; contained?: string[] }
+export interface Box { id: string; x: number; y: number; width: number; height: number; contained?: string[]; nameLines?: string[] }
 export interface GraphLayout { nodes: Box[]; containers: Box[]; width: number; height: number }
 
 // Lay out sibling subtrees with Dagre, then place their parent above them.
@@ -17,7 +17,11 @@ export function graphLayout(state: GraphState, hidden: Set<string>, availableWid
     const parent = node.parent && byId.has(node.parent) ? node.parent : null;
     children.set(parent, [...(children.get(parent) ?? []), node]);
   }
-  const height = 38, gap = 24, padding = 8;
+  const compact = availableWidth < 750;
+  const height = compact ? 32 : 38, gap = compact ? 12 : 24, padding = compact ? 5 : 8;
+  // Wrap long identifiers without deleting characters. Tooltip/click identity
+  // remains the exact Isar name; compact columns must not truncate labels.
+  const nameLines = (name: string): string[] => compact ? name.match(/.{1,14}/g) ?? [''] : [name];
   const widthOf = (name: string) => Math.max(110, name.length * 7.2 + 20);
   function containedNames(id: string): string[] {
     return state.nodes.filter(node => {
@@ -29,16 +33,17 @@ export function graphLayout(state: GraphState, hidden: Set<string>, availableWid
   }
   function subtree(node: GraphNode): GraphLayout {
     const descendants = children.get(node.id) ?? [];
-    const contained = containedNames(node.id), width = Math.max(widthOf(node.name), ...contained.map(widthOf));
-    const tileHeight = height + contained.length * 16;
+    const contained = containedNames(node.id), lines = nameLines(node.name);
+    const width = Math.max(compact ? 114 : widthOf(node.name), ...contained.map(widthOf));
+    const tileHeight = height + (lines.length - 1) * 13 + contained.length * 16;
     if (!descendants.length) {
-      return { nodes: [{ id: node.id, x: 0, y: 0, width, height: tileHeight, contained }], containers: [], width, height: tileHeight };
+      return { nodes: [{ id: node.id, x: 0, y: 0, width, height: tileHeight, contained, nameLines: lines }], containers: [], width, height: tileHeight };
     }
     const inside = siblings(descendants);
     const boxWidth = Math.max(width, inside.width + padding * 2), boxHeight = tileHeight + gap + inside.height + padding;
     const dx = (boxWidth - inside.width) / 2, dy = tileHeight + gap;
     return { width: boxWidth, height: boxHeight,
-      nodes: [{ id: node.id, x: (boxWidth - width) / 2, y: 0, width, height: tileHeight, contained },
+      nodes: [{ id: node.id, x: (boxWidth - width) / 2, y: 0, width, height: tileHeight, contained, nameLines: lines },
         ...inside.nodes.map(box => ({ ...box, x: box.x + dx, y: box.y + dy }))],
       containers: [{ id: node.id, x: 0, y: height / 2, width: boxWidth, height: boxHeight - height / 2 },
         ...inside.containers.map(box => ({ ...box, x: box.x + dx, y: box.y + dy }))] };
@@ -70,7 +75,7 @@ export function graphLayout(state: GraphState, hidden: Set<string>, availableWid
     const ordered = [...pieces].sort(([a], [b]) => graph.node(a).y - graph.node(b).y || graph.node(a).x - graph.node(b).x);
     const result: GraphLayout = { nodes: [], containers: [], width: 0, height: 0 };
     let x = 0, y = 0, rowHeight = 0;
-    const rowWidth = Math.max(240, availableWidth - padding * 4);
+    const rowWidth = Math.max(compact && visible.length > 10 ? 660 : 240, availableWidth - padding * 4);
     for (const [, piece] of ordered) {
       if (x && x + piece.width > rowWidth) { x = 0; y += rowHeight + gap; rowHeight = 0; }
       result.nodes.push(...piece.nodes.map(box => ({ ...box, x: box.x + x, y: box.y + y })));

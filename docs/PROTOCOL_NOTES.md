@@ -992,3 +992,40 @@ recording. The webview cancels an old replay when that epoch changes. The clock
 stops when the existing document check says `fully_checked`, or an accepted
 counter-lemma establishes the existing refutation state. The optional fold
 control affects presentation only; MCP retains every graph node.
+
+## Final demo layout: public VS Code commands
+
+Observed against stock VS Code 1.138.0 and the public extension API (compiled
+against 1.104). No workbench internals are imported by the extension.
+
+- `vscode.setEditorLayout` accepts `{orientation: 0, groups: [{size: .62},
+  {size: .38, groups: [{size: .4}, {size: .6}]}]}`. Nested groups alternate
+  orientation. `vscode.getEditorLayout` returns actual **pixel** sizes, not
+  those fractional weights. `window.tabGroups.all` is not in column order;
+  compare its `viewColumn` values.
+- Create Graph in `ViewColumn.Beside`, Goals in column Two, then execute
+  `workbench.action.moveEditorToAboveGroup`. When no group exists above, the
+  command creates it: Goals becomes column Two, Graph column Three. Pin each
+  panel with `workbench.action.keepEditor`. On repeat, recreate only our
+  read-only panels before `workbench.action.joinAllGroups`; keep all source
+  tabs, document contents and the graph timeline.
+- `workbench.action.positionPanelBottom`, `workbench.action.alignPanelJustify`,
+  `workbench.action.closeSidebar`, `workbench.action.closeAuxiliaryBar` and
+  `workbench.action.terminal.focus` establish the surrounding chrome. Set
+  `workbench.activityBar.location=hidden` at workspace scope only if needed.
+- There is no public panel-height ratio command. `increaseViewSize` depends
+  on OS focus and was ineffective in an unfocused test host. Terminal's
+  `resizePaneUp` / `resizePaneDown` explicitly resize a bottom terminal by
+  four character heights. Measure the two webviews' `innerHeight` and
+  `outerHeight`, allow for title/status/tab bars, and settle near 28% within
+  one resize step. Wait for the renderer to apply each step before measuring.
+- A disposed panel's `webview` getter throws. Capture the webview before
+  registering `onDidDispose`; never read that getter in the disposal callback.
+- `isabelleRevamp.showAsk=false` removes the Ask provider registration and its
+  contribution (`when: config.isabelleRevamp.showAsk`). Demo Layout also hides
+  the compact bottom Graph contribution via a window-local context key.
+  The Ask controller and its tests are unchanged.
+- Goals uses the existing PIDE model and HTML in both sidebar and editor
+  hosts. Graph counts are a separate presentation message; MCP goal snapshots
+  and ASCII positions are unchanged. The editor header reads
+  `Theory · N/M proved · kernel ✓` after checking.
