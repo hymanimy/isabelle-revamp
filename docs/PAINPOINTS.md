@@ -442,3 +442,16 @@ should be.
   confirmed six unchanged admissions. A fresh Ask run was already active in
   the reopened host, so it was left in control instead of starting a competitor.
   Keep the demo window open while its agent is working.
+
+## 35. Mathematical source and displayed mathematics need different treatment
+
+- **What happened.** Isabelle keeps portable `\<Sum>` source, while stock VS
+  Code displays its full spelling; quoted formulae also inherit disabled string
+  quick suggestions. Changing text to Unicode would shift MCP columns.
+- **Experience.** A familiar sum looks like markup and Tab does not obviously
+  offer the expected symbol inside the theorem statement.
+- **Fix needed.** Load the installed symbol table, decorate original ranges,
+  reveal selected symbols, and enable Isabelle-only string suggestions and Tab
+  completion. Preserve ASCII edits and source coordinates. Direct screen access
+  for M9 again returned `Computer Use was not approved to use Code`; retain that
+  visual acceptance limitation alongside actual extension-host checks.

@@ -57,7 +57,7 @@ button:disabled { opacity: .5; cursor: default; }
 <div id="transcript" role="log" aria-label="Ask transcript"></div>
 </section>
 ${viewHeader(goal.theory, goal.status)}
-<pre id="goal" aria-label="Goal at cursor">${escapeText(goal.text)}</pre>
+<pre id="goal" class="source" aria-label="Goal at cursor">${escapeText(goal.text)}</pre>
 <pre id="errors" class="errors" aria-label="Diagnostics">${escapeText(goal.errors)}</pre>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();

@@ -588,3 +588,35 @@ Matching array indices therefore duplicated a long final reply. The decoder now
 reconciles pending text blocks in order within each message ID; thinking remains
 undisplayed. Replaying that captured real stream produces exactly one answer,
 and the deterministic subprocess fixture includes this observed sequence.
+
+## M9 A — display symbols, unchanged source
+
+`isabelle getenv -b ISABELLE_HOME` returns the installed distribution directory.
+At activation we read its `etc/symbols` lines (`\<name> ... code: 0x...`), retaining
+only valid Unicode assignments. The bundled M6 table is an offline fallback,
+with an Output warning if the installed table cannot be read.
+
+Editor decorations cover the original ASCII range with
+`textDecoration: 'none; display: none'`; `before.contentText` supplies Unicode
+with `display: inline`. Ranges use `ClosedClosed`. A caret inside the range, or
+any selection overlapping it (including Find), reveals its original spelling.
+No document edits or coordinate translation occur. Single-character powers with
+a Unicode superscript are display replacements; multi-character powers remain
+literal. Goals and tile labels additionally space a sum binder with U+2009.
+
+Reference: Isabelle's `src/Tools/VSCode/extension/src/script_decorations.ts`
+uses hidden decorations for formatting controls. We use the requested
+before-content pattern for symbol names. The `.source` class follows
+`etc/isabelle.css`, with VS Code theme fonts/colours instead of fixed colours.
+`vscode_unicode_symbols_edits=false` explicitly keeps server completions ASCII;
+`src/Tools/VSCode/src/vscode_rendering.scala` reads this option for completion
+replacement text. Completion inside quoted formulae needs stock VS Code's
+`editor.quickSuggestions.strings` enabled; language defaults now enable it and
+`editor.tabCompletion` for Isabelle only.
+
+Observed in stock VS Code (`vscode.executeCompletionItemProvider` and
+`editor.action.triggerSuggest` / `acceptSelectedSuggestion`): typing `\Sum`
+at line 1, columns 7–11 returned a single completion with label/insertText
+`\<Sum>`, filterText `\Sum`, detail `\<Sum> (symbol "∑")`, and a text edit
+replacing exactly `[1,7,1,11]` with `\<Sum>`. The accepted document contains
+ASCII, not `∑`. The receipt is `.dev-host/m9a-completion.json`.

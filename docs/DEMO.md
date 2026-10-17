@@ -105,3 +105,11 @@ two real Claude requests above using the installed signed-in CLI, run
 `M8_LIVE=1 bash scripts/check_m8.sh`. This temporarily edits `examples/Demo.thy`
 and restores its captured skeleton afterward; use it when the example has no
 unsaved work. Receipts and the generated checked proof go under `.dev-host/`.
+
+## Pretty symbols
+
+`Isabelle: Toggle Pretty Symbols` switches display-only Unicode on/off (default
+on). Move the caret into a symbol or select it with Find to see its ASCII source.
+Search for `Sum` still finds `\<Sum>`. Type `\Sum` inside a formula and accept the
+server suggestion with Tab; the inserted source is `\<Sum>`. Powers such as
+`^2` and `^n` are displayed as superscripts without changing column numbers.

@@ -6,7 +6,8 @@ import { Goals } from './goals';
 import { GoalsView } from './goalsView';
 import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
-import { unicodeSymbols } from './symbols';
+import { loadSymbols, unicodeSymbols } from './symbols';
+import { PrettySymbols } from './prettySymbols';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -51,11 +52,19 @@ export async function activate(context: ExtensionContext) {
     .get<string>('executable', 'isabelle');
   const executable = configured.startsWith('~/')
     ? homedir() + configured.slice(1) : configured;
+  try {
+    const table = await loadSymbols(executable);
+    output.info(`Loaded ${table.count} Unicode symbols from ${table.path}`);
+  } catch (error) { output.warn(`Could not load installed symbols; using bundled fallback: ${String(error)}`); }
+  const prettySymbols = new PrettySymbols();
+  context.subscriptions.push(prettySymbols,
+    commands.registerCommand('isabelleRevamp.togglePrettySymbols', () => prettySymbols.toggle()));
   const args = [
     'vscode_server', '-n', '-l', 'HOL',
     '-o', 'vscode_html_output=true',
     '-o', 'editor_output_state=true',
     '-o', 'vscode_pide_extensions=true',
+    '-o', 'vscode_unicode_symbols_edits=false',
   ];
   const server: ServerOptions = { command: executable, args };
 
@@ -120,6 +129,7 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [],
     getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(),
     selectSwarmStep: (uri: string, version: number, id: string) => swarm.select(uri, version, id) };
 }

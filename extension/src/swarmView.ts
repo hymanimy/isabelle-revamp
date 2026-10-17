@@ -29,7 +29,7 @@ export function swarmHtml(nonce: string): string {
 .card[data-status="proved"] { --accent: var(--vscode-testing-iconPassed); }
 .card[data-status="error"] { --accent: var(--vscode-errorForeground); }
 .card:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
-.label { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.label { display: block; font-weight: 600; overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family), monospace; }
 .detail { display: block; margin-top: 5px; font-size: .9em; }
 #empty { color: var(--vscode-descriptionForeground); }
 </style></head><body>${viewHeader('Isabelle Swarm', 'Open a theory to follow its proof.')}

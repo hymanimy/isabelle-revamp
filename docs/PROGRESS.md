@@ -377,3 +377,27 @@
 - **Next:** reload the development host and follow **Ask Isabelle** in
   `docs/DEMO.md` with `examples/Demo.thy`. M8 implementation and automated/live
   backend checks are complete; no later milestone was started.
+
+## M9 A — mathematical display (implementation and host checks passed)
+
+- **Changed:** installed Isabelle symbol-table loading, source-preserving editor
+  decorations with cursor/selection reveal, workspace toggle, single-token
+  superscripts, thin-spaced sum binders in output, theme-font `.source` styling,
+  and Isabelle-only completion defaults. Existing `Swarm.thy` user edits were
+  preserved byte for byte and excluded from this commit.
+- **Passed:** `scripts/check_m9a.sh` exited 0, including the complete M3–M5 live
+  host/MCP suite. Source ranges, search-selection reveal, toggling, source-byte
+  preservation and actual stock-client/server completion acceptance passed.
+  The server returned and inserted ASCII `\<Sum>` at the original columns.
+  Runtime receipts are `.dev-host/m9a-results.json` and `m9a-completion.json`.
+- **Discovered:** string quick suggestions need a language override for Isar
+  formulae; the installed table can be located with `isabelle getenv` without
+  assuming a distribution path. No new dependencies or distribution edits.
+- **Visual stop condition pending:** the screen tool returned **Computer Use
+  was not approved to use Code**. Source/range checks are not a screenshot or
+  physical Cmd-F/Tab check. A separate development window opens the unchanged
+  current `examples/Swarm.thy` for user inspection. Part B/C must wait for this
+  check under the requested sequential stopping rule.
+- **Would do differently:** enable formula completions at language registration
+  time and separate source representation from display from the first editor
+  milestone.

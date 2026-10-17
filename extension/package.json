@@ -22,6 +22,7 @@
       ]
     },
     "commands": [
+      { "command": "isabelleRevamp.togglePrettySymbols", "title": "Isabelle: Toggle Pretty Symbols" },
       { "command": "isabelleRevamp.ask", "title": "Isabelle: Ask" },
       { "command": "isabelleRevamp.showGoals", "title": "Isabelle: Show Goals" },
       { "command": "isabelleRevamp.showSwarm", "title": "Isabelle: Show Swarm" }
@@ -37,9 +38,19 @@
       "scopeName": "source.isabelle",
       "path": "./syntaxes/isabelle.tmLanguage.json"
     }],
+    "configurationDefaults": {
+      "[isabelle]": {
+        "editor.tabCompletion": "on",
+        "editor.quickSuggestions": { "other": "on", "comments": "on", "strings": "on" }
+      }
+    },
     "configuration": {
       "title": "Isabelle Revamp",
       "properties": {
+        "isabelleRevamp.prettySymbols": {
+          "type": "boolean", "default": true,
+          "description": "Display ASCII Isabelle symbols as mathematics; reveal source at the cursor. Does not change the file or source coordinates."
+        },
         "isabelleRevamp.executable": {
           "type": "string",
           "default": "isabelle",

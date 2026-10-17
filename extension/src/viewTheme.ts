@@ -20,6 +20,9 @@ pre {
   overflow-wrap: anywhere;
 }
 pre:empty { display: none; }
+/* Isabelle etc/isabelle.css uses .source for mathematical output. Keep the
+   host's font and colours instead of its fixed light-page background. */
+.source { direction: ltr; unicode-bidi: isolate; font-family: var(--vscode-editor-font-family), monospace; }
 body.vscode-high-contrast header, body.vscode-high-contrast-light header {
   border-color: var(--vscode-contrastBorder);
 }`;
