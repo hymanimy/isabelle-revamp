@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seven MCP tools, one persistent connection to the VS Code extension."""
+"""Seven MCP tools, one named connection per client to the VS Code extension."""
 import argparse
 import asyncio
 from contextlib import asynccontextmanager
@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.dependencies import get_context
 
 
 class Bridge:
@@ -53,7 +54,9 @@ class Bridge:
             if not self.writer or not self.reader:
                 raise ToolError('The bridge is disconnected. Restart this MCP server; edits are never retried automatically.')
             self.sequence += 1
-            request = {'id': self.sequence, 'method': method, 'params': params}
+            client = get_context().session.client_params
+            name = client.client_info.name if client else 'MCP agent'
+            request = {'id': self.sequence, 'method': method, 'params': params, 'client_name': name}
             body = (json.dumps(request, ensure_ascii=False) + '\n').encode()
             if len(body) > 2 * 1024 * 1024:
                 raise ToolError('Request exceeds the 2 MiB limit.')
@@ -94,7 +97,8 @@ mcp = FastMCP('Isabelle Revamp', lifespan=lifespan, strict_input_validation=True
     instructions='Work in the open VS Code workspace. Positions are zero-based lines and UTF-16 columns; ends are exclusive. '
     'Start with open to read the current buffer. edit changes and saves that buffer. goals_at moves the visible cursor and returns the sidebar text. '
     'Poll processing_status after edits. Empty errors do not prove completion: check status and sorry_positions. '
-    'One agent per extension instance. Never retry an uncertain edit without reading the buffer again.')
+    'Up to two agents share an extension instance. Read open immediately before every edit; stale edits are rejected. '
+    'Never retry an uncertain edit without reading the buffer again.')
 
 READ = {'readOnlyHint': True, 'openWorldHint': False}
 

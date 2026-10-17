@@ -9,16 +9,22 @@
   "engines": { "vscode": "^1.104.0" },
   "categories": ["Programming Languages"],
   "main": "./out/extension.js",
-  "activationEvents": ["onLanguage:isabelle", "onView:isabelleRevamp.goals"],
+  "activationEvents": ["onLanguage:isabelle", "onView:isabelleRevamp.goals", "onView:isabelleRevamp.swarm"],
   "scripts": {
     "compile": "tsc -p .",
     "vscode:prepublish": "npm run compile"
   },
   "contributes": {
     "views": {
-      "explorer": [{ "id": "isabelleRevamp.goals", "name": "Isabelle Goals", "type": "webview" }]
+      "explorer": [
+        { "id": "isabelleRevamp.goals", "name": "Isabelle Goals", "type": "webview" },
+        { "id": "isabelleRevamp.swarm", "name": "Isabelle Swarm", "type": "webview" }
+      ]
     },
-    "commands": [{ "command": "isabelleRevamp.showGoals", "title": "Isabelle: Show Goals" }],
+    "commands": [
+      { "command": "isabelleRevamp.showGoals", "title": "Isabelle: Show Goals" },
+      { "command": "isabelleRevamp.showSwarm", "title": "Isabelle: Show Swarm" }
+    ],
     "languages": [{
       "id": "isabelle",
       "aliases": ["Isabelle", "Isar"],

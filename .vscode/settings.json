@@ -1,3 +1,5 @@
 {
-  "isabelleRevamp.executable": "~/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle"
+  "isabelleRevamp.executable": "~/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle",
+  "files.exclude": { "**/Swarm_solution.thy": true },
+  "search.exclude": { "**/Swarm_solution.thy": true }
 }

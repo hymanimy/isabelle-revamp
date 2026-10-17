@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { Diagnostic, DiagnosticSeverity, Disposable, Range, TextDocument, TextEditor } from 'vscode';
+import { Diagnostic, DiagnosticSeverity, Disposable, EventEmitter, Range, TextDocument, TextEditor } from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { GoalsView, GoalState } from './goalsView';
 import { outputText } from './outputText';
@@ -18,6 +18,8 @@ const busyTypes = new Set([
 const errorTypes = new Set(['text_overview_error']);
 
 export class Goals implements Disposable {
+  private updates = new EventEmitter<void>();
+  readonly onDidUpdate = this.updates.event;
   private generation = 0;
   private caret?: Caret;
   private document?: TextDocument;
@@ -82,6 +84,7 @@ export class Goals implements Disposable {
             this.decorationTimer = setTimeout(() => this.refreshDecorations(message.uri), 250);
           }
         }
+        this.updates.fire();
       }),
     );
   }
@@ -126,6 +129,7 @@ export class Goals implements Disposable {
     this.diagnostics.set(uri, diagnostics.filter(d => d.severity === DiagnosticSeverity.Error)
       .map(d => d.message));
     if (uri === this.caret?.uri) this.render();
+    this.updates.fire();
   }
 
   private async refresh(generation: number, caret: Caret): Promise<void> {
@@ -162,6 +166,7 @@ export class Goals implements Disposable {
     if (this.caret) {
       this.refreshDecorations(this.caret.uri);
     }
+    this.updates.fire();
   }
 
   private refreshDecorations(uri: string): void {
@@ -213,6 +218,7 @@ export class Goals implements Disposable {
     this.confirmedVersions.clear();
     this.annotatedVersions.clear();
     this.publish({ phase: 'unavailable', text: '', errors: [] });
+    this.updates.fire();
   }
 
   observe(document: TextDocument): void {
@@ -223,6 +229,7 @@ export class Goals implements Disposable {
       // Imports may depend on this file, so invalidate their cached completion too.
       this.confirmedVersions.clear();
       this.annotatedVersions.clear();
+      this.updates.fire();
     }
   }
 
@@ -244,6 +251,10 @@ export class Goals implements Disposable {
   sorryPositions(document: TextDocument): SourceRange[] {
     return (this.badRanges.get(document.uri.toString()) ?? [])
       .filter(range => document.getText(new Range(...range)) === 'sorry');
+  }
+
+  decorationRanges(document: TextDocument, type: string): SourceRange[] {
+    return this.ranges.get(document.uri.toString())?.get(type) ?? [];
   }
 
   documentStatus(document: TextDocument) {
@@ -278,5 +289,6 @@ export class Goals implements Disposable {
     this.releasePanel();
     this.unavailable();
     for (const subscription of this.subscriptions) subscription.dispose();
+    this.updates.dispose();
   }
 }

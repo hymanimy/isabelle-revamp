@@ -262,3 +262,60 @@
 - **Next:** reload the development host and visually review the polished sidebar
   and highlighting. M6's requested implementation scope is complete; no further
   features or milestones were started.
+
+## 2026-10-17 — M7 passed: Proof Swarm board
+
+- **Changed:** added the **Isabelle Swarm** WebviewView and **Isabelle: Show
+  Swarm** command. A structural lexer finds the requested depth-one proof steps
+  in the current theorem, ignoring comments, strings, cartouches and nested
+  proofs. The six-card demo proves the sum of the first n odd numbers is n².
+  `Swarm.thy` keeps six `sorry` bodies; `Swarm_solution.thy` is the committed
+  checked reference, hidden from Explorer/search by workspace settings.
+- **Board:** grey admissions, amber processing/unknown completion, green local
+  proofs and red errors reuse the existing current-version decorations and
+  diagnostics. Updates are coalesced over 150 ms. Card buttons select the source
+  step and update cursor goals. The M6 header/theme code is shared; the board
+  shows N/M, seconds since the first document edit, and **kernel-checked ✓** only
+  when the whole theory satisfies the same completion test as MCP `status()`.
+  Retained DOM nodes allow 300 ms CSS status transitions; labels/status text use
+  `textContent`, with keyboard-accessible buttons and a restricted script nonce.
+- **Agents:** M7 supersedes the single-client limit with two authenticated
+  sockets and one editor-operation queue. Actual MCP initialization names pass
+  through the bridge and tag successfully edited cards for ten seconds. A
+  client's stale read version prevents its edit from applying; the client must
+  read and recompute its range. The seven tool signatures remain unchanged.
+- **Passed:** `bash scripts/check_m7.sh` exited 0. It independently kernel-checked
+  `Swarm_solution` with no admissions, compiled TypeScript, and passed all M3–M6
+  regressions plus M7. Opening the skeleton at line zero produced six grey cards;
+  a selected hand-edited `sorry` became green within the required two seconds,
+  and a wrong tactic became red. A slow nested proof showed amber then green.
+  Card selection updated cursor goals; an old-version card click was ignored.
+- **MCP acceptance:** two live FastMCP stdio clients, identifying as Claude and
+  Codex, filled different cards. Both tags appeared, a stale second-client edit
+  was rejected, and fresh reads allowed subsequent edits. The board reached
+  **6/6 proved** with **kernel-checked ✓**, matching `status()`. Tags expired
+  after ten seconds. The third connection was refused, and the existing path,
+  authentication, processing, diagnostic and goal-equality checks still passed.
+  The clients submitted fixed proofs; no language-model session was invoked.
+- **Additional checks:** lexer fixtures cover current-theorem selection, nested
+  proof exclusion, multiline comments/cartouches, anonymous labels and incomplete
+  steps. The actual webview script was tested with a small DOM harness for safe
+  labels, preserved nodes, status classes, header updates and click messages.
+  Live assertions require the board's document version to match the editor,
+  so an old green snapshot cannot satisfy them. Receipts are in
+  `.dev-host/m7-results.json`; the committed skeleton remained unchanged.
+- **Discovered:** the stock server has no explicit finished flag; green requires
+  positive command/ending annotations plus settled current-version status.
+  Python's MCP initialization field is `client_info`, despite its JSON alias
+  `clientInfo`. Two agents require version checks as well as serialization.
+  PAINPOINTS entries 24–28 and `PROTOCOL_NOTES.md` record these details.
+- **Visual limitation:** the screen tool again returned **Computer Use was not
+  approved to use Code**. Real stock-editor tests and webview-script checks
+  passed, but no direct M7 screenshot review is claimed.
+- **Would do differently:** inspect initialization metadata and multi-client
+  version safety before adding ownership badges. Test opening at the theory
+  header, not only at an existing proof cursor, and require the current document
+  version in every live board assertion.
+- **Next:** reload the development host and run the Swarm demo with
+  `docs/SWARM_PROMPT.md`. The requested M7 implementation and automated stopping
+  conditions are complete; no later milestone was started.

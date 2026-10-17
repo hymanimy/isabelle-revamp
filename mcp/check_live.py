@@ -40,8 +40,17 @@ async def main():
     async with Client(transport) as client:
         assert {tool.name for tool in await client.list_tools()} == TOOLS
         await receipt('exactly seven MCP tools')
-        assert 'already connected' in (await raw_connection())['error']
-        await receipt('second connection refused')
+        info = json.loads(PORT_FILE.read_text())
+        second_reader, second_writer = await asyncio.open_connection('127.0.0.1', info['port'])
+        try:
+            second_writer.write((json.dumps({'token': info['token']}) + '\n').encode())
+            await second_writer.drain()
+            assert json.loads(await second_reader.readline()) == {'ok': True}
+            assert 'already connected' in (await raw_connection())['error']
+        finally:
+            second_writer.close()
+            await second_writer.wait_closed()
+        await receipt('two connections accepted; third refused')
 
         async def call(name, **params):
             return (await client.call_tool(name, params)).data

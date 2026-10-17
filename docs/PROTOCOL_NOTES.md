@@ -410,3 +410,76 @@ limit: selecting the final `simp` did not produce a confirmed state, although
 returned `proof (prove)\ngoal (1 subgoal):\n 1. True` and settled the current-version
 status. The live header test uses that position. An unavailable cursor state
 must not be equated with a failed theory or asserted to be fully checked.
+
+## M7: Swarm cards reuse command decorations
+
+Ran the stock server on `Swarm.thy` with the same M6 options, then sent full-text
+`textDocument/didChange` notifications for a correct and an incorrect first step.
+No new Isabelle option, proof search, kernel extension, or prover process is
+needed for the board. A forced snapshot used the existing notification:
+
+```json
+{"method":"PIDE/decoration_request","params":{"uri":"file:///…/Swarm.thy"}}
+```
+
+The initial snapshot's `background_bad` ranges were exactly
+`[9,4,9,9]`, `[12,4,12,9]`, `[15,4,15,9]`, `[18,4,18,9]`, `[21,4,21,9]`,
+and `[24,4,24,9]`, each selecting a literal `sorry`. Replacing the first with
+`by simp` removed `[9,4,9,9]` and produced `text_keyword1` range `[9,4,9,6]`
+for `by`, alongside `[8,2,8,6]` for `have`. Busy/error ranges were empty after
+settling. Replacing it with `by (rule FalseE)` produced `background_bad`
+`[9,4,9,6]` and `text_overview_error` `[9,0,9,20]`.
+
+There is no separate `finished` decoration in this server. Its published list
+contains command keyword annotations and unprocessed/running/cancelled/error
+ranges. `VSCode_Rendering.decorations` constructs that list; `Rendering.background`
+and `overview_color` omit pending/error colours for settled successful commands.
+M7 requires the existing current-version confirmation/full snapshot, a recognised
+command and proof-ending keyword, a structurally closed proof, and no overlapping
+pending, bad, admission or error ranges before marking a card green. `also` and
+`finally` are standalone chain commands and need no separate proof terminator.
+Errors take precedence over admissions within a card. Admissions may appear grey
+before a printable cursor goal is available, provided the marked range still
+selects literal `sorry` in the current source. Unknown completion stays amber.
+
+The structural lexer ignores strings, nested comments and nested cartouches.
+It selects the theorem at the cursor (the first theorem when the cursor is above
+it) and collects `have`, `show`, `obtain`, `also`, `finally` at explicit proof
+depth one. Nested proofs/brace blocks do not create extra cards. It is a small
+client-side structural parser, not a replacement for Isabelle's parser. Source
+ranges are recomputed after edits; no theorem is certified by parsing alone.
+Cards represent locally checked steps, which can depend on earlier admitted
+facts. The header's **kernel-checked ✓** requires the same whole-buffer completion
+check as `status()`. If the cursor has no printable proof state, click a card to
+obtain the current-version confirmation; absence of a cursor state is not success.
+
+### Two named clients
+
+M7 intentionally supersedes M5's single-connection limit. The authenticated
+loopback bridge allows two persistent connections and refuses a third. The
+Python tool handler reads the actual MCP initialization metadata via
+`get_context().session.client_params.client_info.name` (FastMCP 4.1.0 and its
+installed MCP SDK), and sends it outside tool arguments:
+
+```json
+{"id":1,"method":"open","params":{"file":"examples/Swarm.thy"},"client_name":"claude-code"}
+```
+
+The first request binds a display name to that socket. Claude/Codex names are
+normalised; unknown names are bounded, displayed as text, and never used for
+authentication. The token handshake is unchanged. The seven MCP tool names and
+argument shapes are unchanged. The use of request context follows the
+[FastMCP context API](https://gofastmcp.com/servers/context).
+
+Operations from both sockets run in one queue. Each socket remembers versions
+returned by `open` and successful edits. `edit` refuses a changed buffer before
+applying its range, asking that client to read again. This handles line shifts
+without adding a tool argument or silently rebasing an agent's edit. Card IDs
+are captured before a successful edit; those cards carry that socket's name
+for ten seconds. Edits rejected before reaching the editor do not claim a card.
+
+The live test starts two real FastMCP clients with `Implementation` names
+`claude-code` and `codex-mcp-client`; both labels appeared on different cards,
+a stale second-client edit was refused, and the six-card completed proof matched
+whole-theory completion. The test clients submit fixed proofs; no model inference
+or actual Claude/Codex CLI session is claimed by this automated check.

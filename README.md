@@ -6,6 +6,7 @@ M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,
 fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
 `sorry`. M5 connects AI agents to that same editor through seven MCP tools.
 M6 adds a theme-aware sidebar, Unicode output and a theory/check-status header.
+M7 adds **Isabelle Swarm**, a live card board for six proof steps filled through MCP.
 
 ## Try the extension in under five minutes
 
@@ -60,8 +61,10 @@ states. It leaves the real example unchanged.
 Follow [mcp/README.md](mcp/README.md) to install the Python environment and register
 the stdio server with Codex or Claude Code. The tools are `open`, `edit`,
 `goals_at`, `errors`, `status`, `sorry_positions`, and `processing_status`.
-One agent connects to each extension instance. `goals_at` moves the visible cursor
+Up to two agents connect to each extension instance. `goals_at` moves the visible cursor
 and returns the sidebar's text; `edit` changes and saves the VS Code buffer.
+Read `open` immediately before an edit: another agent's changes invalidate old
+coordinates, and stale edits are rejected.
 
 After installing the MCP dependencies, `bash scripts/check_m5.sh` runs the real
 stdio-to-editor acceptance check, including the M3/M4 regressions.
@@ -80,6 +83,20 @@ and click `have root_squared`: the sidebar should show `(sqrt 2)² = 2` below
 **Sqrt2 · fully checked**. Use **Preferences: Color Theme** to inspect light,
 dark and high-contrast rendering. The automated checks validate token styles
 and the view model; they do not replace looking at the rendered window.
+
+## Proof Swarm (M7)
+
+Open `examples/Swarm.thy` in the development host and run **Isabelle: Show Swarm**.
+Its six grey cards are the skeleton of the sum-of-odd-numbers proof. Click a card
+to see its goal; as its proof is filled, it turns amber while checking, green
+when checked, or red on an error. Recent MCP edits show the client name for ten
+seconds. The header shows progress, elapsed time, and whole-theory completion.
+
+Follow the [Swarm demo](docs/DEMO.md#swarm) and [agent prompt](docs/SWARM_PROMPT.md).
+Run `bash scripts/check_m7.sh` for the reference proof, all earlier regression
+checks, live card transitions, two named MCP clients, stale-edit rejection and
+badge expiry. The reference solution is committed but hidden in the demo's
+Explorer/search through workspace settings.
 
 ## Run the goal probe
 

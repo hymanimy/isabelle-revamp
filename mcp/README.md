@@ -30,8 +30,9 @@ These forms were checked against the installed CLI help and the official
 [Codex MCP documentation](https://developers.openai.com/codex/mcp) and
 [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
 Registration is left to you; the test runner does not change client configuration.
-Connect one client at a time: a second connection is refused until the first
-disconnects. Restart the MCP connection after reloading the extension.
+M7 supports two simultaneous clients; a third connection is refused. Each client
+runs its own stdio server and shares the extension's prover. Restart the MCP
+connections after reloading the extension.
 
 ## Tools and coordinates
 
@@ -43,7 +44,7 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 | Tool | Result and behavior |
 | --- | --- |
 | `open(file)` | Opens the editor and returns its current `text`, `version`, and `saved` flag. Includes unsaved user edits. |
-| `edit(file, start_line, start_col, end_line, end_col, text)` | Replaces the range through VS Code, saves the buffer, and returns its new version/status. Uses the editor's undo history. Read with `open` first. |
+| `edit(file, start_line, start_col, end_line, end_col, text)` | Replaces the range through VS Code, saves the buffer, and returns its new version/status. Uses the editor's undo history. A stale client version is rejected; read with `open` immediately before editing. |
 | `goals_at(file, line, col)` | Moves the visible cursor to a proof command and waits up to 30 seconds. Returns Unicode `text` identical to the sidebar, plus `phase`, diagnostics, the file/version/position, `theory` and `checkStatus`. |
 | `errors(file)` | Returns error messages/ranges, `has_errors`, and `complete`. `complete=false` means an empty or partial list is inconclusive. |
 | `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag for all open theory tabs. |
@@ -63,7 +64,8 @@ I/Q's file argument. We do not load I/Q or modify Isabelle.
    tactic need not return a proof state. The sidebar follows this same cursor.
 2. Use `sorry_positions` to find admitted steps. If its list is incomplete,
    first obtain a goal for that document version and poll `processing_status`.
-3. Submit an edit, then poll processing and inspect `errors` and `status`.
+3. Read `open` again, recompute the range, and submit an edit. Then poll
+   processing and inspect `errors` and `status`.
    **unfinished (sorry)** is distinct from an error. `No subgoals!` alone is not
    completion: an admitted or failed command can also produce that text.
 4. Check the target file's `fully_checked` and `saved` fields. The aggregate is
@@ -83,6 +85,17 @@ not retry on network failure. If a response is lost, read the buffer before
 retrying: the edit may already have applied. A user moving the cursor or editing
 the document while `goals_at` waits causes that query to fail explicitly.
 
+Editor operations from both clients are serialized. Each connection remembers
+the version returned by its last `open` or successful `edit`; a change by the
+other client or by hand invalidates that version. A stale edit returns
+`The buffer changed since this client last read it. Call open and recompute the edit range.`
+The seven tool signatures remain unchanged.
+
+**Isabelle Swarm** tags edited cards for ten seconds using MCP initialization's
+client name (normalised to Claude/Codex for those clients). This is self-reported
+display metadata, not authentication. The connection token remains the local
+authentication mechanism. See [SWARM_PROMPT.md](../docs/SWARM_PROMPT.md) for the demo.
+
 ## Verify end to end
 
 ```sh
@@ -97,6 +110,11 @@ connection refusal, and file boundaries. The real example remains unchanged.
 Receipts are in `.dev-host/m5-results.json`. Profiles and discovery files stay
 under `.dev-host/` during tests. Pass another VS Code application executable as
 the script's first argument if needed.
+
+`bash scripts/check_m7.sh` also kernel-checks the committed odd-sum reference and
+tests six live cards, manual/error/processing transitions, clicks, two named
+clients, stale-edit refusal, card-by-card completion and tag expiry. It includes
+M3–M6 regressions. No language model is invoked by the test.
 
 The bridge binds only to `127.0.0.1` on a random port. The discovery file is JSON
 containing the port and a random connection token, written with mode `0600`.

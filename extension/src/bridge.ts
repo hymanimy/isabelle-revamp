@@ -3,12 +3,13 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { createServer, Server, Socket } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { BridgeTools } from './bridgeTools';
+import { AgentSession, BridgeTools } from './bridgeTools';
 
-// Newline-delimited JSON on loopback. One persistent, authenticated agent socket.
+// Newline-delimited JSON on loopback. Two agents; editor operations serialize.
 export class Bridge {
   private server?: Server;
-  private agent?: Socket;
+  private agents = new Set<Socket>();
+  private operations = Promise.resolve();
   private readonly token = randomBytes(32).toString('hex');
   private metadata = '';
   readonly portFile = process.env.ISABELLE_REVAMP_PORT_FILE ?? join(homedir(), '.isabelle-revamp', 'port');
@@ -32,15 +33,16 @@ export class Bridge {
 
   private connect(socket: Socket): void {
     socket.on('error', () => socket.destroy());
-    if (this.agent) {
-      socket.end(JSON.stringify({ error: 'An agent is already connected to this extension instance.' }) + '\n');
+    if (this.agents.size >= 2) {
+      socket.end(JSON.stringify({ error: 'Two agents are already connected to this extension instance.' }) + '\n');
       return;
     }
-    this.agent = socket;
-    socket.on('close', () => { if (this.agent === socket) this.agent = undefined; });
+    this.agents.add(socket);
+    socket.on('close', () => this.agents.delete(socket));
     socket.setEncoding('utf8');
     socket.setTimeout(5000, () => socket.destroy());
     let authenticated = false;
+    let agent: AgentSession | undefined;
     let buffer = '';
     let queue = Promise.resolve();
     const send = (value: unknown) => { if (!socket.destroyed) socket.write(JSON.stringify(value) + '\n'); };
@@ -68,7 +70,19 @@ export class Bridge {
               || !request.params || typeof request.params !== 'object' || Array.isArray(request.params)) {
               throw new Error('Expected {id: integer, method: string, params: object}.');
             }
-            send({ id, result: await this.tools.call(request.method, request.params) });
+            if (!agent) {
+              const raw = typeof request.client_name === 'string' ? request.client_name : 'MCP agent';
+              const name = /claude/i.test(raw) ? 'Claude' : /codex/i.test(raw) ? 'Codex'
+                : raw.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 40) || 'MCP agent';
+              agent = { name, versions: new Map() };
+            }
+            const session = agent;
+            const operation = this.operations.then(() => {
+              if (socket.destroyed) throw new Error('Client disconnected before the operation started.');
+              return this.tools.call(request.method, request.params, session);
+            });
+            this.operations = operation.then(() => {}, () => {});
+            send({ id, result: await operation });
           } catch (error) {
             send({ id, error: error instanceof Error ? error.message : String(error) });
           }
@@ -78,7 +92,7 @@ export class Bridge {
   }
 
   async close(): Promise<void> {
-    this.agent?.destroy();
+    for (const agent of this.agents) agent.destroy();
     if (this.server?.listening) await new Promise<void>(resolve => this.server!.close(() => resolve()));
     // Another window may now own discovery. Never remove its port file.
     try { if (this.metadata && await readFile(this.portFile, 'utf8') === this.metadata) await unlink(this.portFile); } catch { /* already removed */ }

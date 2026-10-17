@@ -149,6 +149,8 @@ should be.
   The M6 retry using the inventory's `com.microsoft.VSCode` identifier returned
   `Computer Use was not approved to use Code` again. M6 therefore records actual
   tokenizer/live-host checks separately from the still-unverified screen view.
+  The M7 screen retry returned the same denial; its card rendering/message
+  tests and live editor checks are recorded separately from screen inspection.
 
 ## 12. Goal notifications cannot identify the cursor that produced them
 
@@ -299,3 +301,62 @@ should be.
   the demo at a statement or an intermediate Isar command with an open goal.
   The M6 theory-switch check now selects the lemma statement. A richer
   no-goal/context display is outside this milestone's limited polish scope.
+
+## 24. Completed commands have no explicit finished decoration
+
+- **What happened.** M7's live probe found `text_keyword1` spans for the command
+  and its proof ending, with pending/error ranges cleared after checking. The
+  stock server does not send a separate `finished` flag for a proof step.
+- **Experience.** A board built only from an empty error list would make an
+  unchecked or unfinished step look proved.
+- **Fix needed.** Require current-version annotations, marked command/proof
+  tokens, structural closure, and no overlapping pending/error/admission data.
+  Keep unknown completion amber. Show the whole-theory check separately from
+  local green cards, which can rely on earlier admitted facts. M7 implements this.
+
+## 25. The bridge did not yet carry client names
+
+- **What happened.** The M5 bridge knew only its authenticated socket. The first
+  M7 metadata attempt used the JSON field name as a Python attribute and failed
+  with `'InitializeRequestParams' object has no attribute 'clientInfo'`.
+- **Experience.** The board cannot tell the audience who edited a card, although
+  the MCP client has already introduced itself.
+- **Fix needed.** Read the installed SDK's `client_info.name` attribute through
+  FastMCP request context and pass it through the local protocol. Bind it once
+  per socket, escape it as display text, and expire the badge after ten seconds.
+  The live test validates two distinct initialization names end to end.
+
+## 26. Two agents cannot safely reuse old line coordinates
+
+- **What happened.** M5 deliberately refused a second connection. Allowing two
+  for the Swarm demo means one agent can insert lines after another has read its
+  target, making the second agent's otherwise valid range stale.
+- **Experience.** An agent can overwrite the wrong proof step while believing
+  it is working independently. A visible name badge would not prevent corruption.
+- **Fix needed.** Serialize editor operations and remember each client's last
+  read/edit version. Refuse stale edits and require a fresh `open` plus recomputed
+  coordinates. M7's two-client test verifies rejection before mutation, then a
+  successful fresh read/edit. The third connection remains refused.
+
+## 27. The closing method cannot see a local have by name
+
+- **What happened.** An initial six-step reference draft ended with
+  `qed (rule result)`. Isabelle reported `Undefined fact: "result"`; terminal
+  methods use the enclosing goal's context. Adding a separate `show` would also
+  add a seventh board card under the requested command list.
+- **Experience.** The final local fact visibly proves the theorem, yet the
+  apparent closing command cannot refer to it.
+- **Fix needed.** Use the ordinary Isar closing line `thus ?thesis .` before
+  `qed`. The reference now checks and the demo keeps six named `have` cards,
+  with the nested induction proof contained inside the `all_n` card.
+
+## 28. Git ignore rules do not hide a tracked solution from the editor
+
+- **What happened.** The solution needs to stay committed while being hidden
+  from the demo window. Git ignore rules do not remove a tracked file or control
+  the VS Code Explorer.
+- **Experience.** The answer can appear beside the skeleton during the demo, or
+  an attempted ignore rule can give a false impression that it was hidden.
+- **Fix needed.** Keep `Swarm_solution.thy` tracked and use repository-local
+  `files.exclude` and `search.exclude` settings for the demo. Direct paths still
+  allow the reference checker and presenter to access it.

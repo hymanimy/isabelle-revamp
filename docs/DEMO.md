@@ -33,3 +33,33 @@ contradicts coprimality. The reduced-fraction setup uses
 `Rats_abs_nat_div_natE` from `HOL/Real.thy`; the distribution's
 `HOL/Examples/Sqrt.thy` was a reference for that setup. The example does not
 import its irrationality theorem, call Sledgehammer, or use Nitpick.
+
+## Swarm
+
+1. In the development host, open **examples/Swarm.thy**, then run
+   **Isabelle: Show Swarm**. After Isabelle publishes its annotations, the board
+   shows six grey cards and **0/6 proved**. The theorem is the familiar identity
+   `1 + 3 + … + (2n − 1) = n²`. The skeleton intentionally contains six admissions.
+2. Click **base** to inspect its goal in **Isabelle Goals**. For a quick manual
+   preview, replace its `sorry` with `by simp`: the card turns green. Replacing
+   that proof with `by (rule TrueI)` makes it red; restore `sorry` for the full
+   agent demo. Amber means checking or awaiting current completion evidence.
+3. From the repository root, start **Claude Code** with the registered Isabelle
+   MCP server and paste [SWARM_PROMPT.md](SWARM_PROMPT.md). Keep the Swarm board
+   visible. The agent fills one step at a time; its name appears on the edited
+   card for ten seconds. That document also gives optional two-agent assignments.
+4. Watch **N/6 proved** rise while the elapsed timer runs from the first edit.
+   Click any card to follow its current goal. Red cards indicate a local error;
+   grey cards still contain admissions. Status changes use a 300 ms transition.
+5. At **6/6 proved**, wait for **kernel-checked ✓**, then save. This badge reuses
+   the same whole-file completion check as MCP `status()`. A local green card
+   alone can still depend on earlier admitted steps.
+
+`examples/Swarm_solution.thy` is the committed, independently checked reference.
+Workspace `files.exclude` and `search.exclude` hide it from the demo window;
+Git still tracks it. To reset a repeat demo, use Undo or restore the six `sorry`
+proof bodies from the committed skeleton after preserving anything you need.
+
+`bash scripts/check_m7.sh` checks the reference proof and runs the live board/MCP
+acceptance tests in a disposable host. It leaves both committed example files
+unchanged. The test uses two named MCP clients, without running a language model.

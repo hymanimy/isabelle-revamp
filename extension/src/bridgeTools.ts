@@ -3,11 +3,14 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { DiagnosticSeverity, languages, Position, Range, Selection, TabInputText, TextDocument, Uri, window, workspace } from 'vscode';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
+import { Swarm } from './swarm';
+
+export interface AgentSession { name: string; versions: Map<string, number> }
 
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BridgeTools {
-  constructor(private goals: Goals, private view: GoalsView) {}
+  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm) {}
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');
@@ -54,7 +57,7 @@ export class BridgeTools {
     return result;
   }
 
-  async call(method: string, params: Record<string, unknown>): Promise<unknown> {
+  async call(method: string, params: Record<string, unknown>, agent: AgentSession): Promise<unknown> {
     if (method === 'status' || method === 'processing_status') {
       const documents = await this.documents();
       const files = documents.map(document => method === 'status'
@@ -83,12 +86,19 @@ export class BridgeTools {
     }
     const editor = await window.showTextDocument(document);
     this.goals.follow(editor);
-    if (method === 'open') return { ...identity(), text: document.getText(), saved: !document.isDirty };
+    if (method === 'open') {
+      agent.versions.set(document.uri.toString(), document.version);
+      return { ...identity(), text: document.getText(), saved: !document.isDirty };
+    }
     if (method === 'edit') {
+      if (agent.versions.get(document.uri.toString()) !== document.version) {
+        throw new Error('The buffer changed since this client last read it. Call open and recompute the edit range.');
+      }
       const start = this.position(document, params.start_line, params.start_col);
       const end = this.position(document, params.end_line, params.end_col);
       if (start.isAfter(end)) throw new Error('Edit start must not be after its end.');
       if (typeof params.text !== 'string') throw new Error('Edit text must be a string.');
+      const ids = this.swarm.editedCards(document, new Range(start, end));
       const selection = editor.selection;
       if (!await editor.edit(edit => edit.replace(new Range(start, end), params.text as string))) {
         throw new Error('Document changed during the edit; read it again with open.');
@@ -96,6 +106,8 @@ export class BridgeTools {
       editor.selection = new Selection(document.validatePosition(selection.anchor), document.validatePosition(selection.active));
       this.goals.observe(document);
       this.goals.follow(editor);
+      this.swarm.tag(document, ids, agent.name);
+      agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };
     }

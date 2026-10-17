@@ -6,6 +6,7 @@ import { GoalsView } from './goalsView';
 import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
 import { unicodeSymbols } from './symbols';
+import { Swarm } from './swarm';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -48,13 +49,19 @@ export async function activate(context: ExtensionContext) {
     },
   });
   goals = new Goals(client, view);
+  const swarm = new Swarm(goals);
+  context.subscriptions.push(swarm,
+    window.registerWebviewViewProvider('isabelleRevamp.swarm', swarm.view),
+    commands.registerCommand('isabelleRevamp.showSwarm', () => commands.executeCommand('isabelleRevamp.swarm.focus')));
+  swarm.follow(window.activeTextEditor);
   context.subscriptions.push(goals,
     window.onDidChangeTextEditorSelection(event => {
-      if (event.textEditor === window.activeTextEditor) goals?.follow(event.textEditor);
+      if (event.textEditor === window.activeTextEditor) { goals?.follow(event.textEditor); swarm.follow(event.textEditor); }
     }),
-    window.onDidChangeActiveTextEditor(editor => goals?.follow(editor)),
+    window.onDidChangeActiveTextEditor(editor => { goals?.follow(editor); swarm.follow(editor); }),
     workspace.onDidChangeTextDocument(event => {
       goals?.observe(event.document);
+      if (event.contentChanges.length) swarm.changed(event.document);
       if (event.document === window.activeTextEditor?.document) goals?.follow(window.activeTextEditor);
     }),
     client.onDidChangeState(event => {
@@ -74,7 +81,7 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, view));
+  bridge = new Bridge(new BridgeTools(goals, view, swarm));
   try {
     await bridge.start();
     output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);
@@ -85,7 +92,8 @@ export async function activate(context: ExtensionContext) {
     await window.showErrorMessage('The MCP bridge could not start. See Output → Isabelle.');
   }
   // The integration check reads the same model that the webview renders.
-  return { getGoalState: () => view.snapshot() };
+  return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    selectSwarmStep: (uri: string, version: number, id: string) => swarm.select(uri, version, id) };
 }
 
 export async function deactivate(): Promise<void> {
