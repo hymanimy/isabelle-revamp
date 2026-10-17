@@ -91,3 +91,14 @@
   approval; repeating the call does not establish that a prompt reached the user.
 - **Next:** ask Leo whether a Code approval prompt appeared on his side. M2's
   visual check remains pending; M3 has not started.
+
+## 2026-10-17 — M2 passed with Leo's visual confirmation
+
+- **Passed:** Leo confirmed that the visual check passed in the development host.
+  Together with the recorded compile, grammar, and live startup checks, this
+  satisfies M2's stopping condition.
+- **Discovered:** user-observed visual evidence resolved the screen-tool access
+  blocker; no new code changes were needed.
+- **Would do differently:** use a short manual acceptance check when app access
+  is unavailable, clearly attributing the result to the person who observed it.
+- **Next:** M3, the goals sidebar with cursor updates, checking state, and errors.
