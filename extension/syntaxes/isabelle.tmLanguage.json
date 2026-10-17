@@ -1,0 +1,42 @@
+{
+  "name": "Isabelle",
+  "scopeName": "source.isabelle",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#cartouches" },
+    { "name": "keyword.control.isabelle", "match": "\\b(theory|imports|begin|end|lemma|theorem|proof|qed|by|have|show|from|then|hence|thus|obtain|assume|fix|using|unfolding|also|finally|sorry|oops)\\b" },
+    { "include": "#symbols" },
+    { "name": "constant.numeric.isabelle", "match": "\\b[0-9]+\\b" }
+  ],
+  "repository": {
+    "comments": {
+      "name": "comment.block.isabelle",
+      "begin": "\\(\\*",
+      "end": "\\*\\)",
+      "patterns": [{ "include": "#comments" }]
+    },
+    "strings": {
+      "name": "string.quoted.double.isabelle",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "include": "#symbols" },
+        { "name": "constant.character.escape.isabelle", "match": "\\\\(?:[\\\\\"]|[0-9]{3})" }
+      ]
+    },
+    "cartouches": {
+      "name": "string.quoted.other.isabelle",
+      "begin": "‹|\\\\<open>",
+      "end": "›|\\\\<close>",
+      "patterns": [{ "include": "#cartouches" }, { "include": "#symbols" }]
+    },
+    "symbols": {
+      "patterns": [
+        { "name": "constant.character.escape.isabelle", "match": "\\\\<\\^?[A-Za-z][A-Za-z0-9_]*>" },
+        { "name": "keyword.operator.isabelle", "match": "[∀∃⋀⋁λ⇒⟹⟶⟷⟺¬∧∨∈∉⊆⊂∪∩≠≤≥≡×⋅√]" },
+        { "name": "constant.language.isabelle", "match": "[ℕℤℚℝℂ]" }
+      ]
+    }
+  }
+}

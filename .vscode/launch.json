@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [{
+    "name": "Isabelle: Extension Development Host",
+    "type": "extensionHost",
+    "request": "launch",
+    "args": [
+      "--extensionDevelopmentPath=${workspaceFolder}/extension",
+      "${workspaceFolder}",
+      "${workspaceFolder}/examples/Sqrt2.thy"
+    ],
+    "outFiles": ["${workspaceFolder}/extension/out/**/*.js"],
+    "preLaunchTask": "Compile Isabelle extension"
+  }]
+}

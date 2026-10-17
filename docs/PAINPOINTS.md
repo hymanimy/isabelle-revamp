@@ -117,3 +117,28 @@ should be.
   and convert the HTML to plain text in our client. Python's standard-library
   `HTMLParser` removes markup, decodes entities, and preserves the preformatted
   line breaks. No Isabelle files were modified.
+
+## 10. Current client tooling differs from the bundled example
+
+- **What happened.** The first M2 compilation with current dependencies reported
+  that `OutputChannel` lacks the properties of `LogOutputChannel`, and that
+  `node:os` could not be found despite installed Node type declarations. The
+  distribution's extension uses an older LanguageClient API.
+- **Experience.** Copying the official startup pattern and installing its modern
+  dependency sounds sufficient, but produces unrelated-looking type errors before
+  a theory can be opened.
+- **Fix needed.** Ship a lockfile and a tested compile task. Use
+  `createOutputChannel('Isabelle', { log: true })` and explicitly include `node`
+  and `vscode` types in this project's compiler configuration. Both fixes are in M2.
+
+## 11. Visual acceptance needs separate app access
+
+- **What happened.** M2 compiled and started Isabelle in a real stock VS Code
+  Extension Development Host, but the UI tool returned the exact message
+  `Computer Use was not approved to use Code` when asked to inspect the window.
+- **Experience.** The editor is running and its logs say the server is ready,
+  yet the agent cannot verify what the mathematician actually sees.
+- **Fix needed.** Enable Code access for Computer Use, or complete the visual
+  check manually: `Sqrt2.thy` has colored Isar keywords and **Output → Isabelle**
+  shows `Isabelle language server ready (HOL).` This is a test-environment
+  permission issue, not a theorem error or an Isabelle installation failure.

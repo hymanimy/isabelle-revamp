@@ -40,3 +40,41 @@
   the initial acceptance criterion. Keep the raw protocol transcript alongside
   converted output so the distinction stays observable.
 - **Next:** M2, the stock VS Code extension skeleton and its live host check.
+
+## 2026-10-17 — M2 implemented; visual acceptance pending
+
+- **Changed:** added the TypeScript extension, the `isabelle` language for `.thy`,
+  a TextMate grammar covering all 24 requested keywords and common escaped/Unicode
+  symbols, and a stdio LanguageClient using M1's verified options. Added workspace
+  executable configuration, an F5 launch task, a lockfile, and a short root README.
+  Minimal startup is adapted from the official extension and cited in
+  `extension/THIRD_PARTY_NOTICES.md`. No goals sidebar or MCP work has started.
+- **Passed:** `npm run compile --prefix extension`; installed dependencies report
+  no vulnerabilities. Stock VS Code's bundled TextMate/Oniguruma engine tokenized
+  `Sqrt2.thy` and passed checks for every requested keyword, escaped symbols inside
+  quoted terms, Unicode symbols, and nested comments/cartouches. The live stock
+  VS Code 1.138.0 Extension Development Host activated the extension on
+  `onLanguage:isabelle`. Its actual Isabelle Output log contains:
+
+  ```text
+  2026-10-17 09:20:17.886 [info] Starting /Users/leo/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle vscode_server -n -l HOL -o vscode_html_output=true -o editor_output_state=true
+  2026-10-17 09:20:23.776 [info] Welcome to Isabelle/HOL (Isabelle2025-2)
+  2026-10-17 09:20:23.916 [info] Isabelle language server ready (HOL).
+  ```
+
+  No Isabelle-channel or extension activation errors were recorded. Test-host
+  state and logs live under ignored `.dev-host/`, not global VS Code settings.
+- **Discovered:** current `vscode-languageclient` 10.1.2 expects a
+  `LogOutputChannel`; TypeScript 7 needs explicit `node`/`vscode` type inclusion.
+  Both were fixed before the live run. The installed distribution's original
+  extension uses an older client API and a custom encoding; this skeleton uses
+  current `await client.start()` and ordinary UTF-8 in stock VS Code.
+- **Still pending:** direct visual confirmation of colored syntax and the Output
+  panel. Computer Use twice returned `Computer Use was not approved to use Code`.
+  The host is open with `Sqrt2.thy`; logs and token tests do not substitute for the
+  requested visual check. M2 is not yet marked passed, and M3 has not started.
+- **Would do differently:** check app-access availability before scheduling visual
+  acceptance; compile against the selected client version before launching a host.
+- **Next:** enable Code access for the visual check, or have Leo confirm that the
+  open development window shows colored Isar and the ready line in **Output →
+  Isabelle**. Then record M2 as passed and commit that milestone result.

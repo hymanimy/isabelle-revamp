@@ -1,0 +1,49 @@
+{
+  "name": "isabelle-revamp",
+  "displayName": "Isabelle Revamp",
+  "description": "Isabelle/HOL in stock VS Code using the installed Isabelle language server.",
+  "version": "0.1.0",
+  "publisher": "hymanimy",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "vscode": "^1.104.0" },
+  "categories": ["Programming Languages"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onLanguage:isabelle"],
+  "scripts": {
+    "compile": "tsc -p .",
+    "vscode:prepublish": "npm run compile"
+  },
+  "contributes": {
+    "languages": [{
+      "id": "isabelle",
+      "aliases": ["Isabelle", "Isar"],
+      "extensions": [".thy"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "isabelle",
+      "scopeName": "source.isabelle",
+      "path": "./syntaxes/isabelle.tmLanguage.json"
+    }],
+    "configuration": {
+      "title": "Isabelle Revamp",
+      "properties": {
+        "isabelleRevamp.executable": {
+          "type": "string",
+          "default": "isabelle",
+          "scope": "machine-overridable",
+          "description": "Path to the Isabelle executable (~/ is supported), or isabelle on PATH. Reload the window after changing this setting."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "10.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.104.0",
+    "typescript": "7.0.2"
+  }
+}
