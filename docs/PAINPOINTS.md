@@ -427,3 +427,18 @@ should be.
   ID, rather than equating stream indices with the complete message's array.
   Replay the captured stream and include its thinking/text sequence in the
   subprocess fixture. The live acceptance also rejects duplicate replies.
+
+## 34. Reloading the demo window disconnects an external proof run
+
+- **What happened.** During the live Swarm launch, the extension host exited
+  normally and restarted while Claude attempted its first edit. The external
+  MCP client returned `Bridge request failed: Extension connection closed. An
+  edit may already have applied.`, followed by `The bridge is disconnected.
+  Restart this MCP server.` The logs establish the reload, not its cause.
+- **Experience.** The window is open again, but an agent connected before the
+  reload cannot continue. It is unclear whether its interrupted edit landed.
+- **Fix needed.** Stop the old run, reconnect to the new bridge and read the
+  current buffer before any retry. Here the saved file and new bridge both
+  confirmed six unchanged admissions. A fresh Ask run was already active in
+  the reopened host, so it was left in control instead of starting a competitor.
+  Keep the demo window open while its agent is working.
