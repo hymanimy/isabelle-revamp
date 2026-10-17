@@ -865,3 +865,19 @@ should be.
   subsequent complete M12 run passed with 194 measured frames, zero dropped,
   17.8 ms maximum gap and zero status-only layouts. Keep the earlier failures
   in the record; this measured pass is not a guarantee under all machine load.
+
+## 69. Agent edits were easy to miss and restored stale caret coordinates
+
+- **What happened:** MCP replacements could land outside the viewport with no
+  visible authorship. Restoring a saved numeric selection after inserting
+  lines could move the user's caret to different text. A visible deletion
+  preview also introduces a 200 ms window for concurrent human typing.
+- **Experience:** the audience could see the graph change without seeing the
+  proof change; the user could lose their place while an agent worked.
+- **Fix needed:** centre the edited range without taking focus, strike the old
+  text before one replacement, fade an accent highlight and show the client's
+  name. Let VS Code track all selections, rebase active highlights across
+  earlier insertions, and reject a changed document version after the preview.
+  `showAgentEdits=false` disables the display effects. VS Code decorations have
+  no public opacity-transition option, so twenty short-lived alpha levels
+  provide the two-second fade using the current theme's editor-info colour.

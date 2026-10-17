@@ -8,6 +8,7 @@ import { AskView } from './askView';
 import { demoLayout, ProofStatus } from './demoLayout';
 import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
+import { AgentEdits } from './agentEdits';
 import { loadSymbols, unicodeSymbols } from './symbols';
 import { PrettySymbols } from './prettySymbols';
 import { lockLibraryFiles } from './libraryFiles';
@@ -168,6 +169,8 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(semanticColors);
   const swarm = new Swarm(goals);
   const graph = new ProofGraph(goals, context.extensionPath);
+  const agentEdits = new AgentEdits();
+  context.subscriptions.push(agentEdits);
   startProofTimer = () => graph.resetTimer(visibleTheory()?.document);
   const proofStatus = new ProofStatus(graph);
   context.subscriptions.push(swarm,
@@ -213,7 +216,7 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, view, swarm, graph));
+  bridge = new Bridge(new BridgeTools(goals, view, swarm, graph, agentEdits));
   try {
     await bridge.start();
     output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);
@@ -230,6 +233,7 @@ export async function activate(context: ExtensionContext) {
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
     getProofGraph: () => graph.snapshot(),
     getGraphAnchors: () => graph.anchors.snapshot(),
+    getAgentEdits: () => agentEdits.snapshot(),
     hoverProofNode: (uri: string, version: number, id: string) => graph.hover(uri, version, id),
     getProofStatus: () => proofStatus.snapshot(),
     getAskView: () => askView.snapshot(),

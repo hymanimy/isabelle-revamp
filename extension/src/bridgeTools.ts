@@ -1,18 +1,20 @@
 import { realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import { DiagnosticSeverity, languages, Position, Range, Selection, TabInputText, TextDocument, Uri, window, workspace } from 'vscode';
+import { DiagnosticSeverity, EndOfLine, languages, Position, Range, Selection, TabInputText, TextDocument, Uri, window, workspace } from 'vscode';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
 import { Swarm } from './swarm';
 import { encodeSymbols } from './symbols';
 import { ProofGraph } from './proofGraph';
+import { AgentEdits } from './agentEdits';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
 
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BridgeTools {
-  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm, private graph: ProofGraph) {}
+  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm, private graph: ProofGraph,
+    private agentEdits: AgentEdits) {}
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');
@@ -90,7 +92,7 @@ export class BridgeTools {
     const column = window.tabGroups.all.find(group => group.tabs.some(tab =>
       tab.input instanceof TabInputText && tab.input.uri.toString() === document.uri.toString()))?.viewColumn;
     const keepGraph = this.graph.panel.active;
-    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: keepGraph });
+    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: method === 'edit' || keepGraph });
     this.graph.follow(editor);
     this.goals.follow(editor);
     if (method === 'open') {
@@ -107,17 +109,26 @@ export class BridgeTools {
       if (typeof params.text !== 'string') throw new Error('Edit text must be a string.');
       const ids = this.swarm.editedCards(document, new Range(start, end));
       const graphIds = this.graph.editedNodes(document, new Range(start, end));
-      const selection = editor.selection;
-      const text = encodeSymbols(params.text as string);
+      const version = document.version;
+      const offset = document.offsetAt(start);
+      // Match VS Code's newline normalization when computing the new range.
+      const eol = document.eol === EndOfLine.LF ? '\n' : '\r\n';
+      const text = encodeSymbols(params.text as string).replace(/\r\n|\r|\n/g, eol);
+      await this.agentEdits.preview(editor, new Range(start, end));
+      if (document.isClosed || document.version !== version) {
+        throw new Error('The buffer changed during the edit preview. Call open and recompute the edit range.');
+      }
       if (!await editor.edit(edit => edit.replace(new Range(start, end), text))) {
         throw new Error('Document changed during the edit; read it again with open.');
       }
-      editor.selection = new Selection(document.validatePosition(selection.anchor), document.validatePosition(selection.active));
+      // VS Code tracks all user selections through the replacement. Do not
+      // restore old coordinates or put the caret on the agent's proof step.
       this.goals.observe(document);
       this.goals.follow(editor);
       this.swarm.tag(document, ids, agent.name);
       // An appended counter-lemma has no node in the pre-edit document.
-      const inserted = new Range(start, document.positionAt(document.offsetAt(start) + text.length));
+      const inserted = new Range(start, document.positionAt(offset + text.length));
+      this.agentEdits.applied(editor, inserted, agent.name);
       this.graph.tag(document, [...new Set([...graphIds, ...this.graph.editedNodes(document, inserted)])], agent.name);
       agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');

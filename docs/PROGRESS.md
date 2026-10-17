@@ -1056,3 +1056,42 @@ that as its own checklist item.
 - Do differently: keep demo-specific defaults in the committed workspace as
   well as the generated profile, and check current source before reporting
   a feature absent.
+
+## Visible MCP edits — source follows the agent
+
+- **Changed:** `showAgentEdits=true` centres each MCP edit, strikes the old
+  range for 200 ms, fades the new range from 30% accent to transparent over
+  two seconds, and leaves `✎ Claude` / `✎ Codex` for three seconds. One actual
+  replacement reaches PIDE/undo. Terminal focus and user selections are
+  preserved; highlights follow later insertions above them. A document-version
+  check after the preview protects human typing. Disabling the setting clears
+  the effects and disables forced scrolling.
+- **Passed:** `scripts/check_agent_edits.sh` in real VS Code/Isabelle: preview
+  timing, a single document version increment, scrolling, multi-caret tracking
+  including a caret move during preview, independent agent markers, fade and
+  cleanup, a conflicting human edit, Terminal focus, kernel-checked proofs,
+  setting off, one-step undo, and CRLF/ASCII source ranges. The same focused
+  suite also passed against the **installed bundled extension**, using an
+  isolated extension-test host. `scripts/check_m8.sh` passed its M3–M8 chain
+  with **68 PASS lines**, including FastMCP, goal/graph equality and Swarm tags.
+  No real Claude/model request was needed for this edit-display check.
+- **Packaging:** setup/Ask checks and the VSIX audit passed. Rebuilt and
+  force-installed into `demo/.demo/`; current archive is **234,899 bytes**,
+  SHA-256 `826beb25dd452d2eb12b7cb74234fbd9e65c1eb9ede40c4147899c965027beee`.
+  Verified the installed manifest and runtime bytes against the archive, and
+  checked the new setting and preview guard are actually bundled. `dist/`
+  remains ignored. Reload an already-open Demo window to load this build.
+- **Discovered / do differently:** the first fixture used bare `proof` for
+  `True`, producing `Failed to refine any pending goal`; `proof -` fixes that
+  fixture. A subsequent test host terminated from its renderer before
+  completion; the final development and installed-bundle runs passed. Keep the
+  test caret on a proof command for PIDE's version confirmation. The first
+  M8 wrapper saw five shared scratch transcripts where four were expected;
+  a standalone rerun and full rerun passed with no Ask source changes. Its
+  duplicate's cause is unconfirmed. The first package audit passed structural
+  checks but contained a stale build without the feature; a fresh build and
+  feature-specific content comparison caught and corrected this before install.
+- **Limits / scope:** the screen tool again returned `Computer Use was not
+  approved to use Code`; these are extension-host checks, not a screenshot
+  claim. No changes to Ask implementations, tracked `demo/`, root `mcp/`, or
+  `CLAUDE.md`. Other workspace settings changes are excluded from this commit.

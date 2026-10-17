@@ -427,3 +427,29 @@ horizontal overflow. The graph renderer passes at the stage-derived viewports:
 visible. These are **viewport measurements**, not full-window screenshots.
 Screenshot capture is still pending: after approval and a screen-tool reset,
 the tool continued returning `Computer Use was not approved to use Code`.
+
+## Watch agent edits in the source
+
+`isabelleRevamp.showAgentEdits` defaults to `true`. With Claude running in
+Terminal, keep your caret in another proof step and ask it to fill one `sorry`:
+
+1. The editor scrolls the replaced range into the centre. The old `sorry`
+   stays in the buffer, struck through for 200 ms, before one replacement.
+2. The inserted text gets an editor-info accent background, fading from 30%
+   to transparent over two seconds. `✎ Claude` stays after the last edited
+   line for three seconds (`✎ Codex` for a Codex connection).
+3. The edit preserves Terminal focus and lets VS Code track your caret and
+   other selections through line shifts. It does not select the inserted proof.
+   Explicit `goals_at` calls still perform their existing cursor navigation.
+4. Turn the setting off to disable the preview, highlight, marker and forced
+   scrolling. Ordinary edits, kernel checking and graph tags continue.
+
+Typing during the preview aborts a stale agent replacement and asks the agent
+to read the buffer again. The strike-through is only a decoration: it adds no
+temporary deletion, extra undo step, or Unicode to the source.
+
+Run `bash scripts/check_agent_edits.sh` for the real VS Code/Isabelle bridge
+check. It uses disposable theories and named socket clients, without a model
+request or changes to the demo theories. Decoration ranges and timing are
+checked through the extension host; screenshot inspection still requires
+screen-tool access to Code.
