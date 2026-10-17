@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import string
 import subprocess
 from zipfile import ZipFile
 
@@ -126,6 +127,24 @@ def copy_theories(destination, previous):
     return hashes
 
 
+def claude_registration(destination, launcher, port_file):
+    """Project-scoped MCP config for Claude Code, leaving the global config alone.
+
+    demo/.mcp.json.template is committed with ${HOME}-relative paths so the
+    checked-in file carries no machine's user name; this expands it and then
+    pins the paths this run actually resolved. For the committed demo folder the
+    two must agree, so a version bump cannot leave a stale template behind.
+    """
+    template = string.Template((DEMO / '.mcp.json.template').read_text())
+    config = json.loads(template.substitute(HOME=str(Path.home())))
+    server = config['mcpServers']['isabelle']
+    resolved = [str(launcher), '--port-file', str(port_file)]
+    if destination == DEMO and server['args'] != resolved:
+        raise SystemExit('demo/.mcp.json.template is stale; update its paths to:\n  ' + '\n  '.join(resolved))
+    server['args'] = resolved
+    return config
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=DEMO)
@@ -173,11 +192,7 @@ def main():
     launcher = next((file for file in candidates if read_json(file.parents[1] / 'package.json')['version'] == manifest['version']), None)
     if not launcher:
         raise SystemExit('Installed extension has no bundled MCP launcher.')
-    # Project-scoped Claude registration, leaving the user's global config alone.
-    mcp_file = destination / '.mcp.json'
-    mcp = read_json(mcp_file)
-    mcp.setdefault('mcpServers', {})['isabelle'] = {'type': 'stdio', 'command': 'python3', 'args': [str(launcher), '--port-file', str(private / 'port')]}
-    write_json(mcp_file, mcp)
+    write_json(destination / '.mcp.json', claude_registration(destination, launcher, private / 'port'))
     hashes = copy_theories(destination, previous.get('theories', {}))
     workspace_file = destination / '.vscode/settings.json'
     workspace = read_json(workspace_file)

@@ -1012,3 +1012,37 @@ that as its own checklist item.
   this work; they are preserved and excluded from the layout commit. The
   only `scripts/demo_env.py` change in this commit is the two layout settings.
   Nothing is pushed.
+
+## M15 — the demo folder configures Claude Code itself
+
+- **Committed:** `demo/.mcp.json.template` (project-scoped MCP registration with
+  `${HOME}`-relative paths), `demo/CLAUDE.md` (the proof-style instructions),
+  `.claude/settings.json` at the repository root
+  (`enabledMcpjsonServers: ["isabelle"]`), and the same key in
+  `demo/.claude/settings.json` for a copy of the folder used as its own project
+  root. `scripts/demo_env.py` now expands the template rather than hard-coding
+  the server entry, and refuses to write a `demo/.mcp.json` whose template
+  paths disagree with the launcher and port file the run resolved.
+- **Verified:** `scripts/check_m13b.sh` exit 0, including a real CLI install
+  into `.dev-host/demo-install-check` whose generated `.mcp.json` is repinned to
+  that scratch directory. Regenerating the committed `demo/.mcp.json` from the
+  template is byte-identical to the existing file. From `demo/`, real Claude
+  Code 2.1.236 lists the eight `mcp__isabelle__*` tools, and `prove this:
+  Swarm.thy` proved all six admissions through the MCP bridge against the live
+  Demo window: `fully_checked`, 0 errors, 0 sorries. The proof came back in the
+  documented style — named `have` steps with one-line `by` justifications, and
+  a single subproof for the induction, which is the one case `CLAUDE.md` allows.
+  `demo/Swarm.thy` was restored to its skeleton afterwards.
+- **Discovered:** a **local**-scope `isabelle` server in `~/.claude.json`,
+  keyed to the repository, silently overrode `demo/.mcp.json`; it was removed
+  with `claude mcp remove isabelle -s local` and the override is now documented
+  as a pre-flight check. Claude Code resolves `.claude/settings.json` against
+  the git root, not the working directory, so the approval key cannot live in
+  `demo/` alone. Print mode (`claude -p`) loads project servers without the
+  interactive approval gate, so a `-p` probe does not by itself prove the
+  interactive session is unprompted; the committed approval key is what covers
+  that, and only an interactive launch can confirm it.
+- **Not done:** `isabelleRevamp.showAsk` does not exist in this extension
+  version, and `demoLayout` opens the Ask panel unconditionally, so the demo
+  leaves Ask as an unfocused background tab and the pre-flight selects the
+  Terminal tab instead. Suppressing it needs an extension change.

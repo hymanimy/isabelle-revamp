@@ -301,8 +301,21 @@ telemetry, and record this machine's Isabelle path. The **workspace** settings
 — pretty symbols, Demo Layout on activation, font size 16, the Isar palette —
 are committed in `demo/.vscode/settings.json`, so preparing the environment
 leaves the working tree clean. Your normal VS Code profile is not
-reconfigured. The bundled MCP environment is prepared before launching, and
-`.mcp.json` is project-scoped to `demo/` and gitignored.
+reconfigured. The bundled MCP environment is prepared before launching.
+
+`.mcp.json` is project-scoped to `demo/` and gitignored; what is committed is
+`demo/.mcp.json.template`, whose paths are written relative to `${HOME}`. Setup
+expands it with this machine's home directory and then pins the launcher and
+port-file paths this run resolved, so a version bump stops with the paths the
+template needs rather than registering a stale launcher. `demo/CLAUDE.md` is
+the proof-style instruction file `claude` reads when started in that folder:
+MCP tools only, `open` before every edit, one admission per edit, structured
+Isar, `try0` allowed, sledgehammer and nitpick never. Interactive approval of
+the project server is pre-granted by `.claude/settings.json` at the repository
+root (`enabledMcpjsonServers`), because Claude Code resolves settings against
+the git root rather than the working directory. A **local**-scope `isabelle`
+server in `~/.claude.json` overrides `.mcp.json` silently; `claude mcp list`
+from `demo/` must show the `demo/.demo/` paths.
 
 Close the Demo window before re-running setup. To use an already built package,
 pass `--vsix dist/isabelle-revamp-0.1.0.vsix`. `demo/`'s theories are
@@ -317,12 +330,13 @@ Before walking on stage:
 
 - [ ] **DND on** in macOS; silence phone and calendar notifications.
 - [ ] Open the printed **Demo** command on `demo/`; no banners or popups.
-- [ ] Sidebars/activity bar hidden; source left, Goals above Graph right,
-      Terminal across the bottom.
+- [ ] **One `.thy` tab open** — the card being proved; `status` aggregates every
+      open theory tab. Source left, Goals above Graph right, Terminal at the bottom.
 - [ ] Sqrt2 checks, and the active card is restored to its intended skeleton
       (`git checkout demo/` after a rehearsal).
-- [ ] Claude is signed in and running in Terminal in `demo/`; `/mcp` shows
-      the Isabelle tools. The Ask view is disabled for this layout.
+- [ ] Claude is signed in, and **`claude` is already running** in a terminal
+      opened in `demo/`, with `/mcp` listing the isabelle server's 8 tools.
+      The Ask panel is not used; select the Terminal tab in the bottom panel.
 - [ ] **Replay tested** on the current rehearsal timeline.
 - [ ] **Backup video ready** and reachable without searching for a file.
 

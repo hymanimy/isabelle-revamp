@@ -1,7 +1,12 @@
 # The demo folder
 
-This folder is the thing you open on stage. It holds the theories and the
-workspace settings, nothing else — no extension source, no tests, no scripts.
+This folder is the thing you open on stage. It holds the theories, the
+workspace settings and the Claude Code configuration (`CLAUDE.md`,
+`.mcp.json.template`), nothing else — no extension source, no tests, no
+scripts. Opening it is all the configuration there is: VS Code picks up
+`.vscode/settings.json`, and `claude` started here picks up `.mcp.json` and
+`CLAUDE.md`.
+
 The storyboard is [docs/STORYBOARD.md](../docs/STORYBOARD.md); the beats and
 screenshot checks are [docs/DEMO.md](../docs/DEMO.md).
 
@@ -60,20 +65,65 @@ rather than here, and `bash scripts/demo-env.sh` writes them:
 - `isabelleRevamp.executable` — this machine's Isabelle, discovered by the
   script, deliberately never committed.
 
+There is no `isabelleRevamp.showAsk` setting in this extension version, and
+`isabelleRevamp.demoLayout` opens the Ask panel unconditionally
+(`extension/src/demoLayout.ts`). The demo does not use Ask, so the panel is
+left as an unfocused background tab: Demo Layout puts the panel at the bottom,
+and the pre-flight below selects the **Terminal** tab in it. Suppressing Ask
+altogether would need an extension change.
+
+## Claude Code
+
+`claude` started **in this folder** configures itself from two committed files:
+
+- `.mcp.json.template` — the project-scoped MCP registration, with paths
+  written relative to `${HOME}`. `bash scripts/demo-env.sh` expands it into the
+  gitignored `.mcp.json` with this machine's absolute paths, pinned to the
+  installed extension's bundled `mcp/launch.py` and to `demo/.demo/port`. If
+  the extension version changes, the script stops and prints the paths the
+  template needs.
+- `CLAUDE.md` — the proof-style instructions Claude Code reads on start: MCP
+  tools only, `open` before every edit, one `sorry` per edit, `errors` and
+  `status` after each, stop at `fully_checked`; structured Isar with named
+  `have` steps; `try0` allowed, sledgehammer and nitpick never.
+
+Check the registration from this folder:
+
+```sh
+claude mcp list        # isabelle, pointing at demo/.demo/{extensions,port}
+```
+
+Two things live **outside** this folder because Claude Code resolves them
+against the git root rather than the working directory:
+
+- `<repository>/.claude/settings.json` holds
+  `enabledMcpjsonServers: ["isabelle"]`, so interactive `claude` does not stop
+  on "pending approval" for the project server. `demo/.claude/settings.json`
+  carries the same key for the case where this folder is copied out of the
+  repository and is a project root in its own right.
+- A **local**-scope registration of a server also named `isabelle` in
+  `~/.claude.json` silently wins over `.mcp.json`. If `claude mcp list` shows
+  anything other than the `demo/.demo/` paths above, remove it:
+  `claude mcp remove isabelle -s local`.
+
 ## Pre-flight
 
 Before walking on stage:
 
 - [ ] **DND on** in macOS; silence phone and calendar notifications.
 - [ ] Open the printed **Demo** command on this folder; no banners or popups.
-- [ ] **Chat closed**; source visible, Ask and Proof Graph at the bottom.
-- [ ] **Only the card you are proving is open.** Ask stops on `status()`, which
+- [ ] **Exactly one `.thy` tab open** — the card you are proving. `status`
       aggregates every open theory tab, so a second unfinished theory (easy
       with `Cascade.thy` and `Demo.thy` in this folder) makes Claude finish the
       card and still report itself stuck. Close the other theory tabs.
+- [ ] Demo Layout has run: source above, Proof Graph and the panel below.
+      Select the **Terminal** tab in the bottom panel; Ask is never used.
+- [ ] **`claude` already started** in this folder in that terminal, at an empty
+      prompt, with `/mcp` showing the isabelle server and its 8 tools. Start it
+      before the audience arrives, not on stage.
 - [ ] `Sqrt2.thy` checks, and the active card is restored to its intended
       skeleton (`git checkout demo/` if a rehearsal left edits).
-- [ ] Claude is signed in; Ask can reach the demo's MCP bridge
-      (`demo/.demo/port`), and **Clear** the Ask transcript between rehearsals.
 - [ ] **Replay tested** on the current rehearsal timeline.
 - [ ] **Backup video ready** and reachable without searching for a file.
+
+Then the whole demo is typing `prove this` at the Claude prompt.
