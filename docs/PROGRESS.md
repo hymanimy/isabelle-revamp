@@ -78,3 +78,16 @@
 - **Next:** enable Code access for the visual check, or have Leo confirm that the
   open development window shows colored Isar and the ready line in **Output →
   Isabelle**. Then record M2 as passed and commit that milestone result.
+
+## 2026-10-17 — M2 visual retry: access still blocked
+
+- **Checked:** branch remains `leo`; retried the screen tool as requested. App
+  inventory confirms Code is running, but selecting it immediately returns
+  `Computer Use was not approved to use Code`. No visual acceptance evidence was
+  obtained, and no extension code changed.
+- **Discovered:** the tool explicitly forbids observing the Codex and Terminal
+  apps for safety reasons, so the agent cannot watch their approval dialogs.
+- **Would do differently:** distinguish an immediate access denial from a pending
+  approval; repeating the call does not establish that a prompt reached the user.
+- **Next:** ask Leo whether a Code approval prompt appeared on his side. M2's
+  visual check remains pending; M3 has not started.

@@ -136,6 +136,10 @@ should be.
 - **What happened.** M2 compiled and started Isabelle in a real stock VS Code
   Extension Development Host, but the UI tool returned the exact message
   `Computer Use was not approved to use Code` when asked to inspect the window.
+  Retrying at Leo's explicit request returned the same immediate denial. Attempts
+  to watch the approval dialog also returned `Computer Use is not allowed to use
+  the app 'com.openai.codex' for safety reasons.` and the same message for
+  `'com.apple.Terminal'`. The tool did not expose a pending approval to the agent.
 - **Experience.** The editor is running and its logs say the server is ready,
   yet the agent cannot verify what the mathematician actually sees.
 - **Fix needed.** Enable Code access for Computer Use, or complete the visual
