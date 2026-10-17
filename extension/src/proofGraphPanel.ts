@@ -1,67 +1,87 @@
 import { randomBytes } from 'node:crypto';
-import { commands, Disposable, Uri, ViewColumn, WebviewPanel, window } from 'vscode';
+import { commands, Disposable, Uri, ViewColumn, Webview, WebviewPanel, WebviewView, WebviewViewProvider, window } from 'vscode';
 import { GraphFrame, GraphState } from './graphTypes';
 
-export class ProofGraphPanel implements Disposable {
+// One renderer/model, hosted either in the bottom view or the optional editor tab.
+export class ProofGraphPanel implements Disposable, WebviewViewProvider {
   private panel?: WebviewPanel;
+  private view?: WebviewView;
   private state?: GraphState;
   private frames: GraphFrame[] = [];
+  private ready = new Set<Webview>();
+  private pending: unknown[] = [];
   private replies = new Map<number, (result: any) => void>();
   private sequence = 0;
-  private ready = false;
-  private pending: unknown[] = [];
-  get active(): boolean { return this.panel?.active === true; }
-  constructor(private extensionPath: string, private select: (uri: string, version: number, id: string) => Promise<void>) {}
-  show(): void {
-    if (this.panel) { this.panel.reveal(); return; }
+  get active(): boolean { return this.panel?.active === true || this.view?.visible === true; }
+  constructor(private extensionPath: string, private select: (uri: string, version: number, id: string) => Promise<void>,
+    private hover: (uri: string, version: number, id: string) => Promise<string>) {}
+  resolveWebviewView(view: WebviewView): void {
+    this.view = view; this.prepare(view.webview);
+    view.onDidDispose(() => { this.ready.delete(view.webview); this.view = undefined; });
+  }
+  show(column?: ViewColumn): void {
+    if (column !== undefined) { this.openEditor(column); return; }
+    void commands.executeCommand('isabelleRevamp.proofGraph.focus');
+    void commands.executeCommand('workbench.action.closeSidebar');
+  }
+  openEditor(column = ViewColumn.Beside): void {
+    if (this.panel) { this.panel.reveal(column); return; }
+    const panel = this.panel = window.createWebviewPanel('isabelleRevamp.proofGraph', 'Isabelle Proof Graph', column,
+      { enableScripts: true, retainContextWhenHidden: true });
+    this.prepare(panel.webview);
+    panel.onDidDispose(() => { this.ready.delete(panel.webview); this.panel = undefined; });
+  }
+  private prepare(webview: Webview): void {
     const media = Uri.joinPath(Uri.file(this.extensionPath), 'media');
-    const panel = this.panel = window.createWebviewPanel('isabelleRevamp.proofGraph', 'Isabelle Proof Graph',
-      ViewColumn.Beside, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media] });
-    panel.onDidDispose(() => { this.panel = undefined; this.ready = false; this.pending = []; for (const reply of this.replies.values()) reply({ error: 'Graph closed' }); this.replies.clear(); });
-    panel.webview.onDidReceiveMessage(message => {
+    webview.options = { enableScripts: true, localResourceRoots: [media] };
+    webview.onDidReceiveMessage(message => {
       if (message?.type === 'ready') {
-        this.ready = true; this.publish();
-        for (const message of this.pending) void panel.webview.postMessage(message);
+        this.ready.add(webview); this.publish();
+        for (const request of this.pending) void webview.postMessage(request);
         this.pending = [];
+      } else if (message?.type === 'select' && typeof message.id === 'string') void this.select(message.uri, message.version, message.id);
+      else if (message?.type === 'hover' && typeof message.id === 'string') {
+        void this.hover(message.uri, message.version, message.id).then(text => webview.postMessage({ type: 'hover', id: message.id, uri: message.uri, version: message.version, text }));
       }
-      else if (message?.type === 'select' && typeof message.id === 'string') void this.select(message.uri, message.version, message.id);
-      else if (message?.type === 'fullscreen') void this.fullscreen();
-      else if (message?.type === 'replay') void panel.webview.postMessage({ type: 'replay', frames: this.frames });
+      else if (message?.type === 'fullscreen') this.openEditor();
+      else if (message?.type === 'replay') void webview.postMessage({ type: 'replay', frames: this.frames });
       else if (message?.type === 'receipt' && Number.isSafeInteger(message.request)) {
         this.replies.get(message.request)?.(message.result); this.replies.delete(message.request);
       }
     });
     const nonce = randomBytes(16).toString('hex');
-    const script = panel.webview.asWebviewUri(Uri.joinPath(media, 'proofGraph.js'));
-    const style = panel.webview.asWebviewUri(Uri.joinPath(media, 'proofGraph.css'));
-    panel.webview.html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource}; script-src 'nonce-${nonce}'">
+    const script = webview.asWebviewUri(Uri.joinPath(media, 'proofGraph.js'));
+    const style = webview.asWebviewUri(Uri.joinPath(media, 'proofGraph.css'));
+    webview.html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'">
 <meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${style}"></head>
-<body><header><div><h1>Isabelle Proof Graph</h1><p id="status" role="status">Open a theory to follow its proof.</p></div>
-<nav><button id="fit">Fit</button><button id="replay">Replay ×8</button><button id="fullscreen">Full screen</button></nav></header>
+<body><header><p id="status" role="status">Open a theory to follow its proof.</p>
+<nav><button id="fit">Fit</button><button id="replay">Replay ×8</button><button id="fullscreen">Open in editor column</button></nav></header>
 <main><svg id="graph" aria-label="Proof dependencies" role="img"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z"/></marker></defs><g id="viewport"><g id="containers"></g><g id="edges"></g><g id="nodes"></g></g></svg></main>
-<footer>Open <span class="key open"></span> · Checking <span class="key checking"></span> · Proved <span class="key proved"></span> · Error <span class="key error"></span> · Drag to pan · Scroll to zoom</footer>
 <script nonce="${nonce}" src="${script}"></script></body></html>`;
   }
   async fullscreen(): Promise<void> {
-    this.panel?.reveal();
-    // This is an editor tab, so maximizing the terminal/panel would maximize
-    // the wrong surface. Maximize its editor group and hide the sidebars.
+    this.openEditor();
     await commands.executeCommand('workbench.action.maximizeEditorHideSidebar');
   }
   update(state: GraphState, frames: GraphFrame[]): void { this.state = state; this.frames = frames; this.publish(); }
-  private publish(): void { if (this.panel && this.state) void this.panel.webview.postMessage({ type: 'state', state: this.state }); }
-  // The host check asks the real offline webview for rendering/timing receipts.
+  private publish(): void {
+    if (this.state) for (const webview of this.ready) void webview.postMessage({ type: 'state', state: this.state });
+  }
   inspect(action: 'snapshot' | 'benchmark' | 'replay'): Promise<any> {
-    this.show();
+    const target = this.panel?.active ? this.panel.webview : this.view?.webview;
+    if (!target) this.show();
     const request = ++this.sequence;
     return new Promise((resolve, reject) => {
       const limit = action === 'replay' ? Math.max(30000, (this.frames.at(-1)?.at ?? 0) / 8 + 15000) : 30000;
       const timeout = setTimeout(() => { this.replies.delete(request); reject(new Error('Proof Graph webview did not reply')); }, limit);
       this.replies.set(request, value => { clearTimeout(timeout); resolve(value); });
       const message = { type: 'inspect', action, request, frames: action === 'replay' ? this.frames : undefined };
-      if (this.ready) void this.panel!.webview.postMessage(message); else this.pending.push(message);
+      if (target && this.ready.has(target)) void target.postMessage(message); else this.pending.push(message);
     });
   }
-  dispose(): void { this.panel?.dispose(); }
+  dispose(): void {
+    this.panel?.dispose(); this.ready.clear();
+    for (const reply of this.replies.values()) reply({ error: 'Graph closed' }); this.replies.clear();
+  }
 }

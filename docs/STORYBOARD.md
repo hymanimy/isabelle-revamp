@@ -12,10 +12,10 @@ The demo is a story with one surprising beat. Everything on screen serves beat 3
 ## Beat 3 screen layout (fixed for the demo)
 
 - Editor: centre, the theory file, Unicode rendering on.
-- Proof Graph: right-hand editor column, full height.
-- Isabelle Goals: right sidebar above the graph, or hidden if space is short.
+- Proof Graph: bottom panel beside Ask by default (M12 amendment). Use **Open in editor column** for the full-height stage moment.
+- Isabelle Goals: hidden by default when the graph opens; hover tiles for their statements and live goal text.
 - Ask Isabelle + Claude transcript: **bottom panel** (where Terminal/Output live), not the sidebar. One line of input, streaming transcript beneath it.
-- Status bar: `N/M proved · T s · kernel-checked ✓` on the right.
+- Status bar: `Theory · N/M proved · T s · kernel ✓` on the right.
 
 ## Theorem card for judges
 

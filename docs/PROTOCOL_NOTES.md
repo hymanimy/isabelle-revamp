@@ -836,3 +836,43 @@ These are test-process flags, not extension or global settings. Logical fold
 completion uses a coalesced timer, and replay catches up overdue frames without
 waiting on a separate throttled zero-delay timer for each one. The production
 extension keeps normal OS background behavior.
+
+## M12 named-step amendment: line anchors and read-only goal previews
+
+The graph now projects source structure onto the theorem/lemma and explicitly
+named outer `have`, `show`, and `obtain` commands. `obtain x :: nat where fact:`
+is named by `fact`, never by its typed witness `x`. Nested proof commands and
+unnamed chains affect their enclosing node's status, with dependencies projected
+onto named owners. `proof_graph` adds one-based `line` while retaining zero-based
+UTF-16 `range`; it uses exactly the ids displayed by the webview.
+
+Live goal-preview experiment (stock Isabelle2025-2, `check_m12.sh`):
+
+1. Pause the existing Goals panel with notification
+   `PIDE/state_auto_update`, `{"id":<panel id>,"enabled":false}`.
+2. Send `PIDE/caret_update` with the hovered node's existing ASCII coordinates,
+   then request `PIDE/state_init`, `{}`. Its response is `{"state_id":<id>}`.
+3. Pin the new panel with `PIDE/state_auto_update`,
+   `{"id":<new id>,"enabled":false}`. Keep the temporary server caret until
+   its tagged output arrives: restoring it before output races the dispatcher.
+4. Read `PIDE/state_output` for that new id, convert its HTML to plain text, then
+   release it with `PIDE/state_exit`, `{"id":<new id>}`. Restore the live caret
+   and resume the existing panel with `enabled:true`.
+
+The reduction tile returned its actual one-subgoal state including `coprime`;
+the editor selection, source, document version, and original Goals text stayed
+unchanged. Preview setup and ordinary goal queries share a short serialization
+queue. Preview replies never certify a document version. Results are cached
+only for that document version and node. Reference: distribution
+`src/Tools/VSCode/src/state_panel.scala` and `lsp.scala` (`State_Auto_Update`).
+
+## M13 bottom panel
+
+`contributes.viewsContainers.panel` hosts Ask (`isabelleRevamp.ask`) and the
+amended graph (`isabelleRevamp.proofGraph`) together. The editor-tab renderer
+remains available through **Open in editor column**; both surfaces receive the
+same model and recorded timeline. Demo Layout uses existing VS Code commands
+`workbench.action.joinAllGroups`, `workbench.action.positionPanelBottom`,
+`workbench.action.alignPanelJustify`, `workbench.action.closeSidebar`, and
+`workbench.action.closeAuxiliaryBar`. It preserves source tabs and unsaved text.
+No global configuration or proposed VS Code API is needed.

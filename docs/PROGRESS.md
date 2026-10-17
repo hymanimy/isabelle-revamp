@@ -575,3 +575,38 @@
   of the remaining timing outlier has not been established. This acceptance
   item is carried forward with the real-Claude limitation under the explicit
   instruction to commit current M12 work before continuing.
+
+## M12 amendment and M13 — named, anchored graph beside bottom Ask
+
+- **Changed:** deterministic theorem/lemma plus explicitly named outer
+  have/show/obtain nodes; nested and unnamed commands contribute to the owning
+  tile's status. Swarm has seven nodes and Sqrt2 thirteen (the final conclusion
+  is now named `contradiction`, and the theory kernel-checks). Cascade's original
+  nested proof now projects to four named obligations plus its root.
+- **Layout:** bottom-panel Ask and Proof Graph share one container; the graph
+  has 96×30 tiles, one-line header, offline Dagre ranksep 24/nodesep 12, and
+  auto-fit. Open in editor column remains explicit. Demo Layout hides the
+  sidebar, preserves source tabs/text, enables symbol display, and optionally
+  shows Goals. The right status bar mirrors counts/time/kernel status; time
+  freezes when the document finishes checking.
+- **Anchors:** tiles and MCP expose the same one-based line labels and named
+  ids; ranges remain zero-based UTF-16. Click highlights the line for one second,
+  cursor movement focuses/reveals its tile, and gutter dots share its status.
+  Hover fetches an actual pinned goal without changing the source cursor or
+  the live Goals text. Preview output never certifies checking status.
+- **Passed:** M3–M8 and mandatory M10 regressions, live FastMCP graph/line
+  comparisons, Sqrt2 CLI kernel check, named-node/900×220 fit checks, bottom Ask
+  visibility beside Graph, repeated Demo Layout, status/frozen clock, cursor
+  reveal of a folded node, and actual-webview reference completion/replay.
+  The hover/cursor/source preservation check passed against Isabelle2025-2.
+  The amended 200-node test measured zero missed frames with no status-only
+  Dagre layouts; receipts are under `.dev-host/`.
+- **Discovered:** an obtain's typed witness (`k :: nat`) is not its fact name;
+  its `where numerator:` binding is. An unnamed final show can keep the root
+  open after every named child is green. VS Code preserves the old group
+  orientation after joining editors, so Demo Layout sets one group explicitly.
+- **Would do differently:** define named-outline semantics before animation,
+  and test the small bottom viewport first. The prior live Claude limitation
+  remains for forthcoming card runs. Screen access remains refused; these are
+  live API/webview receipts, not claimed screenshots. M13b will isolate the
+  demonstration profile before the remaining false-claim/card rehearsals.

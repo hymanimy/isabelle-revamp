@@ -4,6 +4,8 @@ import { commands, ConfigurationTarget, env, ExtensionContext, TabInputText, Uri
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
+import { AskView } from './askView';
+import { demoLayout, ProofStatus } from './demoLayout';
 import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
 import { loadSymbols, unicodeSymbols } from './symbols';
@@ -30,34 +32,36 @@ let ask: Ask | undefined;
 export async function activate(context: ExtensionContext) {
   const output = window.createOutputChannel('Isabelle', { log: true });
   const view = new GoalsView();
+  const askView = new AskView();
   let theoryEditor = window.activeTextEditor;
   const visibleTheory = () => theoryEditor && !theoryEditor.document.isClosed && window.tabGroups.all.some(group =>
     group.tabs.some(tab => tab.input instanceof TabInputText && tab.input.uri.toString() === theoryEditor!.document.uri.toString()))
     ? theoryEditor : undefined;
   const serverRoot = existsSync(resolve(context.extensionPath, 'src/extension.ts'))
     ? resolve(context.extensionPath, '..') : context.extensionPath;
-  ask = new Ask(serverRoot, state => view.updateAsk(state));
+  ask = new Ask(serverRoot, state => askView.update(state));
   const sendAsk = async (text: string) => {
     const editor = visibleTheory();
     const folder = editor && workspace.getWorkspaceFolder(editor.document.uri);
     if (!editor || editor.document.isClosed || editor.document.languageId !== 'isabelle' || !folder) {
       ask?.notice('Open a theory in this workspace before asking Isabelle.');
-      view.updateAsk(ask!.snapshot()); return false;
+      askView.update(ask!.snapshot()); return false;
     }
     if (!bridge) { ask?.notice('Locate Isabelle, then reload the window to start checking.'); return false; }
     return ask!.send({ file: editor.document.uri.fsPath, line: editor.selection.active.line + 1,
       cwd: folder.uri.fsPath, portFile: bridge.portFile }, text);
   };
-  view.onAsk = text => { void sendAsk(text); };
-  view.onStop = () => ask?.stop();
+  askView.onAsk = text => { void sendAsk(text); };
+  askView.onStop = () => ask?.stop();
   context.subscriptions.push(output,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
+    window.registerWebviewViewProvider('isabelleRevamp.ask', askView, { webviewOptions: { retainContextWhenHidden: true } }),
     commands.registerCommand('isabelleRevamp.showGoals', () =>
       commands.executeCommand('isabelleRevamp.goals.focus')),
     commands.registerCommand('isabelleRevamp.ask', async () => {
-      view.focusAsk();
-      await commands.executeCommand('isabelleRevamp.goals.focus');
-      view.focusAsk();
+      askView.focus();
+      await commands.executeCommand('isabelleRevamp.ask.focus');
+      askView.focus();
     }));
 
   const locate = () => findIsabelle(workspace.getConfiguration('isabelleRevamp').get<string>('executable', 'isabelle'));
@@ -145,8 +149,12 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(semanticColors);
   const swarm = new Swarm(goals);
   const graph = new ProofGraph(goals, context.extensionPath);
+  const proofStatus = new ProofStatus(graph);
   context.subscriptions.push(swarm,
+    proofStatus,
+    commands.registerCommand('isabelleRevamp.demoLayout', () => demoLayout(visibleTheory(), graph)),
     graph,
+    window.registerWebviewViewProvider('isabelleRevamp.proofGraph', graph.panel, { webviewOptions: { retainContextWhenHidden: true } }),
     window.registerWebviewViewProvider('isabelleRevamp.swarm', swarm.view),
     commands.registerCommand('isabelleRevamp.showProofGraph', () => graph.show()),
     commands.registerCommand('isabelleRevamp.showSwarm', () => commands.executeCommand('isabelleRevamp.swarm.focus')));
@@ -196,6 +204,10 @@ export async function activate(context: ExtensionContext) {
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
     getProofGraph: () => graph.snapshot(),
+    getGraphAnchors: () => graph.anchors.snapshot(),
+    hoverProofNode: (uri: string, version: number, id: string) => graph.hover(uri, version, id),
+    getProofStatus: () => proofStatus.snapshot(),
+    getAskView: () => askView.snapshot(),
     inspectProofGraph: (action: 'snapshot' | 'benchmark' | 'replay') => graph.panel.inspect(action),
     fullscreenProofGraph: () => graph.panel.fullscreen(),
     selectProofNode: (uri: string, version: number, id: string) => graph.select(uri, version, id),

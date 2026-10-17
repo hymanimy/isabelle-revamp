@@ -47,18 +47,25 @@ async function run() {
     editor = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One });
     const position = doc.positionAt(leaf.start); editor.selection = new vscode.Selection(position, position);
     const start = Date.now();
-    assert(await editor.edit(edit => edit.replace(new vscode.Range(doc.positionAt(leaf.finish.start), doc.positionAt(leaf.end)), text)));
+    assert(await editor.edit(edit => edit.replace(new vscode.Range(doc.positionAt(leaf.start), doc.positionAt(leaf.end)), text)));
     await doc.save();
     await vscode.commands.executeCommand('isabelleRevamp.showProofGraph');
     return start;
   }
   await vscode.commands.executeCommand('isabelleRevamp.showProofGraph');
-  await until('Cascade has 52 kernel-annotated nodes and 38 open leaves', () => graph().complete && graph().total === 52
+  await until('Cascade has five named obligations with four open leaves', () => graph().complete && graph().total === 5
     && leaves.every(leaf => node(leaf.id)?.status === 'open'));
   assert.equal(graph().proved, 0);
-  let view = await rendered(view => view.dashed.length === 52);
-  assert.equal(view.nodes.length, 52); assert.equal(view.dashed.length, 52);
-  assert(view.containers >= 10 && view.edges > 30, JSON.stringify(view)); receipts.push({ check: 'open graph', view, model: graph() });
+  let view = await rendered(view => view.dashed.length === 5);
+  assert.equal(view.nodes.length, 5); assert.equal(view.dashed.length, 5);
+  assert(view.containers === 1 && view.edges >= 4, JSON.stringify(view)); receipts.push({ check: 'open graph', view, model: graph() });
+  const beforeHover = { text: doc.getText(), version: doc.version, selection: editor.selection, goal: api.getGoalState().text };
+  const preview = await api.hoverProofNode(graph().uri, graph().version, leaves[0].id);
+  assert(preview.includes('goal (1 subgoal)') && preview.includes('coprime'), preview);
+  assert.deepEqual(editor.selection, beforeHover.selection); assert.equal(doc.version, beforeHover.version);
+  assert.equal(doc.getText(), beforeHover.text);
+  await pause(300); assert.equal(api.getGoalState().text, beforeHover.goal, 'Preview must restore the main goal caret');
+  receipts.push({ check: 'pinned goal hover, unchanged cursor/source/live goal', preview });
   if (process.env.M12_BENCH_ONLY) {
     await api.fullscreenProofGraph();
     const result = await api.inspectProofGraph('benchmark');
@@ -66,22 +73,34 @@ async function run() {
     assert.equal(result.droppedFrames, 0, JSON.stringify(result));
     console.log('PASS: focused 200-node benchmark'); return;
   }
-  const leaf = leaves[0], proof = solution.slice(leaf.finish.start, leaf.end);
+  const leaf = leaves[0], proof = solution.slice(leaf.start, leaf.end);
   const start = await replaceLeaf(leaf.id, proof);
   await until('hand proof turns leaf green within two seconds', () => node(leaf.id)?.status === 'proved', 2000);
   view = await rendered(view => view.statuses[leaf.id] === 'proved');
   assert(Date.now() - start < 2000, 'The rendered leaf must also turn green within two seconds');
   assert(view.pulseCount > 0 && view.edgePulseCount > 0);
   receipts.push({ check: 'hand proof pulse', milliseconds: Date.now() - start, view });
-  await replaceLeaf(leaf.id, 'by (rule TrueI)');
+  await replaceLeaf(leaf.id, leaf.statement + '\n    by (rule TrueI)');
   await until('wrong tactic turns leaf red', () => node(leaf.id)?.status === 'error');
   await pause(2000); view = await api.inspectProofGraph('snapshot'); assert(view.nodes.includes(leaf.id), 'Red must not fold');
-  await replaceLeaf(leaf.id, 'sorry');
+  const original = proofStructure(skeleton).nodes.find(n => n.id === leaf.id);
+  await replaceLeaf(leaf.id, skeleton.slice(original.start, original.end));
   await until('restored leaf is open', () => node(leaf.id)?.status === 'open');
   const target = node(leaves[3].id), old = graph();
   await api.selectProofNode(old.uri, old.version - 1, target.id);
   await api.selectProofNode(old.uri, old.version, target.id);
   assert.equal(vscode.window.activeTextEditor.selection.active.line, target.range[0]);
+  assert.equal(target.line, target.range[0] + 1);
+  assert.equal(api.getGraphAnchors().highlightLine, target.line);
+  view = await rendered(view => view.focused.includes(target.id));
+  assert.equal(view.labels[target.id], 'L' + target.line);
+  assert.deepEqual(api.getGraphAnchors().dots, graph().nodes.map(n => ({ id: n.id, line: n.line, status: n.status })));
+  await pause(1050); assert.equal(api.getGraphAnchors().highlightLine, undefined);
+  editor = vscode.window.activeTextEditor;
+  editor.selection = new vscode.Selection(leaf.range?.[0] ?? doc.positionAt(original.start).line, 4, doc.positionAt(original.start).line, 4);
+  await rendered(view => view.focused.includes(leaf.id));
+  assert.equal(vscode.window.tabGroups.all.length, 1, 'The default graph must not open an editor column');
+  receipts.push({ check: 'two-way source anchors, gutter dots and one-second line flash', anchors: api.getGraphAnchors(), view });
   await vscode.commands.executeCommand('isabelleRevamp.showProofGraph');
 
   if (process.env.M12_LIVE) {
@@ -112,7 +131,7 @@ async function run() {
       await until('Ask fills the tree and kernel checks the theorem', () => graph().fully_checked, 30000);
       assert(observed.some(item => item.graph.nodes.some(node => node.agent === 'Claude')));
       assert(observed.some(item => item.ask.entries.some(entry => entry.kind === 'tool' && entry.text === 'proof_graph Cascade.thy')));
-      assert(edits.length >= 38 && edits.every(edit => edit.leaf && edit.dependencies?.every(node => node.status === 'proved')),
+      assert(edits.length >= 4 && edits.every(edit => edit.leaf && edit.dependencies?.every(node => node.status === 'proved')),
         'Each MCP edit must target one dependency-ready leaf: ' + JSON.stringify(edits));
       assert.deepEqual(graph().nodes.map(node => node.id), reference.nodes.map(node => node.id));
       receipts.push({ check: 'real Claude bottom-up proof', transcript: api.getAskState(), graph: graph(), edits });
@@ -123,8 +142,16 @@ async function run() {
     }
   } else {
     for (const leaf of leaves) {
-      await replaceLeaf(leaf.id, solution.slice(leaf.finish.start, leaf.end));
+      await replaceLeaf(leaf.id, solution.slice(leaf.start, leaf.end));
       await until('reference leaf ' + leaf.name, () => node(leaf.id)?.status === 'proved');
+    }
+    // The unnamed final show is owned by the root, not a separate tile.
+    const tail = doc.getText().lastIndexOf('sorry');
+    if (tail >= 0) {
+      editor = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One });
+      editor.selection = new vscode.Selection(doc.positionAt(tail), doc.positionAt(tail));
+      assert(await editor.edit(edit => edit.replace(new vscode.Range(doc.positionAt(tail), doc.positionAt(tail + 5)), 'by blast')));
+      await doc.save(); await vscode.commands.executeCommand('isabelleRevamp.showProofGraph');
     }
     await until('reference leaves kernel check the full tree', () => graph().fully_checked);
   }

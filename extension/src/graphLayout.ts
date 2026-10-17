@@ -17,8 +17,7 @@ export function graphLayout(state: GraphState, hidden: Set<string>): GraphLayout
     const parent = node.parent && byId.has(node.parent) ? node.parent : null;
     children.set(parent, [...(children.get(parent) ?? []), node]);
   }
-  const compact = state.total > 60, width = compact ? 108 : 150, height = compact ? 36 : 48;
-  const gap = compact ? 20 : 30, padding = 18;
+  const width = 96, height = 30, gap = 24, padding = 8;
   function subtree(node: GraphNode): GraphLayout {
     const descendants = children.get(node.id) ?? [];
     if (!descendants.length) {
@@ -37,7 +36,7 @@ export function graphLayout(state: GraphState, hidden: Set<string>): GraphLayout
   }
   function siblings(nodes: GraphNode[]): GraphLayout {
     if (!nodes.length) return { nodes: [], containers: [], width: 0, height: 0 };
-    const graph = new graphlib.Graph().setGraph({ rankdir: 'TB', nodesep: gap, ranksep: gap, marginx: 0, marginy: 0 });
+    const graph = new graphlib.Graph().setGraph({ rankdir: 'TB', nodesep: 12, ranksep: 24, marginx: 0, marginy: 0 });
     graph.setDefaultEdgeLabel(() => ({}));
     const pieces = new Map(nodes.map(node => [node.id, subtree(node)]));
     for (const [id, piece] of pieces) graph.setNode(id, { width: piece.width, height: piece.height });
@@ -73,4 +72,9 @@ export function edgePath(from: Box, to: Box): string {
   const y1 = from.y + (upward ? 0 : from.height), y2 = to.y + (upward ? to.height : 0);
   const middle = (y1 + y2) / 2;
   return `M${x1},${y1} V${middle} H${x2} V${y2}`;
+}
+
+export function fitGraph(layout: Pick<GraphLayout, 'width' | 'height'>, width: number, height: number) {
+  const scale = Math.max(.001, Math.min(1, (width - 16) / Math.max(layout.width, 1), (height - 16) / Math.max(layout.height, 1)));
+  return { scale, tx: (width - layout.width * scale) / 2, ty: (height - layout.height * scale) / 2 };
 }

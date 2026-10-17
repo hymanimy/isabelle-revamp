@@ -21,7 +21,10 @@
     "onCommand:isabelleRevamp.showGoals",
     "onCommand:isabelleRevamp.showSwarm",
     "onCommand:isabelleRevamp.setupCheck",
-    "onCommand:isabelleRevamp.showProofGraph"
+    "onCommand:isabelleRevamp.showProofGraph",
+    "onView:isabelleRevamp.ask",
+    "onCommand:isabelleRevamp.demoLayout",
+    "onView:isabelleRevamp.proofGraph"
   ],
   "scripts": {
     "compile": "tsc -p . && node build-webview.cjs",
@@ -40,6 +43,18 @@
         {
           "id": "isabelleRevamp.swarm",
           "name": "Isabelle Swarm",
+          "type": "webview"
+        }
+      ],
+      "isabelle-revamp-ask": [
+        {
+          "id": "isabelleRevamp.ask",
+          "name": "Ask Isabelle",
+          "type": "webview"
+        },
+        {
+          "id": "isabelleRevamp.proofGraph",
+          "name": "Proof Graph",
           "type": "webview"
         }
       ]
@@ -73,6 +88,10 @@
       {
         "command": "isabelleRevamp.showProofGraph",
         "title": "Isabelle: Show Proof Graph"
+      },
+      {
+        "command": "isabelleRevamp.demoLayout",
+        "title": "Isabelle: Demo Layout"
       }
     ],
     "languages": [
@@ -126,6 +145,12 @@
           "default": false,
           "scope": "resource",
           "description": "Save recognised Isabelle symbols as Unicode. Off by default: completions and saved source use ASCII Isabelle spellings."
+        },
+        "isabelleRevamp.demoShowGoals": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also show the Goals sidebar in Demo Layout. Off leaves more space for the proof graph.",
+          "scope": "window"
         }
       }
     },
@@ -185,7 +210,16 @@
           ]
         }
       }
-    ]
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "isabelle-revamp-ask",
+          "title": "Isabelle",
+          "icon": "media/ask.svg"
+        }
+      ]
+    }
   },
   "dependencies": {
     "@dagrejs/dagre": "3.1.1",

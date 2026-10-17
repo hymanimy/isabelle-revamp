@@ -83,7 +83,7 @@ export function proofSteps(source: string, cursor: number): ProofStep[] {
     if (steps.has(word)) {
       closeRange(token.start);
       const rest = source.slice(token.end);
-      const name = /^\s*([\p{L}_][\p{L}\p{N}_'.]*)(?:\s*\[[^\]]*\])?\s*:/u.exec(rest)?.[1];
+      const name = /^\s*([\p{L}_][\p{L}\p{N}_'.]*)(?:\s*\[[^\]]*\])?\s*:(?!:)/u.exec(rest)?.[1];
       const statement = tokens[i + 1]?.quoted ? tokens[i + 1].text.slice(1, -1) : rest.split('\n')[0].trim();
       card = { id: `${theorem}:${cards.length}`, command: word, label: name ?? (statement || word).slice(0, 40),
         start: token.start, commandEnd: token.end, end: source.length,
@@ -107,7 +107,7 @@ export interface ProofStructure { nodes: ProofNode[]; edges: ProofEdge[] }
 // The graph is a source-level explanation, not a kernel dependency certificate.
 // Its colours are supplied separately by current-version PIDE annotations.
 export function proofStructure(source: string): ProofStructure {
-  type Node = ProofNode & { own: Token[]; previous?: string; implicit: boolean };
+  type Node = ProofNode & { own: Token[]; previous?: string; implicit: boolean; displayed: boolean };
   type Frame = { owner: Node; current?: Node; caseNode?: Node; prefix: Token[]; brace?: boolean };
   const nodes: Node[] = [], frames: Frame[] = [];
   const tokens = isarTokens(source);
@@ -124,16 +124,25 @@ export function proofStructure(source: string): ProofStructure {
   }
   function create(token: Token, index: number, parent?: Node, previous?: Node, prefix: Token[] = []): Node {
     const rest = source.slice(token.end);
-    const named = /^\s*([\p{L}_][\p{L}\p{N}_'.]*)(?:\s*\[[^\]]*\])?\s*:/u.exec(rest)?.[1];
+    // Obtain names its facts after `where`, rather than naming the witnesses.
+    const headerEnd = tokens.findIndex((item, at) => at > index
+      && !item.quoted && ['proof', 'by', 'sorry', 'qed'].includes(item.text));
+    const header = tokens.slice(index + 1, headerEnd < 0 ? tokens.length : headerEnd);
+    const directName = /^\s*([\p{L}_][\p{L}\p{N}_'.]*)(?:\s*\[[^\]]*\])?\s*:(?!:)/u.exec(rest)?.[1];
+    const where = header.findIndex(item => !item.quoted && item.text === 'where');
+    const named = directName ?? (token.text === 'obtain' && where >= 0 && header[where + 2]?.text === ':'
+      ? header[where + 1]?.text : undefined);
     const caseName = token.text === 'case' ? /^\s*\(?\s*([\p{L}_][\p{L}\p{N}_'.]*)/u.exec(rest)?.[1] : undefined;
     const statement = tokens[index + 1]?.quoted ? tokens[index + 1].text.slice(1, -1) : rest.split('\n')[0].trim();
-    const name = named ?? caseName ?? (statement || token.text).slice(0, 40);
+    const name = named ?? caseName ?? token.text;
     const key = (parent ? parent.id + '/' : '') + (named ?? caseName ?? token.text);
     const count = occurrences.get(key) ?? 0; occurrences.set(key, count + 1);
     const node: Node = { id: key + (count ? '#' + count : ''), name, label: name, command: token.text,
       statement, start: token.start, commandEnd: token.end, end: source.length, parent: parent?.id,
       closed: ['case', 'also', 'finally'].includes(token.text), abandoned: false,
       own: [...prefix, token], previous: previous?.id,
+      displayed: !parent || Boolean(named && ['have', 'show', 'obtain'].includes(token.text)
+        && frames.filter(frame => !frame.brace).length === 2),
       implicit: ['hence', 'thus', 'also', 'finally'].includes(token.text) || prefix.some(item => ['then', 'with'].includes(item.text)) };
     nodes.push(node); return node;
   }
@@ -147,7 +156,7 @@ export function proofStructure(source: string): ProofStructure {
       if (word === ')' || word === ']') brackets--;
       continue;
     }
-    if (theorems.has(word)) {
+    if (['theorem', 'lemma'].includes(word)) {
       for (const open of frames) { finishFrame(open, token.start); close(open.owner, token.start); }
       frames.length = 0;
       const root = create(token, i);
@@ -247,5 +256,28 @@ export function proofStructure(source: string): ProofStructure {
       ?? Math.min(node.end, source.indexOf('\n', node.start) < 0 ? source.length : source.indexOf('\n', node.start));
     node.statement = source.slice(node.start, headerEnd).trim();
   }
-  return { nodes: nodes.map(({ own, previous, implicit, ...node }) => node), edges: [...edges.values()] };
+  // Project structural commands onto the explicitly named outer obligations.
+  // Nested proof commands remain in their owner's source range/status, never
+  // become tiles. Unnamed chains forward their dependencies, not made-up names.
+  const owner = (node: Node): Node => node.displayed || !node.parent ? node : owner(byId.get(node.parent)!);
+  const sources = (id: string, seen = new Set<string>()): string[] => {
+    if (seen.has(id)) return [];
+    seen.add(id);
+    const node = byId.get(id)!;
+    if (node.displayed) return [id];
+    const enclosing = owner(node);
+    if (enclosing.parent) return [enclosing.id];
+    return [...edges.values()].filter(edge => edge.to === id && edge.kind !== 'nesting')
+      .flatMap(edge => sources(edge.from, new Set(seen)));
+  };
+  const projected = new Map<string, ProofEdge>();
+  for (const edge of edges.values()) {
+    const target = owner(byId.get(edge.to)!).id;
+    for (const from of sources(edge.from)) if (from !== target) {
+      projected.set(from + '\0' + target, { ...edge, from, to: target });
+    }
+  }
+  return { nodes: nodes.filter(node => node.displayed).map(({ own, previous, implicit, displayed, ...node }) => ({
+    ...node, parent: node.parent ? owner(byId.get(node.parent)!).id : undefined,
+  })), edges: [...projected.values()] };
 }

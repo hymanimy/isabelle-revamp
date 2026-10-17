@@ -229,47 +229,44 @@ are ignored by git.
 
 ## Proof Graph (M12)
 
-1. Open `examples/Cascade.thy` and run **Isabelle: Show Proof Graph**. It opens
-   beside the source; from the theory header it selects the theorem. Wait for
-   checking to settle: 52 nodes including the root, 38 leaf obligations, all
-   grey dashed and `0/52 proved`. Capture the soft nested containers and arrows.
-   **Full screen** maximizes the editor group and hides the sidebar. **Fit**,
-   drag-to-pan and scroll-to-zoom keep larger trees navigable. The compact Swarm
-   remains under **Isabelle: Show Swarm**.
-2. Click `denominator_nonzero`, then replace its `sorry` with `by simp` (its
-   `using denominator` stays). Capture the green node and pulsing outgoing edge;
-   accepted children fold after 1.5 seconds plus the fade. Change that method to
-   `by (rule TrueI)`: the node becomes red and stays visible. Undo to `sorry`.
-   Hover a node for its complete statement; click to follow the editor/Goals.
-3. Run **Isabelle: Ask** and enter: **Prove this theorem. Query proof_graph and
-   work bottom-up, one leaf sorry per edit. Preserve the named steps and nested
-   proof structure.** Return focus to the graph tab. Watch Claude tags, streamed
-   tool calls in Goals, green pulses and folding into the parent. The Ask
-   preamble requires dependency-ready leaves, errors/status checks and no
-   Sledgehammer. The reference is committed as `Cascade_solution.thy` but hidden
-   from the demo Explorer/search; it is not supplied to the agent.
-4. At completion only the large theorem root remains: **proved · 51 steps ·
-   kernel-checked ✓ · T s**, with `52/52 proved` in the header. Capture this.
-   `status()` must also say fully checked. Source remains ASCII. Cascade states
-   the rational-square-root claim as `b > 0`, `a² = n·b²` ⇒ `∃k. n = k²` over
-   naturals because `Main` deliberately excludes real numbers.
-5. Press **Replay ×8**. Capture the same open-to-proved flow and final root.
-   Replay uses recorded timestamps and does not edit or ask the prover anything.
-   Reduced-motion settings suppress pulse/fade animations. Restore the skeleton
-   with editor Undo for another demonstration; the automated check uses a
-   disposable copy and never changes the committed demo.
+The M12 named-step amendment supersedes the earlier 52-tile recursive display.
+The underlying Cascade proof still has all its commands; it now displays five
+named obligations. Named steps inside a nested proof belong to its outer tile.
 
-Run `bash scripts/check_m12.sh` for the reference kernel check, M3–M8/M10
-regressions, dependency parser, real-webview transitions/replay and the 200-node
-SVG timing check. `M12_ONLY=1` runs just the new checks during development;
-`M12_LIVE=1` substitutes an actual Claude Ask run for reference leaf edits.
-Timing receipts are written under ignored `.dev-host/m12-results.json`.
-Direct screen capture remains unavailable: the screen tool again returned
-“Computer Use was not approved to use Code”. These are screenshot-able steps,
-not a claim that the screen was inspected.
+1. Open `examples/Swarm.thy`; run **Isabelle: Demo Layout**. Source stays in one
+   editor column. **Isabelle** at the bottom contains Ask and Proof Graph side
+   by side, while the sidebar is hidden. Capture seven grey dashed nodes,
+   each labelled with its name and `L<number>`. The one-line graph header and
+   right status bar agree. Sqrt2 has thirteen nodes; its final show is explicitly
+   named `contradiction`. For a tall graph, use **Open in editor column**, then
+   **Fit**. Drag pans; scroll zooms. Layout always fits the available bounds.
+2. Hover `base` for its statement and live goal text (the source cursor stays put), click it and capture the cursor on its source
+   line, the one-second line highlight, the focus ring and the grey gutter dot.
+   Move the cursor into another named step: its tile acquires the focus ring.
+   Replace the `base` admission with `by simp`; capture its green dot/tile and
+   pulse, then its delayed fold. Use `by (rule TrueI)` instead: it stays red.
+   Restore the admission after the demonstration. Source coordinates remain
+   zero-based UTF-16 in MCP ranges; tile/MCP `line` labels are one-based.
+3. In `Cascade.thy`, filling only an inner admission does **not** turn its owning
+   named obligation green. All inner commands must be accepted first. Four
+   named steps plus the root remain the same nodes when nested proof formatting
+   or inner names change. The unnamed final show belongs to the root.
+4. **Isabelle: Ask** focuses the bottom input. Enter sends, Shift+Enter adds a
+   newline, Stop interrupts, and the streaming transcript stays below the input.
+   Ask uses the same MCP bridge and named graph, one ready obligation per edit.
+   **Isabelle: Demo Layout** is repeatable; `isabelleRevamp.demoShowGoals=true`
+   also exposes Goals. The compact Swarm sidebar remains available separately.
+5. After all commands check, capture the single large proved root, the kernel
+   mark, and frozen elapsed time. **Replay ×8** repeats recorded states without
+   changing source or calling Isabelle. Reduced motion disables CSS animation.
 
-M12 acceptance status at its commit: reference filling, red/green transitions,
-folding, replay and existing regressions passed. The real Claude attempt stalled
-before any edit and was stopped. The final 200-node run recorded one missed
-frame out of 194, so the strict timing assertion still fails on that run; it
-has not been weakened. See PROGRESS.md for the carried-forward acceptance items.
+`bash scripts/check_m12.sh` checks the reference theory, named parser, M3–M8/M10
+regressions, live colours/navigation/folding/replay and the 200-node SVG timing
+benchmark. `bash scripts/check_m13.sh` checks the bottom Ask/layout/status bar.
+`M12_ONLY=1` / `M13_ONLY=1` run focused checks. Receipts live in ignored
+`.dev-host/`. Direct screen inspection remains unavailable because the screen
+tool refused Code access; the steps above are screenshot-able checks, not a
+claim that screenshots were taken.
+
+The earlier M12 commit's live Claude run stalled before editing; it is not a
+successful AI rehearsal. Card runs will record live success/failure separately.

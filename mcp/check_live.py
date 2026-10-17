@@ -82,6 +82,7 @@ async def main():
         assert (await call('errors', file=str(FILE)))['errors'] == []
         await receipt('sorry positions are exact', sorry)
         graph = await call('proof_graph', file=str(FILE))
+        assert all(node['line'] == node['range'][0] + 1 for node in graph['nodes'])
         assert graph['complete'] and not graph['fully_checked'], graph
         assert len(graph['nodes']) == 1 and graph['nodes'][0]['status'] == 'open', graph
         assert graph['nodes'][0]['parent'] is None
@@ -98,6 +99,7 @@ async def main():
         await receipt('sidebar matches MCP goals', goal)
 
         graph = await call('proof_graph', file=str(FILE))
+        assert all(node['line'] == node['range'][0] + 1 for node in graph['nodes'])
         assert graph['fully_checked'] and graph['nodes'] and graph['edges'], graph
         assert all(node['status'] == 'proved' for node in graph['nodes']), graph
         assert any(node['parent'] is not None for node in graph['nodes'])

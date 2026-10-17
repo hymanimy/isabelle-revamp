@@ -670,3 +670,37 @@ should be.
   outside advice, in the Ask preamble. Keep the failed run explicit; it is not
   an AI-proof acceptance pass. Further live acceptance belongs with the planned
   card runs. The observation does not establish why the model paused.
+
+## 54. Recursive syntax makes a graph much larger than the mathematician's outline (M12 amendment)
+
+- **What happened:** the original Cascade renderer exposed 52 command nodes,
+  including unnamed conclusions, cases and inner proof scaffolding.
+- **Experience:** a compact panel became a map of syntax rather than a stable
+  outline the author and agent could identify by name and line.
+- **Fix needed:** display only explicit named outer obligations plus the theorem.
+  Nested proofs stay inside their owner's status/range; typed `obtain` witnesses
+  must not be mistaken for fact names. Swarm now has seven nodes and Sqrt2 has
+  thirteen, with its final conclusion explicitly named `contradiction`.
+
+## 55. A goal preview shares the server's global caret (M12 amendment)
+
+- **What happened:** `PIDE/state_init` has no source-position parameter; it reads
+  the server's current caret, and panels auto-update by default.
+- **Experience:** a naive tile hover would replace the user's live goal or move
+  their source cursor just to inspect another obligation.
+- **Fix needed:** serialize query setup, pause the live panel, pin a temporary
+  built-in state panel at the hovered command, restore the live caret, and
+  release the preview after its tagged reply. Restoring the server caret before
+  that reply raced the dispatcher and once returned the root goal instead of
+  the hovered reduction goal; restoration must wait for output. Live checks verify unchanged
+  source, selection and original goal text. Preview data cannot certify status.
+
+## 56. Editor-column graphs compete with the proof source (M13)
+
+- **What happened:** the original default opened another editor group for every
+  graph, while Ask occupied the Goals sidebar.
+- **Experience:** a narrow window hid the proof behind a large graph and made
+  the input hard to find during a live demonstration.
+- **Fix needed:** put Ask and the compact graph together in the bottom panel,
+  hide Goals by default, and keep the full-height editor graph as an explicit
+  button. Demo Layout restores this arrangement without changing source files.

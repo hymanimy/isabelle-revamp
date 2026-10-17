@@ -148,7 +148,7 @@ async def processing_status() -> dict:
 
 @mcp.tool(annotations=READ)
 async def proof_graph(file: str) -> dict:
-    """Return proof nodes (id, name, status, range, parent) and directed edges from the same model as the Proof Graph tab. complete=false means annotations are provisional. Pick an open leaf with proved dependencies; one step per edit."""
+    """Return named proof nodes (id, name, line, status, range, parent) and directed edges from the same model as the Proof Graph view. line is one-based; range uses zero-based UTF-16 coordinates. Nested proof commands contribute to their enclosing named step. complete=false means annotations are provisional. Pick an open leaf with proved dependencies; one step per edit."""
     return await bridge.request('proof_graph', file=file)
 
 

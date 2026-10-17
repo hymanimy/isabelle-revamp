@@ -1,11 +1,14 @@
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { goalsHtml, GoalsView } = require('../out/goalsView');
+const { askHtml, AskView } = require('../out/askView');
 exports.checkAskView = async function () {
   const state = { phase: 'ready', text: 'goal', errors: [], theory: 'Demo' };
-  const html = goalsHtml(state, 'asknonce');
+  const html = askHtml('asknonce');
   assert(html.includes("script-src 'nonce-asknonce'"));
-  assert(html.indexOf('id="prompt"') < html.indexOf('<header>'));
+  assert(html.includes('rows="1"'));
+  assert(html.indexOf('id="prompt"') < html.indexOf('id="transcript"'));
+  assert(!goalsHtml(state).includes('id="prompt"'));
   class Element {
     constructor() { this.children = []; this.dataset = {}; this.events = {}; this.textContent = ''; this.value = ''; this.disabled = false; this.scrollTop = 0; this.scrollHeight = 0; this.clientHeight = 100; }
     append(child) { this.children.push(child); }
@@ -21,7 +24,7 @@ exports.checkAskView = async function () {
     acquireVsCodeApi: () => ({ postMessage: value => messages.push(value), getState: () => saved, setState: value => { saved = value; } }),
   });
   assert.equal(elements.prompt.value, 'unsent draft');
-  receive({ data: { type: 'goal', goal: { theory: 'Demo', status: 'checking…', phase: 'checking', text: '', errors: '' } } });
+  receive({ data: { type: 'askState', state: { active: false, entries: [] } } });
   assert.equal(elements.prompt.value, 'unsent draft');
   assert.equal(elements.goal.textContent, '');
   const enter = shiftKey => ({ key: 'Enter', shiftKey, preventDefault() { this.prevented = true; } });
@@ -45,32 +48,40 @@ exports.checkAskView = async function () {
   receive({ data: { type: 'askState', state: { active: false, entries: [{ id: 1, kind: 'assistant', text: 'done' }] } } });
   assert(!elements.prompt.disabled && elements.stop.disabled && elements.prompt.focused);
   let inbound, dispose; const posted = [];
-  const view = new GoalsView(); let asked, stopped = false;
+  const view = new AskView(); let asked, stopped = false;
   view.onAsk = text => { asked = text; }; view.onStop = () => { stopped = true; };
-  view.focusAsk();
+  view.focus();
   const fake = { webview: { onDidReceiveMessage(fn) { inbound = fn; return { dispose() {} }; },
     postMessage(value) { posted.push(value); return Promise.resolve(true); } }, onDidDispose(fn) { dispose = fn; } };
-  view.update(state); view.updateAsk({ active: false, entries: [{ id: 1, kind: 'user', text: 'earlier' }] });
+  view.update({ active: false, entries: [{ id: 1, kind: 'user', text: 'earlier' }] });
   view.resolveWebviewView(fake); const initialHtml = fake.webview.html;
   inbound({ type: 'ready' });
   assert(posted.some(m => m.type === 'focus'));
   assert(posted.some(m => m.type === 'askState' && m.state.entries[0].text === 'earlier'));
   inbound({ type: 'ask', text: 'prove this' }); inbound({ type: 'stop' });
   assert.equal(asked, 'prove this'); assert(stopped);
-  view.update({ ...state, text: 'updated' });
-  assert.equal(fake.webview.html, initialHtml, 'Goal updates must not reload the webview');
+  view.update({ active: false, entries: [{ id: 1, kind: 'user', text: 'earlier' }] });
+  assert.equal(fake.webview.html, initialHtml, 'Transcript updates must not reload the webview');
   dispose(); view.resolveWebviewView(fake); inbound({ type: 'ready' });
   assert(posted.findLast(message => message.type === 'askState').state.entries[0].text === 'earlier');
+  const goals = new GoalsView();
+  goals.resolveWebviewView(fake);
+  const goalScript = goalsHtml(state, 'goalnonce').match(/<script nonce="goalnonce">([\s\S]+)<\/script>/)[1];
+  vm.runInNewContext(goalScript, {
+    document: { getElementById: id => elements[id], querySelector: key => elements[key], body: { classList: { toggle() {} } } },
+    window: { addEventListener: (_, callback) => { receive = callback; } },
+    acquireVsCodeApi: () => ({ postMessage: value => messages.push(value) }),
+  });
   let opened, hovered;
-  view.onNavigate = async link => { opened = link; };
-  view.onHover = async link => { hovered = link; return 'editor hover'; };
-  view.update({ ...state, html:'<a href="file:/tmp/Target.thy#3">target</a>' });
-  const current = view.linkSnapshot();
-  await view.followLink(0,current.revision-1);assert.equal(opened,undefined);
-  await view.followLink(0,current.revision);assert.equal(opened.line,2);
-  assert.equal(await view.hoverLink(0,current.revision),'editor hover');
-  view.update({ ...state, phase:'checking',html:'<a href="file:/tmp/Target.thy#3">target</a>' });
-  assert.equal(view.linkSnapshot().links.length,0);
+  goals.onNavigate = async link => { opened = link; };
+  goals.onHover = async link => { hovered = link; return 'editor hover'; };
+  goals.update({ ...state, html:'<a href="file:/tmp/Target.thy#3">target</a>' });
+  const current = goals.linkSnapshot();
+  await goals.followLink(0,current.revision-1);assert.equal(opened,undefined);
+  await goals.followLink(0,current.revision);assert.equal(opened.line,2);
+  assert.equal(await goals.hoverLink(0,current.revision),'editor hover');
+  goals.update({ ...state, phase:'checking',html:'<a href="file:/tmp/Target.thy#3">target</a>' });
+  assert.equal(goals.linkSnapshot().links.length,0);
   // Actual inline script: only modified clicks navigate; hover asks the host.
   const anchor={ classList:['isabelle-entity','isabelle-link-0'],closest(){return this;},title:'' };
   elements.goal.contains=()=>true;elements.goal.querySelector=()=>anchor;

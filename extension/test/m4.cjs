@@ -81,8 +81,9 @@ exports.run = async function () {
     assert(!goalsHtml(api.getGoalState()).includes('Proof error'));
 
     // Keep a genuine sorry and add a separate failed command: errors still win.
-    const broken = unfinished.replace('  then show False\n    sorry',
-      '  have bad: False by (rule TrueI)\n  then show False\n    sorry');
+    const broken = unfinished.replace('  then show contradiction: False\n    sorry',
+      '  have bad: False by (rule TrueI)\n  then show contradiction: False\n    sorry');
+    assert.notEqual(broken, unfinished, 'The error control must actually insert a wrong tactic');
     await replace(broken);
     await lastStep();
     await until('real error takes precedence over sorry', () => api.getGoalState().phase === 'error'

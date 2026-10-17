@@ -115,7 +115,7 @@ Explorer/search through workspace settings.
 
 With Claude Code installed, signed in and registered using [mcp/README.md](mcp/README.md),
 open `examples/Demo.thy` and run **Isabelle: Ask**. Type **prove this** and press
-Enter. Claude fills the three named proof steps through MCP while the Goals and
+Enter in the bottom Ask panel. Claude fills the three named proof steps through MCP while the Goals and
 Swarm panels update. Ask **why does this fail?** to inspect an actual diagnostic.
 Shift+Enter adds a line; Stop cancels the child process. The session transcript
 appends, and requests stop automatically after ten minutes.
@@ -126,24 +126,31 @@ streaming, Stop, missing-tool help, webview behavior and earlier regressions.
 requests with your configured account/model, temporarily editing and restoring
 `Demo.thy`. Ask uses only the installed Claude Code CLI and the MCP tools.
 
-## Full-screen Proof Graph (M12)
+## Proof Graph and demo layout (M12–M13)
 
-Open `examples/Cascade.thy`, then run **Isabelle: Show Proof Graph**. The editor
-tab shows nested proof obligations and fact dependencies; the compact Swarm
-sidebar remains available. Use **Full screen**, **Fit**, drag to pan and scroll
-to zoom. Grey dashed nodes are open, amber is checking, green is proved, and red
-is an error or an abandoned proof. Accepted subtrees fold into their parent;
-**Replay ×8** plays the recorded timeline without changing the proof.
+Run **Isabelle: Demo Layout** with a theory open. Source stays in the editor;
+Ask and Proof Graph share the bottom panel. The right status bar mirrors the
+proof counts/time and opens the graph when clicked. Goals is hidden by default;
+`isabelleRevamp.demoShowGoals` can expose it for the demo.
 
-Cascade has 52 nodes, including the theorem, and 38 open leaf proofs across
-three nested levels. It proves the rational-square-root claim using natural
-numerator/denominator witnesses so it needs only `Main`. The zero-sorry reference
-is `examples/Cascade_solution.thy`. See [the graph demo](docs/DEMO.md#proof-graph-m12).
+Only the theorem/lemma and named outer `have`/`show`/`obtain` steps get tiles.
+Nested proof commands contribute to their owner's status. Swarm has seven
+nodes, Sqrt2 thirteen, and Cascade five; names and line numbers match MCP
+`proof_graph`. Hover for the statement and actual goal, click for a one-second
+source highlight; cursor movement focuses the corresponding tile. Gutter dots
+show the same status. Open is grey/dashed, checking amber, proved green and
+error/abandoned red. Accepted steps fold into their parent.
 
-`bash scripts/check_m12.sh` runs the reference kernel check, existing regressions,
-real webview transitions/replay and a 200-node animation timing check.
-`M12_LIVE=1 bash scripts/check_m12.sh` additionally uses your signed-in Claude
-Code account to fill a disposable skeleton through Ask and MCP.
+**Open in editor column** provides the full-height view. **Fit**, pan/zoom and
+**Replay ×8** work on both surfaces; replay never changes source or calls Isabelle.
+Cascade proves the rational-square-root claim over natural numerator/denominator
+witnesses, importing only `Main`; its full reference is `Cascade_solution.thy`.
+See [the graph demo](docs/DEMO.md#proof-graph-m12).
+
+`bash scripts/check_m12.sh` checks the reference, regressions, live graph and
+200-node animation timing. `bash scripts/check_m13.sh` checks bottom layout,
+Ask controls and status. Real Claude rehearsal is separate from these checks;
+the first Cascade attempt stalled and is recorded in PROGRESS.md.
 
 ## Run the goal probe
 

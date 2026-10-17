@@ -80,7 +80,7 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 | `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag for all open theory tabs. |
 | `sorry_positions(file)` | Returns server-marked `[start_line,start_col,end_line,end_col]` ranges and a `complete` flag. Comments and strings containing the word are ignored. |
 | `processing_status()` | Returns per-file `known`, `processed`, `processing`, version, and pending ranges; the top-level `processing` flag is true if any open theory is pending. |
-| `proof_graph(file)` | Returns recursive nodes (`id`, `name`, `status`, UTF-16 `range`, `parent`), dependency edges (`from`, `to`, `kind`), `complete`, `fully_checked`, counts and document version. Read-only; it does not move the cursor. |
+| `proof_graph(file)` | Returns named outer steps (`id`, `name`, one-based `line`, `status`, zero-based UTF-16 `range`, `parent`), dependency edges (`from`, `to`, `kind`), `complete`, `fully_checked`, counts and document version. Read-only; it does not move the cursor. |
 
 `sorry_positions` and `processing_status` follow the purposes of I/Q's `get_sorry_positions` and
 `get_processing_status`, read before implementation in the
@@ -94,8 +94,11 @@ I/Q's file argument. We do not load I/Q or modify Isabelle.
    `have` command. Blank lines, the final `end`, and a completed top-level `by`
    tactic need not return a proof state. The sidebar follows this same cursor.
 2. Query `proof_graph`: choose an `open` leaf whose incoming dependencies are
-   `proved`. Parent links represent nested proofs; a `case` supplies assumptions
-   to its children. Replace one leaf per edit, then repeat. `sorry_positions`
+   `proved`. The theorem and explicitly named outer `have`/`show`/`obtain`
+   steps are nodes. Nested commands and unnamed steps belong to their nearest
+   named enclosing step; they affect its status, not its node count. A leaf here
+   means no remaining open child (the root may still own an unnamed final show).
+   Replace one named obligation per edit, then repeat. `sorry_positions`
    supplies the exact admitted command ranges. If `complete` is false, obtain
    a goal for that document version and poll `processing_status`.
 3. Read `open` again, recompute the range, and submit an edit. Then poll

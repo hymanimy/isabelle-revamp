@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { proofStructure } = require('../out/isarSteps');
-const { graphLayout } = require('../out/graphLayout');
+const { graphLayout, fitGraph } = require('../out/graphLayout');
 
 function dag(graph) {
   const visiting = new Set(), finished = new Set();
@@ -58,32 +58,38 @@ end`;
 const graph = proofStructure(source);
 function edge(from, to) { assert(graph.edges.some(edge => edge.from === from && edge.to === to), `${from} -> ${to}`); }
 edge('graph/A', 'graph/B'); edge('graph/B', 'graph/C'); edge('graph/A', 'graph/D'); edge('graph/C', 'graph/D');
-edge('graph/nested/A', 'graph/nested/E'); edge('graph/nested/E', 'graph/nested/show');
-edge('graph/nested/show', 'graph/nested'); edge('graph/nested', 'graph/F'); edge('graph/A', 'graph/F'); edge('graph/C', 'graph/F');
+edge('graph/nested', 'graph/F'); edge('graph/A', 'graph/F'); edge('graph/C', 'graph/F');
+assert(!graph.nodes.some(node => node.id.startsWith('graph/nested/')));
 assert(!graph.edges.some(edge => edge.from === 'graph/nested/E' && edge.to === 'graph/G'));
-assert(graph.nodes.some(node => node.id === 'cases/True/leaf' && node.parent === 'cases/True'));
+assert(graph.nodes.some(node => node.id === 'cases/True/leaf' && node.parent === 'cases'));
 assert(graph.nodes.filter(node => node.abandoned).map(node => node.id).includes('abandoned/broken'));
-assert(!graph.nodes.some(node => node.name === 'fake'));
-edge('witnesses/obtain', 'witnesses/used'); edge('graph', 'witnesses/used');
+assert(!graph.nodes.some(node => node.name === 'fake' || ['also', 'finally', 'case'].includes(node.command)));
+edge('witnesses/witness', 'witnesses/used'); edge('graph', 'witnesses/used');
+assert.deepEqual(proofStructure(source), proofStructure(source), 'Parsing is deterministic');
+const variation = source.replace('have E: True', 'have renamed_inside: True');
+assert.deepEqual(proofStructure(variation).nodes.map(n => n.id), graph.nodes.map(n => n.id), 'Nested naming cannot create or rename tiles');
 dag(graph);
+for (const [file, count] of [['Swarm', 7], ['Sqrt2', 13]]) {
+  const parsed = proofStructure(fs.readFileSync(path.resolve(__dirname, `../../examples/${file}.thy`), 'utf8'));
+  assert.equal(parsed.nodes.length, count, file);
+  const layout = graphLayout({ ...parsed, total: count, nodes: parsed.nodes.map(node => ({ ...node, parent: node.parent ?? null })) }, new Set());
+  assert(layout.nodes.every(box => box.width === 96 && box.height === 30));
+  const fit = fitGraph(layout, 900, 190); // 220px panel minus the single 30px header.
+  assert(fit.tx >= 7.999 && fit.ty >= 7.999 && fit.tx + layout.width * fit.scale <= 892.001
+    && fit.ty + layout.height * fit.scale <= 182.001, file + ': 900x220 panel must need no scrolling');
+  assert(parsed.nodes.every(n => !n.parent || ['have', 'show', 'obtain'].includes(n.command)));
+}
+const typedWitness = proofStructure('lemma a: True proof - obtain x :: nat where witness: "x=0" by simp show ?thesis by simp qed');
+assert.equal(typedWitness.nodes[1].name, 'witness', 'A typed variable is not a fact name');
 
 const fixture = fs.readFileSync(path.resolve(__dirname, '../../examples/Cascade_solution.thy'), 'utf8');
 const tree = proofStructure(fixture);
-assert(tree.nodes.length >= 40, tree.nodes.length);
+assert.equal(tree.nodes.length, 5, 'Nested Cascade commands fold into four named obligations');
 const byId = new Map(tree.nodes.map(node => [node.id, node]));
-const depth = node => node.parent ? 1 + depth(byId.get(node.parent)) : 0;
-assert(Math.max(...tree.nodes.map(depth)) >= 3);
 const leaves = tree.nodes.filter(node => !tree.nodes.some(child => child.parent === node.id));
-assert(leaves.length >= 25);
+assert.equal(leaves.length, 4);
 const skeleton = fs.readFileSync(path.resolve(__dirname, '../../examples/Cascade.thy'), 'utf8');
-let filled = skeleton;
-const openLeaves = proofStructure(skeleton).nodes.filter(node => leaves.some(leaf => leaf.id === node.id));
-for (const node of openLeaves.reverse()) {
-  const leaf = leaves.find(leaf => leaf.id === node.id);
-  filled = filled.slice(0, node.finish.start) + fixture.slice(leaf.finish.start, leaf.end) + filled.slice(node.end);
-}
-assert.equal(filled.replace('theory Cascade\n', 'theory Cascade_solution\n'), fixture,
-  'Each reference method must replace one sorry without changing its fact context');
+assert.deepEqual(proofStructure(skeleton).nodes.map(n => n.id), tree.nodes.map(n => n.id));
 dag(tree);
 const state = { ...tree, total: tree.nodes.length, nodes: tree.nodes.map(node => ({ ...node, parent: node.parent ?? null })) };
 const layout = graphLayout(state, new Set());

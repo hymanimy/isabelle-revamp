@@ -46,7 +46,7 @@ proof
     using numerator_even denominator_even by simp
   have impossible: "(2 :: nat) dvd 1"
     using common_factor reduced by simp
-  then show False
+  then show contradiction: False
     by simp
 qed
 

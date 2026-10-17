@@ -1,5 +1,6 @@
-import { edgePath, graphLayout, GraphLayout } from './graphLayout';
+import { edgePath, graphLayout, GraphLayout, fitGraph } from './graphLayout';
 import type { GraphFrame, GraphNode, GraphState } from './graphTypes';
+import { graphSummary } from './graphTypes';
 
 declare function acquireVsCodeApi(): { postMessage(value: unknown): void };
 const host = acquireVsCodeApi(), ns = 'http://www.w3.org/2000/svg';
@@ -7,7 +8,6 @@ const svg = document.getElementById('graph') as unknown as SVGSVGElement;
 const viewport = document.getElementById('viewport')!;
 const layers = { nodes: document.getElementById('nodes')!, edges: document.getElementById('edges')!, containers: document.getElementById('containers')! };
 const status = document.getElementById('status')!;
-const title = document.querySelector('h1')!;
 const elements = new Map<string, SVGGElement>(), edges = new Map<string, SVGPathElement>();
 const painted = new Map<string, string>(), located = new Map<string, string>();
 const hidden = new Set<string>(), folding = new Map<string, ReturnType<typeof setTimeout>>();
@@ -15,6 +15,7 @@ const pulsed = new Set<string>(), fades = new Set<string>();
 let state: GraphState | undefined, live: GraphState | undefined, topology = '', layoutKey = '';
 let positions: GraphLayout = { nodes: [], containers: [], width: 1, height: 1 };
 let expanded: GraphLayout = positions;
+let inspected: string | undefined;
 let scale = 1, tx = 0, ty = 0, scheduled = false, speed = 1, playing = false, generation = 0;
 let layoutCount = 0, pulseCount = 0, edgePulseCount = 0, foldCount = 0;
 const pause = (milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds));
@@ -28,8 +29,7 @@ function element<K extends keyof SVGElementTagNameMap>(tag: K, attributes: Recor
 function transform(): void { viewport.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`); }
 function fit(): void {
   const bounds = svg.getBoundingClientRect();
-  scale = Math.min(1.5, (bounds.width - 50) / Math.max(positions.width, 1), (bounds.height - 50) / Math.max(positions.height, 1));
-  scale = Math.max(.03, scale); tx = (bounds.width - positions.width * scale) / 2; ty = (bounds.height - positions.height * scale) / 2;
+  ({ scale, tx, ty } = fitGraph(positions, bounds.width, bounds.height));
   transform();
 }
 function reset(): void {
@@ -64,6 +64,7 @@ function accepted(): void {
   for (const node of state.nodes) {
     if (node.status !== 'proved' || hidden.has(node.id) || children(node.id).some(child => !hidden.has(child.id))) continue;
     pulse(node.id);
+    if (node.id === inspected || node.id === state.focused && !state.fully_checked) continue;
     if (!node.parent || folding.has(node.id)) continue;
     folding.set(node.id, setTimeout(() => {
       const current = state?.nodes.find(item => item.id === node.id);
@@ -91,6 +92,8 @@ function foldedCount(id: string, byId: Map<string, GraphNode>): number {
 }
 function render(next: GraphState): void {
   if (state && state.uri !== next.uri) reset();
+  const focusChanged = state?.focused !== next.focused;
+  if (focusChanged) inspected = state?.fully_checked && next.fully_checked ? next.focused : undefined;
   state = next;
   const byId = new Map(next.nodes.map(node => [node.id, node]));
   const key = JSON.stringify([next.uri, next.nodes.map(node => [node.id, node.parent])]);
@@ -101,9 +104,9 @@ function render(next: GraphState): void {
     expanded = graphLayout(next, new Set()); layoutCount++;
   }
   for (const node of next.nodes) {
-    if (['open', 'error', 'abandoned'].includes(node.status)) {
+    if (node.status !== 'proved' || focusChanged && node.id === next.focused) {
       let id: string | null = node.id;
-      while (id) { hidden.delete(id); pulsed.delete(id); id = byId.get(id)?.parent ?? null; }
+      while (id) { hidden.delete(id); if (node.status !== 'proved') pulsed.delete(id); id = byId.get(id)?.parent ?? null; }
       const timer = folding.get(node.id); if (timer) clearTimeout(timer);
       folding.delete(node.id); fades.delete(node.id);
     }
@@ -143,19 +146,19 @@ function render(next: GraphState): void {
       item.setAttribute('transform', `translate(${box.x} ${box.y})`);
       const rect = item.querySelector('rect')!; rect.setAttribute('width', String(box.width)); rect.setAttribute('height', String(box.height));
       for (const text of item.querySelectorAll('text')) text.setAttribute('x', String(box.width / 2));
-      item.querySelector('.name')!.setAttribute('y', String(box.height / 2 - 2));
-      item.querySelector('.detail')!.setAttribute('y', String(box.height / 2 + 14));
+      item.querySelector('.name')!.setAttribute('y', String(box.height / 2 - (finished ? 2 : 3)));
+      item.querySelector('.detail')!.setAttribute('y', String(box.height / 2 + (finished ? 14 : 9)));
     }
     const count = foldedCount(node.id, byId);
-    const paint = JSON.stringify([node.status, node.name, node.statement, node.agent, count, fades.has(node.id), finished, finished && next.elapsed]);
+    const paint = JSON.stringify([node.status, node.line, next.focused === node.id, node.name, node.statement, node.agent, count, fades.has(node.id), finished, finished && next.elapsed]);
     if (painted.get(node.id) === paint) continue;
     painted.set(node.id, paint);
-    item.setAttribute('class', `node ${node.status}${pulsed.has(node.id) && item.classList.contains('pulse') ? ' pulse' : ''}${fades.has(node.id) ? ' fading' : ''}${finished ? ' finished' : ''}`);
+    item.setAttribute('class', `node ${node.status}${pulsed.has(node.id) && item.classList.contains('pulse') ? ' pulse' : ''}${fades.has(node.id) ? ' fading' : ''}${finished ? ' finished' : ''}${next.focused === node.id ? ' focused' : ''}`);
     item.querySelector('title')!.textContent = `${node.statement}\n${node.status}${node.agent ? ' · ' + node.agent : ''}`;
-    item.querySelector('.name')!.textContent = finished ? 'proved' : node.name.length > 21 ? node.name.slice(0, 20) + '…' : node.name;
+    item.querySelector('.name')!.textContent = finished ? 'proved' : node.name.length > 14 ? node.name.slice(0, 13) + '…' : node.name;
     item.querySelector('.detail')!.textContent = finished
       ? `${count} steps · kernel-checked ✓ · ${(next.elapsed / 1000).toFixed(1)} s`
-      : `${node.status}${count ? ' · +' + count : ''}${node.agent ? ' · ' + node.agent : ''}`;
+      : `L${node.line}${count ? ' · +' + count : ''}`;
   }
   const boxes = new Map(positions.nodes.map(box => [box.id, box])), wanted = new Set<string>();
   for (const edge of next.edges) {
@@ -168,15 +171,17 @@ function render(next: GraphState): void {
     if (path.getAttribute('d') !== geometry) path.setAttribute('d', geometry);
   }
   for (const [id, item] of edges) if (!wanted.has(id)) { item.remove(); edges.delete(id); }
-  title.textContent = next.theory + (playing ? ' · Replay ×8' : '');
-  status.textContent = `${next.proved}/${next.total} proved · ${(next.elapsed / 1000).toFixed(1)} s${next.fully_checked ? ' · kernel-checked ✓' : next.complete ? '' : ' · checking…'}`;
-  if (newTopology || finished && changed) fit();
+  status.textContent = graphSummary(next) + (playing ? ' · Replay ×8' : '');
+  if (changed) fit();
   accepted();
 }
 function snapshot() {
   return { nodes: [...elements.keys()], hidden: [...hidden], statuses: Object.fromEntries(state?.nodes.map(node => [node.id, node.status]) ?? []),
     dashed: [...elements].filter(([, item]) => item.classList.contains('open')).map(([id]) => id),
     containers: positions.containers.length, edges: edges.size, layoutCount, pulseCount, edgePulseCount, foldCount,
+    focused: [...elements].filter(([, item]) => item.classList.contains('focused')).map(([id]) => id),
+    bounds: { width: svg.clientWidth, height: svg.clientHeight, scale, tx, ty, graphWidth: positions.width, graphHeight: positions.height },
+    labels: Object.fromEntries([...elements].map(([id, item]) => [id, item.querySelector('.detail')!.textContent])),
     header: status.textContent, rootText: layers.nodes.textContent, playing, visible: document.visibilityState };
 }
 async function replay(frames: GraphFrame[]): Promise<ReturnType<typeof snapshot>> {
@@ -200,7 +205,7 @@ async function replay(frames: GraphFrame[]): Promise<ReturnType<typeof snapshot>
 async function benchmark() {
   const saved = live, current = ++generation; playing = true; speed = 1; reset();
   const nodes: GraphNode[] = Array.from({ length: 200 }, (_, i) => ({ id: 'mock-' + i, name: i ? 'step_' + i : 'Mock theorem', statement: 'Synthetic proof step ' + i,
-    command: i ? 'have' : 'theorem', parent: i ? 'mock-0' : null, range: [i, 0, i, 4], status: 'open' }));
+    line: i + 1, command: i ? 'have' : 'theorem', parent: i ? 'mock-0' : null, range: [i, 0, i, 4], status: 'open' }));
   const mock: GraphState = { uri: 'mock', file: 'mock', version: 1, theory: '200-node animation check', nodes,
     edges: nodes.slice(1).map(node => ({ from: node.id, to: 'mock-0', kind: 'nesting' })), complete: true,
     fully_checked: false, proved: 0, total: 200, elapsed: 0 };
@@ -235,6 +240,12 @@ function select(event: Event): void {
   if (node) host.postMessage({ type: 'select', uri: state.uri, version: state.version, id: node.dataset.id });
 }
 svg.addEventListener('click', select);
+svg.addEventListener('mouseover', event => {
+  const node = (event.target as Element).closest<SVGGElement>('.node');
+  if (node && state && !playing && !(event.relatedTarget instanceof Node && node.contains(event.relatedTarget))) {
+    host.postMessage({ type: 'hover', uri: state.uri, version: state.version, id: node.dataset.id });
+  }
+});
 svg.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(event); } });
 let drag: { x: number; y: number; tx: number; ty: number } | undefined;
 svg.addEventListener('pointerdown', event => {
@@ -252,6 +263,10 @@ window.addEventListener('resize', fit);
 window.addEventListener('message', event => {
   const message = event.data;
   if (message.type === 'state') { live = message.state; if (!playing) render(message.state); }
+  else if (message.type === 'hover' && state && state.uri === message.uri && state.version === message.version) {
+    const node = state.nodes.find(node => node.id === message.id);
+    if (node) elements.get(node.id)?.querySelector('title')?.replaceChildren(document.createTextNode(node.statement + '\n\n' + message.text));
+  }
   else if (message.type === 'replay') void replay(message.frames);
   else if (message.type === 'inspect') {
     const result = message.action === 'benchmark' ? benchmark() : message.action === 'replay' ? replay(message.frames) : Promise.resolve(snapshot());

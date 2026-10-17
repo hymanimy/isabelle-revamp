@@ -3,12 +3,11 @@
 body { margin: 0; height: 100vh; display: flex; flex-direction: column;
   color: var(--vscode-editor-foreground); background: var(--vscode-editor-background);
   font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); }
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 18px; border-bottom: 1px solid var(--vscode-panel-border); }
-h1 { margin: 0; font-size: 16px; font-weight: 600; }
-#status { margin: 5px 0 0; color: var(--vscode-descriptionForeground); }
-nav { display: flex; gap: 6px; flex-wrap: wrap; }
-button { padding: 6px 10px; font: inherit; color: var(--vscode-button-foreground);
+header { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 30px; flex: none; padding: 3px 8px; border-bottom: 1px solid var(--vscode-panel-border); }
+#status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+nav { display: flex; gap: 4px; flex: none; }
+button { padding: 3px 5px; font: inherit; font-size: 10px; white-space: nowrap; color: var(--vscode-button-foreground);
   background: var(--vscode-button-background); border: 0; border-radius: 3px; cursor: pointer; }
 button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
 main { flex: 1; min-height: 0; overflow: hidden; }
@@ -24,14 +23,14 @@ footer { padding: 8px 18px; color: var(--vscode-descriptionForeground); border-t
 .tile { transform-box: fill-box; transform-origin: center; }
 .node rect { rx: 7; fill: var(--vscode-editor-background); stroke: var(--vscode-descriptionForeground);
   stroke-width: 1.5; transition: stroke 300ms, fill 300ms; }
-.node text { fill: var(--vscode-editor-foreground); text-anchor: middle; pointer-events: none; font-size: 12px; }
+.node text { fill: var(--vscode-editor-foreground); text-anchor: middle; pointer-events: none; font-size: 10px; }
 .node .detail { font-size: 10px; fill: var(--vscode-descriptionForeground); }
 .node.open rect { stroke-dasharray: 6 4; }
 .node.checking rect { stroke: var(--vscode-editorWarning-foreground); }
 .node.proved rect { stroke: var(--vscode-testing-iconPassed); fill: color-mix(in srgb, var(--vscode-testing-iconPassed) 12%, var(--vscode-editor-background)); }
 .node.error rect, .node.abandoned rect { stroke: var(--vscode-errorForeground); fill: color-mix(in srgb, var(--vscode-errorForeground) 12%, var(--vscode-editor-background)); }
 .node.abandoned .name { text-decoration: line-through; }
-.node:focus rect { stroke-width: 3; }
+.node:focus rect, .node.focused rect { stroke-width: 3; filter: drop-shadow(0 0 2px var(--vscode-focusBorder)); }
 .pulse .tile { animation: accepted 400ms ease-out; }
 .edge.pulse { animation: accepted-edge 400ms ease-out; }
 .fading { opacity: 0; pointer-events: none; }

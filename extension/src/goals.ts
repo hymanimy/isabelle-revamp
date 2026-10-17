@@ -28,6 +28,8 @@ export class Goals implements Disposable {
   private decorationTimer?: ReturnType<typeof setTimeout>;
   private panel?: number;
   private pending = 0;
+  private navigation: Promise<void> = Promise.resolve();
+  private previews = new Map<number, (text: string) => void>();
   private earlyStates = new Map<number, string>();
   private confirmed?: string;
   private confirmedHtml?: string;
@@ -51,7 +53,8 @@ export class Goals implements Disposable {
       }),
       client.onNotification('PIDE/state_output', (message: StateOutput) => {
         const text = message.content;
-        if (message.id === this.panel) this.acceptState(text);
+        if (this.previews.has(message.id)) this.previews.get(message.id)!(text);
+        else if (message.id === this.panel) this.acceptState(text);
         else if (this.pending) this.earlyStates.set(message.id, text);
       }),
       client.onNotification('PIDE/decoration', (message: Decoration) => {
@@ -105,6 +108,7 @@ export class Goals implements Disposable {
           line: editor!.selection.active.line, character: editor!.selection.active.character }
       : undefined;
     if (JSON.stringify(next) === JSON.stringify(this.caret)) return;
+    for (const finish of this.previews.values()) finish('Goal preview cancelled.');
     this.caret = next;
     const generation = ++this.generation;
     clearTimeout(this.timer);
@@ -134,30 +138,79 @@ export class Goals implements Disposable {
     this.updates.fire();
   }
 
+  private navigate<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.navigation.then(operation, operation);
+    this.navigation = next.then(() => {}, () => {}); return next;
+  }
+
+  // A pinned built-in state panel previews a tile without moving the editor.
+  // Serialize caret setup with normal Goals queries; restore the live caret
+  // after its tagged output, and never use preview output to certify a version.
+  async preview(document: TextDocument, line: number, character: number): Promise<string> {
+    if (!this.available || !this.processing(document).known) return 'checking…';
+    const version = document.version;
+    const result = await this.navigate(async () => {
+      const existing = this.panel;
+      this.pending++;
+      let id: number | undefined;
+      try {
+        if (existing !== undefined) await this.client.sendNotification('PIDE/state_auto_update', { id: existing, enabled: false });
+        await this.client.sendNotification('PIDE/caret_update', { uri: document.uri.toString(), line, character });
+        id = (await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {})).state_id;
+        await this.client.sendNotification('PIDE/state_auto_update', { id, enabled: false });
+        const previewId = id;
+        const text = new Promise<string>(resolve => {
+          const complete = (content: string) => {
+            clearTimeout(timer); this.previews.delete(previewId);
+            void this.client.sendNotification('PIDE/state_exit', { id: previewId }).catch(() => {});
+            resolve(document.version === version ? outputText(content) : 'checking…');
+          };
+          const timer = setTimeout(() => complete('Goal preview unavailable.'), 10000);
+          this.previews.set(previewId, complete);
+          const early = this.earlyStates.get(previewId); if (early !== undefined) complete(early);
+        });
+        return { text: await text };
+      } catch (error) {
+        if (id !== undefined) void this.client.sendNotification('PIDE/state_exit', { id }).catch(() => {});
+        throw error;
+      } finally {
+        if (--this.pending === 0) this.earlyStates.clear();
+        const caret = this.caret;
+        await this.client.sendNotification('PIDE/caret_update', caret
+          ? { uri: caret.uri, line: caret.line, character: caret.character } : {});
+        if (existing !== undefined && existing === this.panel) await this.client.sendNotification('PIDE/state_auto_update', { id: existing, enabled: true });
+      }
+    });
+    return result.text;
+  }
+
   private async refresh(generation: number, caret: Caret): Promise<void> {
-    this.pending++;
-    try {
-      const { uri, line, character } = caret;
-      await this.client.sendNotification('PIDE/caret_update', { uri, line, character });
+    return this.navigate(async () => {
       if (generation !== this.generation) return;
-      // Dynamic output has no cursor/version ID. A fresh built-in state panel
-      // supplies a tagged confirmation and re-emits identical goal text.
-      const { state_id } = await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {});
-      if (generation !== this.generation) {
-        await this.client.sendNotification('PIDE/state_exit', { id: state_id });
-        return;
+      this.pending++;
+      try {
+        const { uri, line, character } = caret;
+        await this.client.sendNotification('PIDE/caret_update', { uri, line, character });
+        if (generation !== this.generation) return;
+        // Dynamic output has no cursor/version ID. A fresh built-in state panel
+        // supplies a tagged confirmation and re-emits identical goal text.
+        const { state_id } = await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {});
+        if (generation !== this.generation) {
+          await this.client.sendNotification('PIDE/state_exit', { id: state_id });
+          return;
+        }
+        this.panel = state_id;
+        const early = this.earlyStates.get(state_id);
+        if (early !== undefined) this.acceptState(early);
+      } catch {
+        if (generation === this.generation) {
+          clearTimeout(this.deadline);
+          this.publish({ phase: 'unavailable', text: '', errors: [] });
+        }
+      } finally {
+        if (--this.pending === 0) this.earlyStates.clear();
       }
-      this.panel = state_id;
-      const early = this.earlyStates.get(state_id);
-      if (early !== undefined) this.acceptState(early);
-    } catch {
-      if (generation === this.generation) {
-        clearTimeout(this.deadline);
-        this.publish({ phase: 'unavailable', text: '', errors: [] });
-      }
-    } finally {
-      if (--this.pending === 0) this.earlyStates.clear();
-    }
+    });
   }
 
   private acceptState(text: string): void {
@@ -290,6 +343,7 @@ export class Goals implements Disposable {
   }
 
   dispose(): void {
+    for (const finish of this.previews.values()) finish('Goal preview closed.');
     this.releasePanel();
     this.unavailable();
     for (const subscription of this.subscriptions) subscription.dispose();
