@@ -15,7 +15,10 @@ exports.run = async function () {
   const original = fs.readFileSync(path.join(root, 'examples/Swarm.thy'), 'utf8');
   const file = path.join(root, '.dev-host/m7-fixture/Swarm.thy');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, original);
+  // Rehearsing the real example must not require undoing the user's proof.
+  const fixture = process.env.ISABELLE_TEST_SWARM_SKELETON
+    ? fs.readFileSync(process.env.ISABELLE_TEST_SWARM_SKELETON, 'utf8') : original;
+  fs.writeFileSync(file, fixture);
   const document = await vscode.workspace.openTextDocument(file);
   const editor = await vscode.window.showTextDocument(document);
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();

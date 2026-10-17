@@ -101,7 +101,7 @@ export function proofSteps(source: string, cursor: number): ProofStep[] {
 export interface ProofNode extends ProofStep {
   name: string; statement: string; parent?: string; abandoned: boolean;
 }
-export interface ProofEdge { from: string; to: string; kind: 'fact' | 'implicit' | 'nesting' }
+export interface ProofEdge { from: string; to: string; kind: 'fact' | 'implicit' | 'nesting' | 'refutation' }
 export interface ProofStructure { nodes: ProofNode[]; edges: ProofEdge[] }
 
 // The graph is a source-level explanation, not a kernel dependency certificate.

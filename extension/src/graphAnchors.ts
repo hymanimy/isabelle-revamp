@@ -10,9 +10,9 @@ export class GraphAnchors implements Disposable {
   private state?: GraphState;
   private highlightLine?: number;
   constructor(extensionPath: string) {
-    for (const status of ['open', 'checking', 'proved', 'error', 'abandoned'] as GraphStatus[]) {
+    for (const status of ['open', 'checking', 'proved', 'error', 'abandoned', 'refuted'] as GraphStatus[]) {
       this.dots.set(status, window.createTextEditorDecorationType({ gutterIconPath:
-        Uri.joinPath(Uri.file(extensionPath), 'media', `dot-${status === 'abandoned' ? 'error' : status}.svg`), gutterIconSize: 'contain' }));
+        Uri.joinPath(Uri.file(extensionPath), 'media', `dot-${['abandoned', 'refuted'].includes(status) ? 'error' : status}.svg`), gutterIconSize: 'contain' }));
     }
   }
   update(state?: GraphState): void {

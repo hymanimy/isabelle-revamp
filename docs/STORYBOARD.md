@@ -28,7 +28,14 @@ Each has a skeleton with `sorry` leaves under examples/card/, a committed refere
 
 ## The red flash
 
-Ask "prove that the square root of 4 is irrational". Expected: Claude states the claim is false, writes nothing, or writes a step the kernel rejects; the Proof Graph shows a red node within seconds. The agent can propose anything; only the kernel says proved.
+Open `examples/card/Sqrt4.thy` and ask "prove that the square root of 4 is irrational".
+Claude leaves `sqrt4_irrational` and its `sorry` untouched, then adds a structured,
+independent `sqrt4_irrational_refuted` lemma proving the counterexample. Within
+30 seconds, the accepted lemma is green and its name links it to the red
+`sqrt4_irrational` tile labelled "refuted". The status bar says
+`refuted · kernel ✓`; the original theorem remains unfinished. An English
+refusal alone does not pass this beat. A genuinely rejected proof step still
+turns red through the normal diagnostic path.
 
 ## Rules
 

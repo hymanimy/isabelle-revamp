@@ -610,3 +610,39 @@
   remains for forthcoming card runs. Screen access remains refused; these are
   live API/webview receipts, not claimed screenshots. M13b will isolate the
   demonstration profile before the remaining false-claim/card rehearsals.
+
+## M14 — kernel-checked red flash
+
+- **Passed:** real Ask prompt “prove that the square root of 4 is irrational”
+  rendered the green `sqrt4_irrational_refuted` and red/refuted original in
+  **15.476 s**, with the exact status bar `refuted · kernel ✓`. The final
+  sentence completed at **30.858 s**. The only applied edit inserted the
+  structured counter-lemma after the original theorem; its bytes and sole
+  `sorry` were unchanged. The appended nodes carried the Claude tag. All four
+  required tool checks ran. The real MCP graph matched the rendered model.
+- **Kernel audit:** the combined file exited 0 with explicit
+  `-o quick_and_dirty=true` for the original admission; Claude's actual lemma
+  was extracted into a fresh theory without that original fact and exited 0
+  with admissions disabled. The committed independent reference also passed.
+  Whole-file `fully_checked` correctly stayed false. A wrong-tactic control
+  rendered red in **399 ms**; admitting/removing the counter-proof retracted
+  the refuted state, and the red root never folded.
+- **Discovered:** batch mode rejects `sorry` by default, file-wide completion
+  cannot represent an independently accepted counter-lemma, and an appended
+  lemma has no pre-edit node to tag. An initial real request took 57 s to edit
+  and left a numeric simplification processing; a second rendered in 14.4 s
+  but exposed missing tags/checks. All three transcripts, timings and failures
+  are retained under `docs/card-runs/Sqrt4-{1,2,3}.md`. The installed Claude
+  2.1.236 supports per-child `--effort low`; no global settings were changed.
+- **Would do differently:** run the live false-claim rehearsal early and check
+  its counter-proof in isolation from the admitted theorem. Keep refusal,
+  diagnostics, refutation and whole-file completion distinct in the demo.
+- **Regression checks:** `scripts/check_m14.sh` passed its M3–M8 and mandatory
+  M10 chain plus the new refutation controls; the real-Claude pass used
+  `M14_ONLY=1 M14_LIVE=1`. The broad check used
+  `ISABELLE_TEST_SWARM_SKELETON=.dev-host/m7-skeleton.thy`, a copy of the committed
+  skeleton, while preserving Leo's separately edited `examples/Swarm.thy`.
+  Exact-name/retraction unit checks, streaming/Stop/help checks, Python syntax
+  and TypeScript compilation passed. Pending M13b files remain separate.
+  The VSIX packaging audit also passed: 227,293 bytes, bundled runtime and
+  offline graph, no runtime node_modules. The artifact remains gitignored.

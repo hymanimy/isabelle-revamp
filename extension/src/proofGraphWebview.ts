@@ -158,7 +158,7 @@ function render(next: GraphState): void {
     item.querySelector('.name')!.textContent = finished ? 'proved' : node.name.length > 14 ? node.name.slice(0, 13) + '…' : node.name;
     item.querySelector('.detail')!.textContent = finished
       ? `${count} steps · kernel-checked ✓ · ${(next.elapsed / 1000).toFixed(1)} s`
-      : `L${node.line}${count ? ' · +' + count : ''}`;
+      : `L${node.line}${node.status === 'refuted' ? ' · refuted' : count ? ' · +' + count : ''}`;
   }
   const boxes = new Map(positions.nodes.map(box => [box.id, box])), wanted = new Set<string>();
   for (const edge of next.edges) {

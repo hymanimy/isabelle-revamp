@@ -876,3 +876,46 @@ same model and recorded timeline. Demo Layout uses existing VS Code commands
 `workbench.action.alignPanelJustify`, `workbench.action.closeSidebar`, and
 `workbench.action.closeAuxiliaryBar`. It preserves source tabs and unsaved text.
 No global configuration or proposed VS Code API is needed.
+
+## M14 — explicit refutation names and admitted batch fixtures
+
+No new PIDE request or prover service is used. The existing current-version
+command/finish decorations, pending ranges, diagnostics and admission ranges
+establish acceptance of the complete counter-lemma range. The presentation
+convention pairs exact top-level names `X` and `X_refuted`; it does not infer
+mathematical negation from text. Both are independent source roots, with
+unchanged one-based line labels and zero-based UTF-16 ranges.
+
+`proof_graph(file)` adds status `refuted` and edge kind `refutation`:
+
+```json
+{"from":"sqrt4_irrational_refuted","to":"sqrt4_irrational","kind":"refutation"}
+```
+
+The edge is present while both declarations exist, including before acceptance,
+so recolouring never triggers layout. Only an accepted current-version
+counter-lemma turns the original red. An admitted/error/pending counter-proof
+cannot do so. Removing or invalidating it retracts the state. Ordinary theorem
+roots retain the fully-checked-document rule; an accepted matching counter-lemma
+is the explicit exception while the original admission remains. The status bar
+and graph header say `refuted · kernel ✓`; `status().fully_checked` remains false
+and `errors()` can be empty. The graph therefore never calls the false theorem
+proved or the file admission-free.
+
+Experiment with Isabelle2025-2 `process_theories -D examples/card -O Sqrt4`:
+exit 1, `*** Cheating requires quick_and_dirty mode!`, at the original `sorry`.
+The tool's `-?` output offers `-o OPTION`; the distribution's `etc/options`
+declares `quick_and_dirty` false by default. Running the combined original and
+independent counter-lemma with `-o quick_and_dirty=true` exits 0 with exactly
+one admission. Running `Sqrt4_solution` (only the independent counter-lemma)
+with default options also exits 0. The live test repeats the strict check on
+Claude's actual extracted lemma; no original admitted fact is available there.
+
+The installed `claude --help` offers `--effort <level>` (low, medium, high,
+xhigh, max). Ask now passes `--effort low` for its small incremental requests,
+while retaining the existing eight-tool allowlist and Claude-only backend.
+This is a per-child flag; no global Claude settings change. Its preamble
+requests an independent structured counter-lemma after the original, no changes
+to that theorem, no prose argument, and errors/status/graph checks before the
+one-sentence report. It permits stopping at `refuted` even though the deliberately
+unchanged admission prevents `fully_checked`.

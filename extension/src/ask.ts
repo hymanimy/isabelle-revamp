@@ -17,7 +17,7 @@ const toolNames = ['open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positi
 export function preamble(context: AskContext): string {
   return 'You have the `isabelle` MCP tools. The active theory is ' + context.file + ', cursor at line ' + context.line
     + '. Work only through those tools. Write structured Isar: named `have` steps with short `by` justifications, no Sledgehammer. '
-    + 'After each edit check errors and status; stop when fully_checked is true or you are stuck, and say which.\n'
+    + 'After each edit check errors and status; stop when fully_checked is true, a counter-lemma is accepted as described below, or you are stuck, and say which.\n'
     + 'Query proof_graph, pick an open leaf whose dependencies are proved, prove it, repeat; one step per edit. '
     + 'Work directly on one ready leaf; do not delegate or seek advice from another agent. '
     + 'Nodes are explicitly named outer proof steps; nested commands belong to their enclosing node. Preserve these names. An open leaf has no open child; the root may still own unnamed commands after its named children are proved. '
@@ -25,14 +25,22 @@ export function preamble(context: AskContext): string {
     + 'Read open immediately before each edit and recompute its range. Query goals_at on a theorem or have command '
     + 'after editing to confirm the current version, then check errors and status. '
     + 'For an explanation request, inspect the actual diagnostics and explain them without editing. '
-    + 'Change only the active theory. Do not use sorry, oops, axioms, ML, external tools or other proof automation services to bypass a proof.';
+    + 'If you believe the statement is false, do not argue in prose. Add, directly after the theorem, a lemma named <theorem_name>_refuted '
+    + 'whose statement is the negation (or the concrete witness, e.g. sqrt (4::real) = 2 then sqrt (4::real) ∈ ℚ), '
+    + "prove it in structured Isar, and leave the original theorem's sorry untouched. Preserve the entire original theorem byte for byte: insert only after its completed proof, before the next declaration or end. "
+    + 'Prove the counter-lemma independently: never use the admitted original theorem as a fact. Name every have in its structured proof. '
+    + 'After insertion, call goals_at on the new lemma, then errors(file), status(), and proof_graph(file): all four checks are required. '
+    + 'Stop once the counter-lemma is proved and the original node is refuted, even though fully_checked remains false because of the original sorry. '
+    + 'Then report in one sentence what the kernel accepted. Do not narrate before tool calls. Do not add placeholders to the new lemma; submit its short structured proof in one edit. '
+    + 'For concrete numeric witnesses, try plain `by simp` first; do not feed numeral-expansion equalities back into simp. '
+    + 'Change only the active theory. Do not introduce sorry, oops, axioms, ML, external tools or other proof automation services to bypass a proof.';
 }
 
 export function claudeArgs(context: AskContext, serverRoot: string): string[] {
   // Explicit config isolates this extension instance without changing registration.
   const config = { mcpServers: { isabelle: { type: 'stdio',
     command: 'python3', args: [join(serverRoot, 'mcp/launch.py'), '--port-file', context.portFile] } } };
-  return ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+  return ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--effort', 'low',
     '--tools', '', '--allowedTools', ...toolNames.map(name => 'mcp__isabelle__' + name),
     '--permission-mode', 'dontAsk', '--strict-mcp-config', '--mcp-config', JSON.stringify(config),
     '--disable-slash-commands', '--settings', JSON.stringify({ disableAllHooks: true }),

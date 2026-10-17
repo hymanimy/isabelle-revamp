@@ -15,7 +15,7 @@ export class ProofStatus implements Disposable {
   private update(state?: GraphState): void {
     if (!state?.total) { this.item.hide(); return; }
     this.item.text = graphSummary(state);
-    this.item.backgroundColor = state.nodes.some(node => ['error', 'abandoned'].includes(node.status))
+    this.item.backgroundColor = state.nodes.some(node => ['error', 'abandoned', 'refuted'].includes(node.status))
       ? new ThemeColor('statusBarItem.errorBackground') : undefined;
     this.item.show();
   }

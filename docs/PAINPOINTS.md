@@ -704,3 +704,54 @@ should be.
 - **Fix needed:** put Ask and the compact graph together in the bottom panel,
   hide Goals by default, and keep the full-height editor graph as an explicit
   button. Demo Layout restores this arrangement without changing source files.
+
+## 59. Batch checking rejects a deliberately unfinished counterexample demo (M14)
+
+- **What happened:** `isabelle process_theories -D examples/card -O Sqrt4`
+  exited 1 at `sorry`: `*** Cheating requires quick_and_dirty mode!`.
+- **Experience:** retaining the false claim as an unfinished theorem prevents
+  the normal batch command from accepting an otherwise valid counter-proof.
+- **Fix needed:** use `-o quick_and_dirty=true` explicitly for the one-admission
+  demo, then extract and check the counter-lemma separately with default options.
+  Keep the file's `fully_checked=false`; a green counter-proof does not certify
+  the original theorem. Never use its admitted fact in the counter-proof.
+
+## 60. File completion hides an accepted counter-lemma (M14)
+
+- **What happened:** the original graph allowed a theorem/lemma root to turn
+  green only after the entire file was admission-free. Keeping the false
+  original's `sorry` therefore also held a valid counter-lemma at checking.
+- **Experience:** an audience could not distinguish the accepted counterexample
+  from the deliberately unfinished claim.
+- **Fix needed:** pair exact top-level `X`/`X_refuted` names and allow the
+  counter-lemma's own fresh command range to establish its green state. Its
+  arrow turns `X` red/refuted; ordinary error diagnostics and unfinished file
+  status remain separate. Retract refutation when its proof is edited or removed.
+
+## 61. A short false claim can trigger long thinking and a stuck simplification (M14)
+
+- **What happened:** the first actual Claude rehearsal submitted its counter-proof
+  after 57.2 s, then `have val: "sqrt (4::real) = 2" by (simp add: sq)` remained
+  processing until the test stopped the run at 120 s. Here `sq` expanded
+  `4 = 2 ^ 2`; plain `by simp` had already passed independently. The full failed
+  transcript and submitted source are retained in `docs/card-runs/Sqrt4-1.md`.
+- **Experience:** the audience waits despite a one-step numeric witness. The
+  observed simplification is consistent with a rewrite cycle between numeral
+  expansion and arithmetic normalization; it did not return a diagnostic.
+- **Fix needed:** use the installed CLI's `--effort low` for short incremental
+  requests, ask for plain simplification of numeric witnesses, and require the
+  four post-edit checks explicitly. Preserve timings/failures rather than treating
+  an English answer or an unfinished tactic as a successful refutation.
+
+## 62. Newly inserted proof nodes have no pre-edit identity for agent tags (M14)
+
+- **What happened:** the second real run rendered the refutation in 14.4 s,
+  but its appended lemma had no node in the document snapshot used to attach
+  the Claude label. The integration check caught the missing tag. The model
+  also omitted `status()` despite calling errors and the graph.
+- **Experience:** a checked lemma appeared without showing which agent wrote it,
+  and the requested completion check was incomplete.
+- **Fix needed:** tag both existing affected nodes and nodes in the inserted
+  post-edit range; explicitly require goals, errors, status and graph before the
+  final report. Log the failed acceptance separately from its successful kernel
+  and visual-state transition.

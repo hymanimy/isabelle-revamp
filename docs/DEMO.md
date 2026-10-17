@@ -270,3 +270,43 @@ claim that screenshots were taken.
 
 The earlier M12 commit's live Claude run stalled before editing; it is not a
 successful AI rehearsal. Card runs will record live success/failure separately.
+
+## The red flash — kernel-checked refutation (M14)
+
+1. Open `examples/card/Sqrt4.thy`, then **Isabelle: Demo Layout**. The named
+   `sqrt4_irrational` tile is grey/dashed, with its original `sorry` visible.
+2. In Ask, enter **prove that the square root of 4 is irrational**.
+3. Claude must insert an independent, structured `sqrt4_irrational_refuted`
+   lemma immediately after the original theorem. The original statement and
+   `sorry` remain unchanged. No English refusal counts as acceptance.
+4. Screenshot the green counter-lemma, its arrow into the red original tile
+   labelled **refuted**, and status bar **refuted · kernel ✓**. Hover/click
+   still refer to each declaration's source line. Neither root disappears.
+5. `status()` intentionally remains unfinished, with one admission and no
+   errors: the counterexample is accepted; the original claim is not proved.
+   Replacing a valid counter-proof with `sorry` retracts the red refutation.
+   A wrong tactic such as `by (rule TrueI)` has the ordinary red error state.
+
+Run the repeatable control with `bash scripts/check_m14.sh`; include an actual
+Claude rehearsal with `M14_LIVE=1 bash scripts/check_m14.sh`. The live test uses
+an isolated copy and writes timings, full displayed transcript and resulting
+source to `docs/card-runs/Sqrt4-<n>.md`. It fails if the rendered refutation takes
+more than 30 seconds or any edit touches the original theorem.
+
+Batch checking the deliberately admitted demo requires an explicit option:
+
+```sh
+isabelle process_theories -o quick_and_dirty=true -D <demo-copy-directory> -O Sqrt4
+isabelle process_theories -D examples/card -O Sqrt4_solution
+```
+
+The first command permits the one original `sorry`; it does not prove that
+claim. The second checks only the independent counter-proof with admissions
+disabled. The live test also extracts Claude's actual counter-lemma into a
+fresh theory and checks it with the default options, without the original
+admitted theorem in scope.
+
+Verified rehearsal: [Sqrt4 run 3](card-runs/Sqrt4-3.md) rendered the kernel-backed
+refutation in **15.476 s**; the final sentence arrived at **30.858 s**. Earlier
+failed attempts are retained beside it. These are actual VS Code webview/MCP
+receipts, not a claimed manual screenshot check.

@@ -108,14 +108,17 @@ export class BridgeTools {
       const ids = this.swarm.editedCards(document, new Range(start, end));
       const graphIds = this.graph.editedNodes(document, new Range(start, end));
       const selection = editor.selection;
-      if (!await editor.edit(edit => edit.replace(new Range(start, end), encodeSymbols(params.text as string)))) {
+      const text = encodeSymbols(params.text as string);
+      if (!await editor.edit(edit => edit.replace(new Range(start, end), text))) {
         throw new Error('Document changed during the edit; read it again with open.');
       }
       editor.selection = new Selection(document.validatePosition(selection.anchor), document.validatePosition(selection.active));
       this.goals.observe(document);
       this.goals.follow(editor);
       this.swarm.tag(document, ids, agent.name);
-      this.graph.tag(document, graphIds, agent.name);
+      // An appended counter-lemma has no node in the pre-edit document.
+      const inserted = new Range(start, document.positionAt(document.offsetAt(start) + text.length));
+      this.graph.tag(document, [...new Set([...graphIds, ...this.graph.editedNodes(document, inserted)])], agent.name);
       agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };

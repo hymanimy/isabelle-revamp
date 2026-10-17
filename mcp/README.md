@@ -137,8 +137,23 @@ Graph edges explain explicit local Isar fact use and implicit chaining; they
 are not a kernel dependency certificate. Unrecognised or imported library facts
 are not invented as nodes. Status is conservative: `checking` until fresh PIDE
 annotations arrive, `open` for admissions, `error` for diagnostics, `abandoned`
-for `oops`, and `proved` for accepted commands. Only a fully checked document
-can mark its theorem root proved. Edits keep the graph tab focused when active;
+for `oops`, and `proved` for accepted commands. Ordinary theorem roots require a
+fully checked document. A separate accepted lemma named `X_refuted` is the
+explicit exception: it stays green while the original `X` becomes `refuted`
+(red), with an edge `{from: <counter-lemma id>, to: <original id>, kind: "refutation"}`.
+Names match exactly; no English or statement-text heuristic chooses this link.
+The link exists while the counter-lemma is pending, but cannot turn `X` red
+until its current-version range is accepted without admissions or errors.
+Changing/removing the proof retracts that state. `status().fully_checked` stays
+false while the original `sorry` remains, and `errors()` can correctly be empty.
+The graph convention identifies the counter-lemma; Isabelle checks its stated
+proposition, rather than inferring a negation from its name.
+
+For a false claim, insert the independent structured counter-lemma directly
+after the original theorem, leaving that entire theorem unchanged. Never use
+the admitted claim to prove its counterexample. Check errors, status and graph;
+finish once the counter-lemma is `proved` and the original is `refuted`.
+Edits keep the graph tab focused when active;
 Goals and the compact Swarm still follow the source cursor.
 
 ## Verify end to end

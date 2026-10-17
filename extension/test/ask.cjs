@@ -28,6 +28,7 @@ exports.checkAsk = async function () {
   for (const flag of ['-p', '--verbose', '--include-partial-messages', '--strict-mcp-config', '--disable-slash-commands']) assert(invocation.args.includes(flag));
   assert.equal(invocation.args[invocation.args.indexOf('--tools') + 1], '');
   assert.equal(invocation.args[invocation.args.indexOf('--permission-mode') + 1], 'dontAsk');
+  assert.equal(invocation.args[invocation.args.indexOf('--effort') + 1], 'low');
   assert(!invocation.args.includes('--dangerously-skip-permissions'));
   assert(invocation.args.at(-1).includes('cursor at line 12'));
   assert(invocation.prompt.includes('$(also literal)'));

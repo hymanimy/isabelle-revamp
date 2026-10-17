@@ -6,6 +6,7 @@ import { GraphFrame, GraphNode, GraphState } from './graphTypes';
 import { unicodeSymbols } from './symbols';
 import { ProofGraphPanel } from './proofGraphPanel';
 import { GraphAnchors } from './graphAnchors';
+import { refutationGraph } from './refutations';
 
 export class ProofGraph implements Disposable {
   private editor?: TextEditor;
@@ -85,7 +86,7 @@ export class ProofGraph implements Disposable {
     errors.push(...this.goals.decorationRanges(document, 'text_overview_error').map(offsets));
     const pending = processing.pending.map(item => offsets(item.range));
     const bad = this.goals.decorationRanges(document, 'background_bad').map(offsets);
-    const nodes = source.nodes.map(node => {
+    const acceptedNodes = source.nodes.map(node => {
       // The entire named obligation includes every nested/unnamed command.
       const endOffset = node.end;
       const overlap = ([start, end]: [number, number]) => start === end
@@ -98,18 +99,18 @@ export class ProofGraph implements Disposable {
         else if (!pending.some(overlap) && !bad.some(overlap) && node.closed && marked(node.start, node.commandEnd)
           && (!node.finish || marked(node.finish.start, node.finish.end))) status = 'proved';
       }
-      if (!node.parent && status === 'proved' && !checked) status = 'checking';
       const start = document.positionAt(node.start), end = document.positionAt(node.end);
       const tag = this.tags.get(uri + '#' + node.id);
-      return { id: node.id, name: unicodeSymbols(node.name), statement: unicodeSymbols(node.statement),
+      return { id: node.id, name: node.name, statement: unicodeSymbols(node.statement),
         line: start.line + 1, command: node.command, parent: node.parent ?? null, status,
         range: [start.line, start.character, end.line, end.character] as SourceRange,
         agent: tag && tag.until > Date.now() ? tag.name : undefined };
     });
+    const { nodes, edges } = refutationGraph(acceptedNodes, source.edges, checked);
     const cursor = this.editor?.document === document ? document.offsetAt(this.editor.selection.active) : -1;
     const focused = source.nodes.filter(node => node.start <= cursor && cursor < node.end).at(-1)?.id;
     return { focused, file: document.uri.fsPath, uri, version: document.version, theory: basename(document.uri.fsPath, '.thy'),
-      nodes, edges: source.edges, complete: processing.processed, fully_checked: checked,
+      nodes, edges, complete: processing.processed, fully_checked: checked,
       proved: nodes.filter(node => node.status === 'proved').length, total: nodes.length,
       elapsed: this.starts.has(uri) ? (this.finishes.get(uri) ?? Date.now()) - this.starts.get(uri)! : 0 };
   }
@@ -155,6 +156,7 @@ export class ProofGraph implements Disposable {
       return errors.map(item => item.message).join('\n') || 'Isabelle rejected a command in this step.';
     }
     if (node.status === 'abandoned') return 'Abandoned (oops).';
+    if (node.status === 'refuted') return `Refuted by ${node.name}_refuted. Isabelle accepted the counter-lemma; the original sorry remains unfinished.`;
     const key = uri + ':' + version + ':' + id;
     if (!this.goals.processing(document).known) return 'checking…';
     if (!this.hoverCache.has(key)) this.hoverCache.set(key,
