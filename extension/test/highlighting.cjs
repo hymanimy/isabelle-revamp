@@ -20,7 +20,7 @@ exports.checkHighlighting = async function (app) {
     const grammar = await registry.loadGrammar(contribution.scopeName);
     const tokenize = (line, state = textmate.INITIAL) => grammar.tokenizeLine(line, state);
     const has = (result, scope) => result.tokens.some(token => token.scopes.includes(scope));
-    const keywords = 'theory imports begin end lemma theorem proof qed by have show from then hence thus obtain assume fix using unfolding also finally sorry oops text where and'.split(' ');
+    const keywords = 'theory imports begin end lemma theorem proof qed by have show from then hence thus obtain assume fix using unfolding also finally sorry oops text where and case next with definition datatype locale context apply done let note ultimately moreover'.split(' ');
     for (const word of keywords) assert(has(tokenize(word), 'keyword.control.isabelle'), word);
     for (const name of ["theory'", 'proof_lemma', 'Some.proof', "'theory", 'αproof', 'proofβ']) {
       assert(!has(tokenize(name), 'keyword.control.isabelle'), 'Identifier mistaken for keyword: ' + name);

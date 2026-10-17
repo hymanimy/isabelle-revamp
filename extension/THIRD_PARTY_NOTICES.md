@@ -57,3 +57,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
+
+M10 semantic token names follow `src/Tools/VSCode/extension/src/decorations.ts`
+(author: Makarius). The client maps these existing PIDE classes to VS Code
+standard TextMate scopes instead of copying the distribution's editor theme.

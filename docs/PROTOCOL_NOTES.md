@@ -633,3 +633,19 @@ are preserved. No filesystem permissions or Isabelle distribution files change.
 `src/HOL/Real.thy`. `TextEditor.edit` is a trusted API and bypasses the editor's
 read-only policy; it is unsuitable as a typing-lock test. The host acceptance
 uses the `type` command with auto-save off and verifies the buffer and disk.
+
+## M10.4 — theme scopes from existing decorations
+
+The grammar uses standard `keyword.control`, `keyword.operator`, `string.quoted`,
+`comment.block`, `constant.character.escape`, and `constant.numeric` scopes.
+Additional ordinary Isar commands (including case/next/with) use keyword scopes.
+The existing PIDE decoration cache supplies `text_free`, `text_bound`,
+`text_skolem`, `text_tfree`, `text_tvar`, `text_var`. These become document
+semantic tokens with standard TextMate fallback scopes (`variable.other`,
+`variable.parameter`, `variable.other.constant`, `entity.name.type`). No new
+server requests or syntactic guesses about bound variables are needed.
+Only annotations confirmed for the current document version are exposed.
+
+Reference: Isabelle `src/Tools/VSCode/extension/src/decorations.ts`, `text_colors`.
+Workspace token colour recommendations cover built-in light/dark/high-contrast
+families. Custom themes retain their own standard-scope palette.

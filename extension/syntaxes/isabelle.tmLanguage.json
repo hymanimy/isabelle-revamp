@@ -5,7 +5,7 @@
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#cartouches" },
-    { "name": "keyword.control.isabelle", "match": "(?<![\\p{L}\\p{N}_'.])(theory|imports|begin|end|lemma|theorem|proof|qed|by|have|show|from|then|hence|thus|obtain|assume|fix|using|unfolding|also|finally|sorry|oops|text|where|and)(?![\\p{L}\\p{N}_'.])" },
+    { "name": "keyword.control.isabelle", "match": "(?<![\\p{L}\\p{N}_'.])(theory|imports|begin|end|lemma|theorem|proof|qed|by|have|show|from|then|hence|thus|obtain|assume|fix|using|unfolding|also|finally|sorry|oops|text|where|and|case|next|corollary|proposition|definition|fun|primrec|datatype|locale|context|interpretation|notepad|apply|done|prefer|defer|subgoal|let|note|with|ultimately|moreover)(?![\\p{L}\\p{N}_'.])" },
     { "include": "#symbols" },
     { "name": "constant.numeric.isabelle", "match": "\\b[0-9]+\\b" }
   ],

@@ -469,3 +469,14 @@ should be.
   even a no-op API edit returned true. Acceptance therefore exercises the
   actual typing command and checks unchanged bytes. This protects human
   editing; MCP independently enforces its canonical workspace boundary.
+
+## 37. TextMate cannot tell free variables from bound ones
+
+- **What happened.** Formula strings were coloured as generic strings. A regex
+  grammar cannot reliably distinguish `x` bound by a lambda from free `n` or a
+  proof's fixed variable `k`.
+- **Experience.** The syntactic colouring loses the distinctions familiar from
+  jEdit, even though Isabelle already computes them.
+- **Fix needed.** Reuse current-version `text_free`, `text_bound`, and
+  `text_skolem` PIDE decorations as semantic tokens. Map them to standard theme
+  scopes and provide theme-specific workspace palette recommendations.

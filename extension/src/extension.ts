@@ -9,6 +9,7 @@ import { BridgeTools } from './bridgeTools';
 import { loadSymbols, unicodeSymbols } from './symbols';
 import { PrettySymbols } from './prettySymbols';
 import { lockLibraryFiles } from './libraryFiles';
+import { SemanticColors } from './semanticColors';
 import { Swarm } from './swarm';
 import { Ask } from './ask';
 
@@ -87,6 +88,8 @@ export async function activate(context: ExtensionContext) {
     },
   });
   goals = new Goals(client, view);
+  const semanticColors = new SemanticColors(goals);
+  context.subscriptions.push(semanticColors);
   const swarm = new Swarm(goals);
   context.subscriptions.push(swarm,
     window.registerWebviewViewProvider('isabelleRevamp.swarm', swarm.view),
@@ -134,6 +137,7 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
+    getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
     getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [],
     getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(),
     selectSwarmStep: (uri: string, version: number, id: string) => swarm.select(uri, version, id) };

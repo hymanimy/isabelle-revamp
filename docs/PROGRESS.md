@@ -416,3 +416,16 @@
   registration, before the first definition navigation. A preliminary regression
   run exited during MCP startup without a surfaced exception; the harness now
   records failures explicitly, and the complete rerun passed.
+
+## M10.4 — grammar and semantic colours
+
+- **Passed:** `scripts/check_m10.sh` exited 0 with the full M3–M8 chain and
+  library-lock check. Live PIDE annotations classified lambda-bound `x`, free
+  `n`, fixed/skolem `k`, and schematic `?thesis` at their ASCII source ranges.
+  Receipt: `.dev-host/m10-colours.json`. The existing four-theme TextMate checks
+  pass. Screenshot instructions cover the built-in light/dark palettes.
+- **Discovered:** the needed semantic distinctions were already in the cached
+  `PIDE/decoration` stream. They can be exposed as standard-scope semantic tokens
+  without requests, prover changes, or identifier heuristics.
+- **Would do differently:** distinguish formula syntax from prose styling early;
+  keep custom-theme fallbacks rather than imposing one fixed light palette.

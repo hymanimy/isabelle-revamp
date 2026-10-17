@@ -125,3 +125,14 @@ indicator. Return to the example, which remains editable. The workspace
 recommendation uses expanded installation/user-library paths; activation adds
 missing paths from `isabelle getenv` without changing global settings or
 replacing existing read-only overrides.
+
+### 4. jEdit-style colours
+
+In a scratch `.thy` importing Main, use `lemma "(\<lambda>x::nat. x) n = n"`
+and a proof with `fix k :: nat` and `have "k = k" by simp`. After checking,
+`n` is free (blue), `x` bound (green), and `k` a fixed/skolem variable (orange).
+Keywords are blue and quoted inner syntax uses the theme's ordinary foreground.
+Capture the editor in Default Dark Modern, then Default Light Modern. Other
+custom themes receive standard TextMate/semantic scope fallbacks rather than
+hardcoded colours. `Developer: Inspect Editor Tokens and Scopes` shows the
+PIDE-backed semantic classification.

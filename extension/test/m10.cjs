@@ -39,6 +39,34 @@ async function run() {
   assert.equal(library.isDirty,false);
   assert.deepEqual(fs.readFileSync(target.fsPath),bytes);
   console.log('PASS: real definition opens HOL/Real.thy read-only; editor rejects edits; distribution bytes unchanged');
+  await checkColors(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
+
+async function checkColors(root,api) {
+  const file = path.join(root,'.dev-host/m10-fixture/Colours.thy');
+  fs.writeFileSync(file,String.raw`theory Colours imports Main begin
+lemma "(\<lambda>x::nat. x) n = n"
+proof -
+  fix k :: nat
+  have "k = k" by simp
+  show ?thesis by simp
+qed
+end
+`);
+  const doc = await vscode.workspace.openTextDocument(file);
+  const editor = await vscode.window.showTextDocument(doc);
+  editor.selection = new vscode.Selection(4,8,4,8);
+  let colors;
+  for(let i=0;i<200;i++) {
+    await pause(50); colors = api.getSemanticColors();
+    if(['free','bound','skolem'].every(kind=>colors.some(c=>c.kind===kind))) break;
+  }
+  fs.writeFileSync(path.join(root,'.dev-host/m10-colours.json'),JSON.stringify(colors,null,2));
+  for(const kind of ['free','bound','skolem']) assert(colors.some(c=>c.kind===kind),JSON.stringify(colors));
+  assert(colors.some(c=>c.kind==='free' && c.text==='n'));
+  assert(colors.some(c=>c.kind==='bound' && c.text==='x'));
+  assert(colors.some(c=>c.kind==='skolem' && c.text==='k'));
+  console.log('PASS: live PIDE free n, bound x, and fixed skolem k map to standard theme scopes');
+}
