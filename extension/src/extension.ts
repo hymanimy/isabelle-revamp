@@ -3,12 +3,15 @@ import { commands, ExtensionContext, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
+import { Bridge } from './bridge';
+import { BridgeTools } from './bridgeTools';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
 // See ../THIRD_PARTY_NOTICES.md for attribution and the distribution license.
 let client: LanguageClient | undefined;
 let goals: Goals | undefined;
+let bridge: Bridge | undefined;
 
 export async function activate(context: ExtensionContext) {
   const output = window.createOutputChannel('Isabelle', { log: true });
@@ -49,6 +52,7 @@ export async function activate(context: ExtensionContext) {
     }),
     window.onDidChangeActiveTextEditor(editor => goals?.follow(editor)),
     workspace.onDidChangeTextDocument(event => {
+      goals?.observe(event.document);
       if (event.document === window.activeTextEditor?.document) goals?.follow(window.activeTextEditor);
     }),
     client.onDidChangeState(event => {
@@ -68,11 +72,23 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
+  bridge = new Bridge(new BridgeTools(goals, view));
+  try {
+    await bridge.start();
+    output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);
+  } catch (error) {
+    await bridge.close();
+    bridge = undefined;
+    output.error(`MCP bridge failed: ${String(error)}`);
+    await window.showErrorMessage('The MCP bridge could not start. See Output → Isabelle.');
+  }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot() };
 }
 
 export async function deactivate(): Promise<void> {
+  await bridge?.close();
+  bridge = undefined;
   goals?.dispose();
   goals = undefined;
   await client?.dispose();

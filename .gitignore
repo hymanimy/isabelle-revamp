@@ -2,3 +2,4 @@ extension/node_modules/
 extension/out/
 .dev-host/
 __pycache__/
+mcp/.venv/

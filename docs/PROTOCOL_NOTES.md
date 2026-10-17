@@ -295,3 +295,82 @@ keep their existing precedence.
 This is a status for admissions in the open document, not a certificate about
 the axioms or transitive imports of an arbitrary theory. M4 separately checks
 the complete example with `process_theories` and no `sorry` in its source.
+
+## M5: processing observations and local MCP bridge
+
+Before implementation, the [I/Q README's tool list](https://github.com/awslabs/AutoCorrode/blob/main/iq/README.md#mcp-tools)
+was read as requested. Its two inspection tools report a file's processing status
+and positions of admissions. Our `sorry_positions(file)` uses the M4 observed
+marked ranges; `processing_status()` reports all open workspace theory tabs.
+Neither calls an invented `PIDE/get_processing_status` method. The stock server
+has no I/Q endpoint, and no I/Q plugin is installed.
+
+The M5 stdio probe on the completed example observed `text_keyword2` ranges
+`[2,0,2,5]` for the theory's `begin` and `[52,0,52,3]` for `end`. These arrive
+alongside the previously verified busy/error/bad ranges. A state query on the
+blank line after `end` yielded no proof output; callers should select a theorem
+or proof command instead.
+
+The extension invalidates cached completion when a theory's document version
+changes. It requires a fresh tagged state response, followed by a full decoration
+snapshot for that version, before treating absence of pending ranges as processed.
+It continues to consume decoration deltas. The server messages themselves are
+still unversioned; the version association and invalidation are client-side.
+`goals_at` waits for the annotation snapshot too, so a goal response cannot race
+ahead of the current `unfinished (sorry)` status.
+
+`processed` means those pending ranges are empty, not that the proof succeeded.
+`fully_checked` additionally requires no diagnostics/error decorations, no
+`background_bad`, no marked `sorry` or `oops`, and a closed `begin`/`end` structure
+in the server's keyword ranges. This is a conservative status for current editor
+buffers, not a general check for axioms/admissions in arbitrary imports. Unknown
+versions and inactive edited documents remain pending until a goal query confirms
+them. Status aggregation uses actual open editor tabs: `workspace.textDocuments`
+was observed to retain closed buffers with unprocessed decorations.
+
+Removing the final theory `end` left running/unprocessed ranges in the live
+test. An unfinished theory need not reach a settled, error-free state; it remains
+not fully checked. `theory_closed=false` is reported alongside that processing
+state instead of assuming that every malformed input will promptly emit an error.
+
+Restoring `end` exposed a second issue: forced snapshots sampled transient
+running/unprocessed ranges that later remained stuck in the client's cache. In
+`VSCode_Resources.force_decorations` (lines 367–373), `publish_full` returns a
+new model but it is not stored, so the forced snapshot does not advance the
+normal publication baseline. A normal delta need not clear a transient range
+seen only in a forced snapshot. The client therefore requests a fresh full
+snapshot every 250 ms while the active theory has pending ranges, and stops
+when they clear. This also repairs the sidebar's busy indicator; Isabelle's
+distribution remains unchanged.
+
+The first live MCP error check observed an error decoration before its diagnostic
+text was available. `errors` therefore returns `has_errors=true, complete=false`
+in that interval, rather than treating an empty list as proof of success.
+
+### Local wire format
+
+This is a separate client protocol, not an addition to Isabelle's LSP. The
+extension listens on `127.0.0.1:0` and atomically writes JSON `{ "port": PORT,
+"token": "RANDOM_TOKEN" }` to `~/.isabelle-revamp/port` with mode `0600`.
+The Python server reads it, connects once, and exchanges UTF-8 JSON lines:
+
+```json
+{"token":"RANDOM_TOKEN"}
+{"ok":true}
+{"id":1,"method":"goals_at","params":{"file":"examples/Sqrt2.thy","line":6,"col":4}}
+{"id":1,"result":{"file":"ABSOLUTE_PATH","version":1,"line":6,"col":4,"phase":"unfinished","text":"proof (prove)\ngoal (1 subgoal):\n 1. sqrt 2 ∉ ℚ","errors":[]}}
+```
+
+The `phase` in this example is from the initial admitted test copy. Responses
+contain either `result` or an `error` string and echo the request ID. A second
+socket receives `{"error":"An agent is already connected to this extension
+instance."}` and closes. Authentication is an internal handshake, not an eighth
+MCP tool. Requests are serialized; the Python client uses a 35-second timeout and
+never retries edits automatically. Requests are limited to 2 MiB.
+
+The seven methods are exactly `open`, `edit`, `goals_at`, `errors`, `status`,
+`sorry_positions`, and `processing_status`. File/range semantics and the complete
+result contract are in [mcp/README.md](../mcp/README.md). The Python-facing side is
+standard FastMCP stdio, including MCP initialize, tool discovery, and tool calls.
+`scripts/check_m5.sh` drives that full route into a real VS Code/Isabelle host;
+the host compares received goal text and phase with the sidebar's actual model.

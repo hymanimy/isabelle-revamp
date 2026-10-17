@@ -175,3 +175,49 @@
   the parity argument. In the new goal test, match actual `have` commands rather
   than the word inside prose; the initial test mistakenly selected a text block.
 - **Next:** M5, the local socket and MCP tools. M5 has not started.
+
+## 2026-10-17 — M5 passed: seven-tool MCP bridge
+
+- **Changed:** added the loopback TCP bridge in the extension and a FastMCP 4.1.0
+  stdio server in `mcp/server.py`. The tool list is exactly `open`, `edit`,
+  `goals_at`, `errors`, `status`, `sorry_positions`, and `processing_status`.
+  Leo explicitly added the last two to M5; the stopping condition in
+  `CODEX_PROMPT.md` is unchanged. Read the requested
+  [AutoCorrode I/Q tool list](https://github.com/awslabs/AutoCorrode/blob/main/iq/README.md#mcp-tools)
+  before writing the tools and followed the purposes of its processing/admission
+  queries. No I/Q plugin or Isabelle modifications are involved.
+- **Passed:** `bash scripts/check_m5.sh` compiled TypeScript and ran the installed
+  stock VS Code/Isabelle host, exiting 0. A real FastMCP stdio client discovered
+  exactly seven tools, opened a disposable Sqrt2 copy with `sorry`, received goal
+  text and phase equal to the sidebar model, and obtained the exact admission
+  range. Through `edit` it submitted the full M4 proof; `status` reported both the
+  file and aggregate `fully_checked: true`, saved, zero admissions and no errors.
+  The completed proof's `No subgoals!` output also matched the sidebar. These are
+  live protocol checks, not simulated prover results or a trivial solved control.
+- **Also passed:** wrong-tactic error messages/ranges; pending status during a
+  two-second proof command; restoring the complete proof after removing `end`;
+  invalid-range and symlink escape rejection; invalid-token rejection; refusal
+  of a second connection; successful reconnect after the first agent disconnected.
+  M3/M4 regression checks passed in the same run. Python dependency validation
+  reported no broken requirements. The real `examples/Sqrt2.thy` was verified
+  unchanged. Receipts are in ignored `.dev-host/m5-results.json`.
+- **Discovered:** fresh goal output can precede status annotations, and error
+  decorations can precede diagnostic text. Cached closed documents are not open
+  tabs. Forced decoration snapshots do not advance the server's delta baseline,
+  so transient running ranges can remain stuck without another snapshot. The
+  client now waits for current annotations, marks incomplete error lists, uses
+  actual tabs for aggregation, and refreshes snapshots only while busy. Exact
+  observations and message shapes are in `PROTOCOL_NOTES.md`; PAINPOINTS entries
+  17–19 record the user impact. A slow-command fixture also needed `ML_prf`
+  inside a proof; plain `ML` produced `Bad context for command "ML"` and correctly
+  remained an error.
+- **Delivery:** `mcp/README.md` documents coordinates, result fields, limits,
+  lifecycle, and one-line Codex/Claude Code registration commands, checked against
+  installed CLI help and official documentation. No client registration or global
+  configuration was changed. Test profiles, fixtures and discovery files stayed
+  under `.dev-host/`; the runtime default remains `~/.isabelle-revamp/port`.
+- **Would do differently:** probe repeated edits and forced-snapshot/delta
+  interaction before designing completion reporting. Keep processing, error-list
+  completeness, admissions and saved state separate from the start; no single
+  goal string or empty diagnostic list can establish completion.
+- **Next:** M6's limited sidebar polish. M6 has not started.

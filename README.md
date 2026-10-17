@@ -4,7 +4,7 @@ Isabelle/HOL in stock VS Code, using the unmodified `isabelle vscode_server`.
 M1 provides a plain-text goal probe; M2 adds Isar highlighting and server startup;
 M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,
 fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
-`sorry`. The MCP server is the next milestone.
+`sorry`. M5 connects AI agents to that same editor through seven MCP tools.
 
 ## Try the extension in under five minutes
 
@@ -49,6 +49,17 @@ The runner uses a separate host profile and test theory under ignored `.dev-host
 It includes M3's cursor/diagnostic regression checks, then checks every demo
 `have`, the real completed proof, and editing between unfinished/error/complete
 states. It leaves the real example unchanged.
+
+## Connect an AI agent (M5)
+
+Follow [mcp/README.md](mcp/README.md) to install the Python environment and register
+the stdio server with Codex or Claude Code. The tools are `open`, `edit`,
+`goals_at`, `errors`, `status`, `sorry_positions`, and `processing_status`.
+One agent connects to each extension instance. `goals_at` moves the visible cursor
+and returns the sidebar's text; `edit` changes and saves the VS Code buffer.
+
+After installing the MCP dependencies, `bash scripts/check_m5.sh` runs the real
+stdio-to-editor acceptance check, including the M3/M4 regressions.
 
 ## Run the goal probe
 

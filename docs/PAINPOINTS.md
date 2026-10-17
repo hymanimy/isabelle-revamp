@@ -208,3 +208,41 @@ should be.
   the proof. The demo names both `squared_real` and `squared`, so the change of
   number type is visible instead of hidden in a large tactic invocation. This
   was a client-authoring mistake, not an Isabelle kernel failure.
+
+## 17. Goal output can arrive before its status annotations
+
+- **What happened.** In the first M5 acceptance runs, the MCP goal text matched
+  the sidebar but returned `ready` just before the sidebar became `unfinished`.
+  Separately, an error decoration arrived before the corresponding diagnostic
+  text, briefly producing an empty error list for a failed proof.
+- **Experience.** An agent could announce success based on a correct-looking goal
+  or an empty error list while the editor is still receiving the relevant status.
+- **Fix needed.** Require the current version's goal confirmation and full
+  decoration snapshot before returning settled MCP goals. Keep `has_errors`
+  separate from diagnostic text availability and return `complete=false` while
+  that text is pending. Invalidate completion immediately on theory edits.
+
+## 18. Closed editor tabs remain in VS Code's document collection
+
+- **What happened.** M5's first aggregate status included the already closed
+  M3/M4 test files from `workspace.textDocuments`. Their retained unprocessed
+  decorations kept the aggregate pending even after the actual open demo passed.
+- **Experience.** The only visible theory is complete, yet the agent says another
+  invisible theory is still checking. There is no obvious editor action to fix it.
+- **Fix needed.** Enumerate actual open theory tabs for status aggregation and use
+  the document collection only to read their buffers. An empty tab set must not
+  report all theories fully checked.
+
+## 19. A requested snapshot can leave checking stuck
+
+- **What happened.** The M5 client restored the complete proof after deleting its
+  final `end`, but cached running/unprocessed ranges never cleared. The stock
+  `PIDE/decoration_request` path sends a full snapshot without updating the
+  server's normal delta baseline (`VSCode_Resources.force_decorations`). A
+  transient range sampled only by that request need not receive a clearing delta.
+- **Experience.** A small, previously verified proof can say `checking…` forever
+  until the user moves the cursor or otherwise triggers another full refresh.
+- **Fix needed.** Refresh full decorations while the active theory has pending
+  ranges, stopping once they clear. The client polls at 250 ms while busy;
+  no Isabelle source changes are needed. Keep a restore-after-edit integration
+  check, since testing only a freshly opened proof missed this interaction.

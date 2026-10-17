@@ -4,7 +4,7 @@ import { GoalsView } from './goalsView';
 import { outputText } from './outputText';
 
 interface Caret { uri: string; line: number; character: number; version: number }
-type SourceRange = [number, number, number, number];
+export type SourceRange = [number, number, number, number];
 interface Decoration { uri: string; entries: { type: string; content: { range: SourceRange }[] }[] }
 interface StateOutput { id: number; content: string }
 
@@ -22,6 +22,7 @@ export class Goals implements Disposable {
   private document?: TextDocument;
   private timer?: ReturnType<typeof setTimeout>;
   private deadline?: ReturnType<typeof setTimeout>;
+  private decorationTimer?: ReturnType<typeof setTimeout>;
   private panel?: number;
   private pending = 0;
   private earlyStates = new Map<number, string>();
@@ -32,6 +33,10 @@ export class Goals implements Disposable {
   private decorations = new Map<string, Map<string, boolean>>();
   private badRanges = new Map<string, SourceRange[]>();
   private diagnostics = new Map<string, string[]>();
+  private ranges = new Map<string, Map<string, SourceRange[]>>();
+  private versions = new Map<string, number>();
+  private confirmedVersions = new Map<string, number>();
+  private annotatedVersions = new Map<string, number>();
   private subscriptions: Disposable[] = [];
 
   constructor(private client: LanguageClient, private view: GoalsView) {
@@ -47,14 +52,35 @@ export class Goals implements Disposable {
       }),
       client.onNotification('PIDE/decoration', (message: Decoration) => {
         const flags = this.decorations.get(message.uri) ?? new Map<string, boolean>();
+        const ranges = this.ranges.get(message.uri) ?? new Map<string, SourceRange[]>();
         for (const entry of message.entries) {
           flags.set(entry.type, entry.content.length > 0);
+          ranges.set(entry.type, entry.content.map(item => item.range));
           if (entry.type === 'background_bad') {
             this.badRanges.set(message.uri, entry.content.map(item => item.range));
           }
         }
         this.decorations.set(message.uri, flags);
-        if (message.uri === this.caret?.uri) this.render();
+        this.ranges.set(message.uri, ranges);
+        // A full snapshot after a fresh state query confirms annotations for
+        // that version. Deltas alone must not certify a newly edited document.
+        if ([...busyTypes, 'background_bad', 'text_overview_error'].every(type =>
+          message.entries.some(entry => entry.type === type))) {
+          const version = this.confirmedVersions.get(message.uri);
+          if (version !== undefined && version === this.versions.get(message.uri)) {
+            this.annotatedVersions.set(message.uri, version);
+          }
+        }
+        if (message.uri === this.caret?.uri) {
+          this.render();
+          clearTimeout(this.decorationTimer);
+          // force_decorations does not advance the server's delta baseline.
+          // A transient busy range in a forced snapshot might never be cleared
+          // by a normal delta. Refresh while busy so it cannot stick forever.
+          if (this.available && [...busyTypes].some(type => flags.get(type))) {
+            this.decorationTimer = setTimeout(() => this.refreshDecorations(message.uri), 250);
+          }
+        }
       }),
     );
   }
@@ -68,6 +94,7 @@ export class Goals implements Disposable {
   follow(editor?: TextEditor): void {
     const document = editor?.document;
     this.document = document;
+    if (document) this.observe(document);
     const next = document?.languageId === 'isabelle' && document.uri.scheme === 'file'
       ? { uri: document.uri.toString(), version: document.version,
           line: editor!.selection.active.line, character: editor!.selection.active.character }
@@ -77,6 +104,7 @@ export class Goals implements Disposable {
     const generation = ++this.generation;
     clearTimeout(this.timer);
     clearTimeout(this.deadline);
+    clearTimeout(this.decorationTimer);
     this.releasePanel();
     this.confirmed = undefined;
     this.dynamic = '';
@@ -127,12 +155,17 @@ export class Goals implements Disposable {
 
   private acceptState(text: string): void {
     this.confirmed = text;
+    if (this.caret) this.confirmedVersions.set(this.caret.uri, this.caret.version);
     clearTimeout(this.deadline);
     this.render();
     if (this.caret) {
-      void this.client.sendNotification('PIDE/decoration_request', { uri: this.caret.uri })
-        .catch(() => this.unavailable());
+      this.refreshDecorations(this.caret.uri);
     }
+  }
+
+  private refreshDecorations(uri: string): void {
+    void this.client.sendNotification('PIDE/decoration_request', { uri })
+      .catch(() => this.unavailable());
   }
 
   private render(): void {
@@ -165,8 +198,62 @@ export class Goals implements Disposable {
     ++this.generation;
     clearTimeout(this.timer);
     clearTimeout(this.deadline);
+    clearTimeout(this.decorationTimer);
     this.confirmed = undefined;
+    this.confirmedVersions.clear();
+    this.annotatedVersions.clear();
     this.view.update({ phase: 'unavailable', text: '', errors: [] });
+  }
+
+  observe(document: TextDocument): void {
+    if (document.languageId !== 'isabelle') return;
+    const uri = document.uri.toString();
+    if (this.versions.get(uri) !== document.version) {
+      this.versions.set(uri, document.version);
+      // Imports may depend on this file, so invalidate their cached completion too.
+      this.confirmedVersions.clear();
+      this.annotatedVersions.clear();
+    }
+  }
+
+  matches(document: TextDocument, line: number, character: number): boolean {
+    return this.caret?.uri === document.uri.toString() && this.caret.version === document.version
+      && this.caret.line === line && this.caret.character === character;
+  }
+
+  processing(document: TextDocument) {
+    const uri = document.uri.toString();
+    const ranges = this.ranges.get(uri);
+    const known = this.available && this.annotatedVersions.get(uri) === document.version;
+    const pending = [...busyTypes].flatMap(type => (ranges?.get(type) ?? []).map(range => ({ type, range })));
+    const processed = known && pending.length === 0;
+    return { file: document.uri.fsPath, version: document.version, known, processed,
+      processing: !processed, pending };
+  }
+
+  sorryPositions(document: TextDocument): SourceRange[] {
+    return (this.badRanges.get(document.uri.toString()) ?? [])
+      .filter(range => document.getText(new Range(...range)) === 'sorry');
+  }
+
+  documentStatus(document: TextDocument) {
+    const processing = this.processing(document);
+    const uri = document.uri.toString();
+    const ranges = this.ranges.get(uri);
+    const keywords = ['text_keyword1', 'text_keyword2', 'text_keyword3', 'text_improper']
+      .flatMap(type => ranges?.get(type) ?? [])
+      .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      .map(range => document.getText(new Range(...range)));
+    const theoryClosed = keywords[0] === 'theory' && keywords.at(-1) === 'end'
+      && keywords.filter(word => word === 'begin').length === keywords.filter(word => word === 'end').length;
+    const errors = this.diagnostics.get(uri) ?? [];
+    const failed = errors.length > 0 || this.decorations.get(uri)?.get('text_overview_error') === true;
+    const sorry = this.sorryPositions(document);
+    const incomplete = sorry.length > 0 || keywords.includes('oops') || !theoryClosed
+      || (this.badRanges.get(uri)?.length ?? 0) > 0;
+    const state = !processing.processed ? 'checking' : failed ? 'error' : incomplete ? 'unfinished' : 'fully_checked';
+    return { ...processing, state, fully_checked: state === 'fully_checked',
+      saved: !document.isDirty, theory_closed: theoryClosed, sorry_count: sorry.length, has_errors: failed, errors };
   }
 
   private releasePanel(): void {
