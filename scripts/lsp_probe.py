@@ -7,6 +7,7 @@ caret is on `show ?thesis`, immediately before the placeholder `sorry`.
 
 import argparse
 import asyncio
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,28 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class OutputText(HTMLParser):
+    """Read Isabelle's preformatted output as text, without rendering HTML."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "br":
+            self.parts.append("\n")
+
+
+def plain_text(html):
+    parser = OutputText()
+    parser.feed(html)
+    parser.close()
+    return "".join(parser.parts)
 
 
 async def send(process, method, params=None, request_id=None):
@@ -68,21 +91,17 @@ async def probe(process, args, path, source):
         message = await receive(process)
         if message.get("method") == "PIDE/dynamic_output":
             content = message["params"]["content"]
-            print("\n--- Dynamic output (literal content) ---\n" + content + "\n", flush=True)
-            if args.html_control and "sqrt" in content and "subgoal" in content:
-                print("CONTROL ONLY: received HTML goal output; M1 plaintext check has NOT passed.", flush=True)
-                return
-            if "goal (1 subgoal):" in content and "sqrt" in content:
-                if "<div" in content or "<span" in content:
-                    raise RuntimeError("Goal arrived as HTML, not plain text")
-                print("PASS: received the unfinished sqrt 2 goal as plain text.", flush=True)
+            text = content if args.server_plaintext else plain_text(content)
+            print("\n--- Goal state (plain text) ---\n" + text + "\n", flush=True)
+            if "goal (1 subgoal):" in text and "sqrt 2 ∉ ℚ" in text:
+                print("PASS: printed the unfinished sqrt 2 goal as plain text.", flush=True)
                 return
 
 
 async def run(args):
     path = args.file.expanduser().resolve()
     source = path.read_text(encoding="utf-8")
-    html = "true" if args.html_control else "false"
+    html = "false" if args.server_plaintext else "true"
     command = [args.isabelle, "vscode_server", "-n", "-l", "HOL",
                "-o", f"vscode_html_output={html}", "-o", "editor_output_state=true"]
     print("Starting: " + shlex.join(command), flush=True)
@@ -120,8 +139,8 @@ def main():
     parser.add_argument("--line", type=int, default=6, help="Zero-based caret line (default: 6)")
     parser.add_argument("--character", type=int, default=4, help="Zero-based caret column (default: 4)")
     parser.add_argument("--timeout", type=float, default=90, help="Startup and goal timeout in seconds")
-    parser.add_argument("--html-control", action="store_true",
-                        help="Diagnose HTML output separately; does not satisfy M1")
+    parser.add_argument("--server-plaintext", action="store_true",
+                        help="Reproduce the Isabelle2025-2 plaintext serialization bug")
     args = parser.parse_args()
     try:
         asyncio.run(run(args))

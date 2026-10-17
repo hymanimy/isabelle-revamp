@@ -3,57 +3,60 @@
 Observed on 2026-10-17, macOS arm64, using the installed, unmodified
 `~/hack/isabelle-env/Isabelle2025-2.app`.
 
-**M1 is blocked, not passed.** Initialization and caret-driven goal output work,
-but the server's plaintext output path fails during JSON serialization. An HTML
-control run returns the expected goal. No client conversion has been implemented.
+**Approved M1 approach:** request HTML from the unmodified server and convert it
+to plain text in the client. Leo approved this on 2026-10-17 after the original
+server-plaintext check exposed the serialization bug documented below.
 
 ## Reproduce
 
-From the repository root, the strict M1 check is:
+From the repository root, the approved M1 check is:
 
 ```sh
 python3 scripts/lsp_probe.py --isabelle "$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle" --timeout 30
 ```
 
-It exits 1 after the server reports the serialization failure below and the probe
-times out. With `isabelle` on PATH, omit `--isabelle`.
+The probe prints the raw notifications and a separate plain-text goal block.
+It exits 0 only after recognizing the unfinished `sqrt 2 ∉ ℚ` goal and shutting
+down the server cleanly. With `isabelle` on PATH, omit `--isabelle`.
 
-The diagnostic control changes only the HTML option:
+To reproduce the original bug, change only the server output mode:
 
 ```sh
-python3 scripts/lsp_probe.py --isabelle "$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle" --timeout 30 --html-control
+python3 scripts/lsp_probe.py --isabelle "$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle" --timeout 30 --server-plaintext
 ```
 
-The control exits 0 and prints `CONTROL ONLY`; that is **not** an M1 pass. Both
-runs shut down the server with `shutdown` / `exit`. The probe prints all received
+That diagnostic exits 1 after the server error and timeout. Both modes shut down
+the server with `shutdown` / `exit`. The probe prints all received
 JSON messages, including notifications during initialization and shutdown, and
-prints dynamic output's literal content separately. Server stderr is inherited.
+prints the converted goal text separately. Server stderr is inherited.
 
 ## Launch options verified with the server
 
 ```sh
 isabelle vscode_server -n -l HOL \
-  -o vscode_html_output=false \
+  -o vscode_html_output=true \
   -o editor_output_state=true
 ```
 
 - `-n`: skip building the already available session image.
 - `-l HOL`: use the installed HOL image.
-- `vscode_html_output=false`: selects plaintext plus decorations. This path fails
-  in this distribution; do not describe it as working.
+- `vscode_html_output=true`: returns HTML; the client extracts its text using
+  Python's `HTMLParser`. It preserves whitespace inside `pre`, decodes character
+  references, and maps `br` to a newline. No HTML is rendered or executed.
 - `editor_output_state=true`: needed to expose goal states. The first run omitted
   it: initialization succeeded but no dynamic output arrived within 60 seconds.
-- `vscode_html_output=true`: the successful diagnostic control, returning HTML.
+- `vscode_html_output=false`: the broken server-plaintext mode, retained only
+  as a diagnostic flag in the probe.
 
 `vscode_pide_extensions` was left at its default (`false`). It was not needed for
-the HTML `PIDE/dynamic_output` notification. Busy-state notifications and inline
+the `PIDE/dynamic_output` notification. Busy-state notifications and inline
 diagnostics have not been verified by this spike.
 
 ## Framing and message sequence
 
 Stdio carries UTF-8 JSON-RPC 2.0. Each message is framed as
 `Content-Length: <UTF-8 byte count>\r\n\r\n<JSON bytes>`. Count bytes, not characters.
-The control's returned HTML contains literal Unicode symbols.
+The returned HTML contains literal Unicode symbols.
 
 In the following shapes, `ROOT_URI` and `FILE_URI` stand for the absolute file
 URIs of this repository and `examples/Sqrt2.thy`. `SOURCE` is the complete theory
@@ -94,7 +97,7 @@ text, encoded as a JSON string. The sample process ID is from the control run.
    `position` object. This run used ASCII source, so non-ASCII column accounting
    remains to be tested. There is no response ID: output arrives asynchronously.
 
-5. Server output in the **HTML control** has this envelope:
+5. Server output has this envelope:
 
    ```json
    {"jsonrpc":"2.0","method":"PIDE/dynamic_output","params":{"content":"HTML_STRING"}}
@@ -109,7 +112,8 @@ text, encoded as a JSON string. The sample process ID is from the control run.
     1. sqrt 2 ∉ ℚ
    ```
 
-   This text was contained in HTML, **not received as plaintext**. The observed
+   The server returns HTML; the approved client conversion produces this text.
+   The observed
    notification has no `uri`, document version, request ID, or `decorations` field.
    Later clients must not assume they can correlate it by a request ID.
 
@@ -164,7 +168,6 @@ are relative to `Isabelle2025-2.app/src/Tools/VSCode/`:
 - `etc/options:36` declares `vscode_html_output`; `extension/src/lsp.ts:46–68`
   defines the official caret and dynamic-output interfaces.
 
-No distribution files were changed. A possible client-only workaround is to ask
-for HTML and extract its text while preserving line breaks. That would change
-M1's explicit requirement that the **server** return plaintext, so it needs a
-scope decision before implementation. M2 has not started.
+No distribution files were changed. The client-only HTML-to-text workaround was
+approved and implemented. The original wire-level plaintext requirement has
+been replaced by plain text at the client boundary; the server bug remains.

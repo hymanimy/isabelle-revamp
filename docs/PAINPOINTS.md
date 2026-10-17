@@ -97,15 +97,23 @@ should be.
 
 ## 9. Plaintext goals fail inside the bundled server
 
-- **What happened.** With `vscode_html_output=false` and proof states enabled,
-  server stderr reports `Session consumer failure: "isabelle.vscode.Dynamic_Output"`
-  followed by `Bad JSON value` naming a lambda. The installed source's dynamic
+- **What happened.** With `-o vscode_html_output=false -o editor_output_state=true`,
+  server stderr reports this exact error (the generated lambda address varies):
+
+  ```text
+  *** Session consumer failure: "isabelle.vscode.Dynamic_Output"
+  *** Bad JSON value: isabelle.vscode.LSP$$$Lambda/0x000000700140cbb0@7b51fb28
+  ```
+
+  The installed source's dynamic
   output serializer passes an unapplied decoration method into JSON. With only
   the HTML option changed to true, the same probe receives the expected sqrt 2
   goal. Exact protocol evidence is in [PROTOCOL_NOTES.md](PROTOCOL_NOTES.md).
 - **Experience.** A documented format switch silently breaks the goals pane;
   the useful error is outside the normal JSON notification stream.
 - **Fix needed.** The upstream serializer needs to emit decoration data rather
-  than a function. A client HTML-to-text adapter could avoid this path, but would
-  change M1's server-plaintext requirement. No Isabelle files were modified, and
-  the HTML control has not been counted as an M1 pass.
+  than a function.
+- **Workaround used.** With Leo's approval, request `-o vscode_html_output=true`
+  and convert the HTML to plain text in our client. Python's standard-library
+  `HTMLParser` removes markup, decodes entities, and preserves the preformatted
+  line breaks. No Isabelle files were modified.
