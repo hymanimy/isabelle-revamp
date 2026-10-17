@@ -59,3 +59,53 @@ should be.
 - **Fix needed.** A "Set up Isabelle" button in the extension on first open, the way the
   Lean extension installs `elan`. Or, as discussed, a hosted check endpoint so a first
   try needs no install at all.
+
+## 6. Installed commands are missing from the editor's tool shell
+
+- **What happened.** `node --version` returned v26.8.2 and `python3 --version`
+  returned 3.13.15, but `code` and `isabelle` both returned `command not found`.
+  Both apps are installed. VS Code's bundled CLI returned 1.138.0, arm64; invoking
+  Isabelle's bundled executable worked too.
+- **Experience.** Setup worked in one terminal, then appears broken in another.
+  The user cannot tell whether to reinstall or change a setting.
+- **Fix needed.** Accept an explicit Isabelle executable path and report the path
+  actually used. Explain how to locate VS Code's CLI without requiring a reinstall.
+- **Workaround used.** Explicit executable paths; no global PATH configuration
+  changes. The probe accepts `--isabelle`.
+
+## 7. Sandboxing blocks startup before any proof is checked
+
+- **What happened.** Isabelle first failed to create `~/.isabelle` in the sandbox.
+  After approved runtime access, the sandboxed probe's initialize request failed
+  with `sysctl: sysctl fmt -1 1024 1: Operation not permitted`. Running the probe
+  outside the sandbox with approval allowed initialization to complete.
+- **Experience.** An operating-system error appears where a proof state should be.
+  It gives no indication that the theory itself has not been checked yet.
+- **Fix needed.** Distinguish server startup failures from proof errors and show
+  the exact failing operation. Keep permission prompts tied to observed failures.
+
+## 8. A running server can still show no proof state
+
+- **What happened.** The server initialized and accepted the document and caret,
+  but sent no dynamic output for 60 seconds. The resources' `editor_output_state`
+  option defaults to false. Adding `-o editor_output_state=true` enabled the goal
+  output path (and exposed the separate serialization failure below).
+- **Experience.** A welcome message says the prover is ready, but the goals pane
+  would stay blank with no explanation.
+- **Fix needed.** Set the proof-state option explicitly in our client, and use a
+  known unfinished goal as the startup acceptance check.
+
+## 9. Plaintext goals fail inside the bundled server
+
+- **What happened.** With `vscode_html_output=false` and proof states enabled,
+  server stderr reports `Session consumer failure: "isabelle.vscode.Dynamic_Output"`
+  followed by `Bad JSON value` naming a lambda. The installed source's dynamic
+  output serializer passes an unapplied decoration method into JSON. With only
+  the HTML option changed to true, the same probe receives the expected sqrt 2
+  goal. Exact protocol evidence is in [PROTOCOL_NOTES.md](PROTOCOL_NOTES.md).
+- **Experience.** A documented format switch silently breaks the goals pane;
+  the useful error is outside the normal JSON notification stream.
+- **Fix needed.** The upstream serializer needs to emit decoration data rather
+  than a function. A client HTML-to-text adapter could avoid this path, but would
+  change M1's server-plaintext requirement. No Isabelle files were modified, and
+  the HTML control has not been counted as an M1 pass.

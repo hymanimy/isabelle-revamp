@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""M1: print Isabelle's LSP traffic and the goal at the unfinished proof.
+
+Uses only Python's standard library. Positions are zero-based; the default
+caret is on `show ?thesis`, immediately before the placeholder `sorry`.
+"""
+
+import argparse
+import asyncio
+import json
+import os
+from pathlib import Path
+import shlex
+import signal
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+async def send(process, method, params=None, request_id=None):
+    message = {"jsonrpc": "2.0", "method": method}
+    if params is not None:
+        message["params"] = params
+    if request_id is not None:
+        message["id"] = request_id
+    body = json.dumps(message, ensure_ascii=False).encode("utf-8")
+    print("--> " + body.decode("utf-8"), flush=True)
+    process.stdin.write(f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+    await process.stdin.drain()
+
+
+async def receive(process):
+    header = await process.stdout.readuntil(b"\r\n\r\n")
+    fields = dict(line.split(b":", 1) for line in header.strip().split(b"\r\n"))
+    size = int(fields[b"Content-Length"].strip())
+    message = json.loads(await process.stdout.readexactly(size))
+    print("<-- " + json.dumps(message, ensure_ascii=False), flush=True)
+    return message
+
+
+async def response(process, request_id):
+    while True:
+        message = await receive(process)
+        if message.get("id") == request_id:
+            if "error" in message:
+                raise RuntimeError(message["error"])
+            return message["result"]
+
+
+async def probe(process, args, path, source):
+    await send(process, "initialize", {
+        "processId": os.getpid(),
+        "rootUri": ROOT.as_uri(),
+        "capabilities": {},
+        "clientInfo": {"name": "isabelle-revamp-lsp-probe", "version": "0.1"},
+    }, request_id=1)
+    await response(process, 1)
+    await send(process, "initialized", {})
+    await send(process, "textDocument/didOpen", {"textDocument": {
+        "uri": path.as_uri(), "languageId": "isabelle", "version": 1,
+        "text": source,
+    }})
+    await send(process, "PIDE/caret_update", {
+        "uri": path.as_uri(), "line": args.line, "character": args.character,
+    })
+    while True:
+        message = await receive(process)
+        if message.get("method") == "PIDE/dynamic_output":
+            content = message["params"]["content"]
+            print("\n--- Dynamic output (literal content) ---\n" + content + "\n", flush=True)
+            if args.html_control and "sqrt" in content and "subgoal" in content:
+                print("CONTROL ONLY: received HTML goal output; M1 plaintext check has NOT passed.", flush=True)
+                return
+            if "goal (1 subgoal):" in content and "sqrt" in content:
+                if "<div" in content or "<span" in content:
+                    raise RuntimeError("Goal arrived as HTML, not plain text")
+                print("PASS: received the unfinished sqrt 2 goal as plain text.", flush=True)
+                return
+
+
+async def run(args):
+    path = args.file.expanduser().resolve()
+    source = path.read_text(encoding="utf-8")
+    html = "true" if args.html_control else "false"
+    command = [args.isabelle, "vscode_server", "-n", "-l", "HOL",
+               "-o", f"vscode_html_output={html}", "-o", "editor_output_state=true"]
+    print("Starting: " + shlex.join(command), flush=True)
+    process = await asyncio.create_subprocess_exec(
+        *command, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+        start_new_session=True,
+    )
+    try:
+        await asyncio.wait_for(probe(process, args, path, source), args.timeout)
+    finally:
+        # Drain and print notifications during shutdown too. Never leave a prover
+        # running after the foreground probe has finished or failed.
+        try:
+            if process.returncode is None:
+                await send(process, "shutdown", request_id=2)
+                await asyncio.wait_for(response(process, 2), 10)
+                await send(process, "exit")
+                await asyncio.wait_for(process.wait(), 10)
+        finally:
+            if process.returncode is None:
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    await asyncio.wait_for(process.wait(), 5)
+                except TimeoutError:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    await process.wait()
+    if process.returncode != 0:
+        raise RuntimeError(f"Server exited with code {process.returncode}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--isabelle", default="isabelle", help="Isabelle executable")
+    parser.add_argument("--file", type=Path, default=ROOT / "examples/Sqrt2.thy")
+    parser.add_argument("--line", type=int, default=6, help="Zero-based caret line (default: 6)")
+    parser.add_argument("--character", type=int, default=4, help="Zero-based caret column (default: 4)")
+    parser.add_argument("--timeout", type=float, default=90, help="Startup and goal timeout in seconds")
+    parser.add_argument("--html-control", action="store_true",
+                        help="Diagnose HTML output separately; does not satisfy M1")
+    args = parser.parse_args()
+    try:
+        asyncio.run(run(args))
+    except (OSError, RuntimeError, TimeoutError, asyncio.IncompleteReadError) as error:
+        print(f"FAIL: {str(error) or 'timed out waiting for the goal state'}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
