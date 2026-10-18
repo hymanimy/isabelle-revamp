@@ -1,202 +1,127 @@
 # Isabelle Revamp
 
-## Two ways in
+**Isabelle/HOL in stock VS Code, with an AI agent that writes proofs the kernel checks.**
 
-**Demo** — [`demo/`](demo/README.md) is the folder you open on stage: five
-theories plus workspace settings, no source and no tests. Run `bash
-scripts/demo-env.sh` from this root; it installs the current VSIX into an
-isolated **Demo** VS Code profile under `demo/.demo/` and prints the single
-command that opens the folder. Use that command, never a normal window.
+Built in one day at the *Reinvent the Wheel* hackathon, 17 October 2026.
 
-**Dev** — this repository root is the development workspace. Run `npm ci
---prefix extension`, open the root in VS Code, then **Run → Start Debugging**
-(F5) for an Extension Development Host. The sources are `extension/` and
-`mcp/`; the checks are `scripts/check_*.sh`. Nothing in `demo/` is needed to
-build, test or package.
+Lean is the only proof assistant with first-class editor and AI tooling. Isabelle has a
+different type theory, a twenty-year library (the Archive of Formal Proofs) and the most
+readable proof language there is, Isar; what it lacks is a modern front end. This project
+adds one, without changing a line of Isabelle.
 
-Isabelle/HOL in stock VS Code, using the unmodified `isabelle vscode_server`.
-M1 provides a plain-text goal probe; M2 adds Isar highlighting and server startup;
-M3 adds the **Isabelle Goals** sidebar and live errors. M4 provides a readable,
-fully checked proof that sqrt 2 is irrational in `examples/Sqrt2.thy`, with no
-`sorry`. M5 connects AI agents to that same editor through MCP tools.
-M6 adds a theme-aware sidebar, Unicode output and a theory/check-status header.
-M7 adds **Isabelle Swarm**, a live card board for six proof steps filled through MCP.
-M8 adds **Ask Isabelle**: streamed Claude Code replies and proof edits through those same tools.
+- **Editor:** `.thy` files in ordinary VS Code: highlighting, Unicode rendering of `∑ ∉ ℚ`,
+  goal state that follows the cursor, errors inline, Ctrl-click into the HOL library.
+- **Proof Graph:** every named step of a proof as a node in a dependency graph, grey while
+  open, amber while checking, green when the kernel accepts it. Replay a proof you just watched.
+- **Agent:** an [MCP](https://modelcontextprotocol.io) server exposing the live proof state
+  (`goals_at`, `errors`, `sorry_positions`, `proof_graph`, …) so Claude Code or Codex can
+  write a proof step by step and see exactly what you see. The agent proposes; **only the
+  kernel says proved.**
 
-## Install in under five minutes
+The one rule: Isabelle's kernel, HOL and Isar syntax are untouched. Everything here is a client
+of Isabelle's own `isabelle vscode_server`.
 
-Requires stock VS Code 1.104+ and Isabelle2025-2 with its HOL heap. Node, npm,
-Python and a checkout are unnecessary for the installed extension's proof checking.
+## Install the VS Code extension
 
-1. Obtain `isabelle-revamp-0.1.0.vsix`. To build it from this checkout:
-   `npm ci --prefix extension && npm run package --prefix extension`.
-   The artifact is `dist/isabelle-revamp-0.1.0.vsix`.
-2. In VS Code, choose **Extensions → … → Install from VSIX…** and select it,
-   or run `code --install-extension dist/isabelle-revamp-0.1.0.vsix`.
-3. Open your theory folder and `examples/Sqrt2.thy` in a regular window.
-   **Isabelle Goals** opens automatically; click an intermediate `have`.
-4. Run **Isabelle: Show Swarm** to see proof cards. Run
-   **Isabelle Revamp: Setup check** for Isabelle, HOL, Claude and MCP checks.
-5. For **Isabelle: Ask**, install/sign in to Claude Code and install Python
-   3.11+. Copy the absolute MCP registration command shown in the panel if
-   needed. The bundled launcher installs its private dependencies on first use.
-   See [the installed demo](docs/DEMO.md#install-from-vsix-m11).
-
-Isabelle is found through `isabelleRevamp.executable`, PATH, then standard
-macOS/home install locations. If missing, the single notification offers
-**Locate…** or **Download**. A missing HOL heap can be built with
-`isabelle build -b HOL`. Source stays ASCII unless `unicodeOnSave` is enabled.
-
-For development and packaging, use Node 22+ (required by vsce), run
-`npm ci --prefix extension`, open this repository in
-VS Code, and press **F5**. `npm run compile --prefix extension` compiles the
-individual modules for the existing checks; `npm run package --prefix extension`
-type-checks and bundles the shipping extension. `bash scripts/check_m11.sh`
-audits the package, discovery and optional Ask setup.
-
-## Check the proof and sidebar (M4)
-
-In a fresh F5 development host, run **Isabelle: Show Goals** from the Command
-Palette. The view lives in the Explorer sidebar. If reusing an older host, first
-compile and run **Developer: Reload Window** there.
-
-The sidebar briefly shows `checking…` during processing. An admitted `sorry`
-shows **unfinished (sorry)**; a failed tactic shows **Proof error** and an inline
-diagnostic. Each of the demo's 11 `have` commands has a distinct goal.
-The header names the active theory and shows **fully checked** once its complete
-buffer has passed. Goals and diagnostics display Unicode (including `²`);
-the source file keeps its original Isabelle notation. Colours and the goal font
-follow your VS Code theme and editor settings.
+Download `isabelle-revamp-0.1.0.vsix` from the
+[latest release](https://github.com/hymanimy/isabelle-revamp/releases/latest), then either
 
 ```sh
-isabelle process_theories -D examples -O Sqrt2
-bash scripts/check_m4.sh
+code --install-extension isabelle-revamp-0.1.0.vsix
 ```
 
-If Isabelle is missing from PATH, use
-`"$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle"` for the first command.
-For another VS Code installation, pass its **application executable** as the
-first argument to `scripts/check_m4.sh`.
-The runner uses a separate host profile and test theory under ignored `.dev-host/`.
-It includes M3's cursor/diagnostic regression checks, then checks every demo
-`have`, the real completed proof, and editing between unfinished/error/complete
-states. It leaves the real example unchanged.
+or in VS Code: **Extensions → ⋯ → Install from VSIX…**. Open any `.thy` file. If Isabelle
+isn't found you get one notification with **Locate…** (pick `bin/isabelle`) or **Download**.
+Run **Isabelle Revamp: Setup check** from the command palette to see what's wired up.
 
-## Connect an AI agent (M5)
+That gives you the editor, goals and proof graph. No Node, Python or clone needed.
 
-Follow [mcp/README.md](mcp/README.md) to install the Python environment and register
-the stdio server with Codex or Claude Code. The tools are `open`, `edit`,
-`goals_at`, `errors`, `status`, `sorry_positions`, `processing_status`, and
-`proof_graph`.
-Up to two agents connect to each extension instance. `goals_at` moves the visible cursor
-and returns the sidebar's text; `edit` changes and saves the VS Code buffer.
-Read `open` immediately before an edit: another agent's changes invalidate old
-coordinates, and stale edits are rejected.
+## Add the agent
 
-After installing the MCP dependencies, `bash scripts/check_m5.sh` runs the real
-stdio-to-editor acceptance check, including the M3/M4 regressions.
+1. Install [Claude Code](https://docs.claude.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`), sign in once.
+2. Python 3.11+ on PATH.
+3. Register the MCP server (printed by **Setup check**, or see [mcp/README.md](mcp/README.md)):
+   ```sh
+   claude mcp add --transport stdio --scope local isabelle -- python3 '<extension path>/mcp/launch.py'
+   ```
+4. Open a `.thy` with a `sorry` in it, open a terminal in VS Code, run `claude`, type **prove this**.
 
-## Verify the polished sidebar and highlighting (M6)
+The `demo/` folder is pre-configured: `cd demo && claude` picks up `.mcp.json` and the
+proof-style rules in [`demo/CLAUDE.md`](demo/CLAUDE.md) automatically.
 
-Run `bash scripts/check_m6.sh` after installing both extension and MCP dependencies.
-It includes the M3–M5 live checks, Unicode goals, theory-header switching, and
-the installed VS Code TextMate engine's highlighting across Dark+, Light+, and
-both high-contrast themes. The grammar covers the core Isar keywords and the
-demo's `text`, `where`, and `and`, with nested comments/cartouches and symbols.
-It uses a separate profile under `.dev-host/` and leaves the demo unchanged.
+## Dependencies
 
-For a visual check, reload the development host, open **Isabelle: Show Goals**,
-and click `have root_squared`: the sidebar should show `(sqrt 2)² = 2` below
-**Sqrt2 · fully checked**. Use **Preferences: Color Theme** to inspect light,
-dark and high-contrast rendering. The automated checks validate token styles
-and the view model; they do not replace looking at the rendered window.
+| Needed for | Dependency | Notes |
+| --- | --- | --- |
+| Everything | [Isabelle2025-2](https://isabelle.in.tum.de/) with the HOL heap | macOS bundle ships HOL prebuilt; on Linux run `isabelle build -b HOL` once (10–20 min) |
+| Everything | VS Code 1.104+ | stock build; no VSCodium needed |
+| Agent | Claude Code 2.1+ or Codex CLI | either; one agent per editor window |
+| Agent | Python 3.11+ | the MCP bridge; its own deps install into a private venv on first run |
+| Development | Node 22+, npm | to build the extension and run the checks |
 
-## Proof Swarm (M7)
+Tested on macOS (Apple Silicon) and Linux. Windows is untested.
 
-Open `examples/Swarm.thy` in the development host and run **Isabelle: Show Swarm**.
-Its six grey cards are the skeleton of the sum-of-odd-numbers proof. Click a card
-to see its goal; as its proof is filled, it turns amber while checking, green
-when checked, or red on an error. Recent MCP edits show the client name for ten
-seconds. The header shows progress, elapsed time, and whole-theory completion.
-
-Follow the [Swarm demo](docs/DEMO.md#swarm) and [agent prompt](docs/SWARM_PROMPT.md).
-Run `bash scripts/check_m7.sh` for the reference proof, all earlier regression
-checks, live card transitions, two named MCP clients, stale-edit rejection and
-badge expiry. The reference solution is committed but hidden in the demo's
-Explorer/search through workspace settings.
-
-## Ask Isabelle (M8)
-
-With Claude Code installed, signed in and registered using [mcp/README.md](mcp/README.md),
-open `examples/Demo.thy` and run **Isabelle: Ask**. Type **prove this** and press
-Enter in the bottom Ask panel. Claude fills the three named proof steps through MCP while the Goals and
-Swarm panels update. Ask **why does this fail?** to inspect an actual diagnostic.
-Shift+Enter adds a line; Stop cancels the child process. The session transcript
-appends, and requests stop automatically after ten minutes.
-
-Follow the [Ask demo](docs/DEMO.md#ask-isabelle). `bash scripts/check_m8.sh` checks
-streaming, Stop, missing-tool help, webview behavior and earlier regressions.
-`M8_LIVE=1 bash scripts/check_m8.sh` also runs the two real Claude acceptance
-requests with your configured account/model, temporarily editing and restoring
-`Demo.thy`. Ask uses only the installed Claude Code CLI and the MCP tools.
-
-## Proof Graph and demo layout (M12–M13)
-
-Run **Isabelle: Demo Layout** with a theory open. Source stays in the editor;
-Ask and Proof Graph share the bottom panel. The right status bar mirrors the
-proof counts/time and opens the graph when clicked. Goals is hidden by default;
-`isabelleRevamp.demoShowGoals` can expose it for the demo.
-
-Only the theorem/lemma and named outer `have`/`show`/`obtain` steps get tiles.
-Nested proof commands contribute to their owner's status. Swarm has seven
-nodes, Sqrt2 thirteen, and Cascade five; names and line numbers match MCP
-`proof_graph`. Hover for the statement and actual goal, click for a one-second
-source highlight; cursor movement focuses the corresponding tile. Gutter dots
-show the same status. Open is grey/dashed, checking amber, proved green and
-error/abandoned red. Accepted steps fold into their parent.
-
-**Open in editor column** provides the full-height view. **Fit**, pan/zoom and
-**Replay ×8** work on both surfaces; replay never changes source or calls Isabelle.
-Cascade proves the rational-square-root claim over natural numerator/denominator
-witnesses, importing only `Main`; its full reference is `Cascade_solution.thy`.
-See [the graph demo](docs/DEMO.md#proof-graph-m12).
-
-`bash scripts/check_m12.sh` checks the reference, regressions, live graph and
-200-node animation timing. `bash scripts/check_m13.sh` checks bottom layout,
-Ask controls and status. Real Claude rehearsal is separate from these checks;
-the first Cascade attempt stalled and is recorded in PROGRESS.md.
-
-## Stage environment (M13b)
-
-Run `bash scripts/demo-env.sh` to prepare `~/hack/demo` and the isolated **Demo**
-profile. Use its printed launch command. It installs only our VSIX, prepares MCP,
-sets font size 16 and pretty symbols, disables update/trust/tip interruptions,
-and opens Demo Layout automatically. Existing edited demo theories are preserved.
-Close that Demo window before re-running setup. See the
-[Pre-flight checklist](docs/DEMO.md#pre-flight-m13b) for DND, Chat, Replay and video.
-
-## Run the goal probe
+## Run the demo
 
 ```sh
-python3 scripts/lsp_probe.py --isabelle "$HOME/hack/isabelle-env/Isabelle2025-2.app/bin/isabelle"
+git clone https://github.com/hymanimy/isabelle-revamp.git && cd isabelle-revamp && git checkout leo
+bash scripts/demo-env.sh      # isolated "Demo" VS Code profile, prints the launch command
 ```
 
-It prints every server notification and the goal at the theorem statement:
+Run the printed command (Linux: replace the macOS `code` path with `code`). Then
+**Isabelle: Demo Layout**, open `demo/Swarm.thy`, `claude` in the terminal, **prove this**.
+The four-beat storyboard is [docs/STORYBOARD.md](docs/STORYBOARD.md); the click-by-click
+script and pre-flight checklist are [docs/DEMO.md](docs/DEMO.md).
 
-```text
-proof (prove)
-goal (1 subgoal):
- 1. sqrt 2 ∉ ℚ
+Independent check of any proof, no extension involved:
+```sh
+isabelle process_theories -D demo -O Swarm     # exit 0, no sorry
 ```
 
-The approved client workaround requests HTML and extracts text because Isabelle's
-plaintext serializer fails. See [protocol notes](docs/PROTOCOL_NOTES.md),
-[pain points](docs/PAINPOINTS.md), and [milestone progress](docs/PROGRESS.md).
-The extension's minimal startup adaptation is credited in
-[third-party notices](extension/THIRD_PARTY_NOTICES.md).
+## How it works
 
-Library definitions opened through Ctrl/Cmd-click are read-only in this workspace.
-Activation adds missing `files.readonlyInclude` entries for the installed Isabelle
-and user library roots, discovered with `isabelle getenv`. This does not change
-library files, permissions, or global VS Code settings. See the numbered M10
-checks in [docs/DEMO.md](docs/DEMO.md).
+```
+ Claude Code / Codex ──MCP (stdio)──▶ mcp/server.py
+                                          │  local socket, token-authenticated
+                                          ▼
+                              VS Code extension (TypeScript)
+                              goals · graph · edits · decorations
+                                          │  LSP + PIDE/caret_update, PIDE/dynamic_output
+                                          ▼
+                              isabelle vscode_server  (unmodified)
+                                          │
+                                   Isabelle/HOL kernel
+```
+
+The extension owns the one Isabelle process. The MCP server is a thin bridge to it, so the
+human and the agent are looking at the same prover. Protocol details discovered empirically
+are in [docs/PROTOCOL_NOTES.md](docs/PROTOCOL_NOTES.md).
+
+## Development
+
+```sh
+npm ci --prefix extension
+# open this folder in VS Code, Run → Start Debugging (F5)
+npm run package --prefix extension      # builds dist/isabelle-revamp-0.1.0.vsix
+bash scripts/check_m14.sh               # full regression chain
+```
+
+Layout: `extension/` (VS Code extension), `mcp/` (MCP server), `examples/` (theories and
+reference solutions), `demo/` (what you open on stage), `scripts/` (checks), `docs/`.
+
+## Docs
+
+- [docs/PAINPOINTS.md](docs/PAINPOINTS.md) — every way installing and using Isabelle went
+  wrong today, with the fix each one needs. The reason this project exists.
+- [docs/STORYBOARD.md](docs/STORYBOARD.md) — the demo.
+- [docs/PROGRESS.md](docs/PROGRESS.md) — milestone-by-milestone build log, M1–M15.
+- [docs/README_milestones.md](docs/README_milestones.md) — the previous, feature-by-feature README.
+
+## Credits and lineage
+
+Isabelle and its VS Code language server are by the Isabelle team (BSD; see
+[THIRD_PARTY_NOTICES](extension/THIRD_PARTY_NOTICES.md)). The MCP tool design follows AWS's
+[I/Q](https://github.com/awslabs/AutoCorrode/blob/main/iq/README.md) for Isabelle/jEdit;
+the dependency-graph idea follows Anthropic's
+[Prove2Me](https://www.anthropic.com/news/formalizing-fermats-last-theorem) harness.
+Team: Alex Hyman, Leo Aarons-Ditson. Built with Codex and Claude Code. MIT licence.
