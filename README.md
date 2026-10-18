@@ -1,5 +1,9 @@
 # Isabelle Revamp
 
+![Isabelle Revamp proving Michaelis–Menten monotonicity in VS Code](docs/images/demo-michaelis-menten.png)
+
+*The extension proving a biology maths fact: the [Michaelis–Menten](https://en.wikipedia.org/wiki/Michaelis%E2%80%93Menten_kinetics) reaction rate strictly increases with substrate concentration, checked by [Isabelle](https://isabelle.in.tum.de/).*
+
 **Isabelle/HOL in stock VS Code, with an AI agent that writes proofs the kernel checks.**
 
 Built in one day at the *Reinvent the Wheel* hackathon, 17 October 2026.
