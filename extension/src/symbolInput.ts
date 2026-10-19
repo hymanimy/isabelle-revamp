@@ -18,6 +18,7 @@ export function asciiCompletions(result: CompletionItem[] | CompletionList | nul
 
 export class SymbolInput implements Disposable {
   private sessionAbbrevs: [string,string][] = [];
+  private pairCache?: { catalog: typeof symbolCatalog; session: [string,string][]; pairs: [string,string][] };
   private subscriptions: Disposable[];
   constructor(private client: LanguageClient) {
     this.subscriptions = [client.onNotification('PIDE/abbrevs_response', (message: { abbrevs: [string,string][] }) => {
@@ -38,14 +39,22 @@ export class SymbolInput implements Disposable {
   }
   async request(): Promise<void> { await this.client.sendNotification('PIDE/abbrevs_request'); }
   snapshot() { return this.sessionAbbrevs.map(pair=>[...pair]); }
+  // The catalog is replaced once at startup and the session list on each abbrevs response.
+  private pairs(): [string,string][] {
+    const cache = this.pairCache;
+    if (cache?.catalog === symbolCatalog && cache.session === this.sessionAbbrevs) return cache.pairs;
+    const pairs = [...symbolCatalog.entries.flatMap(entry =>
+      entry.abbrevs.map(abbrev => [abbrev,entry.symbol] as [string,string])), ...this.sessionAbbrevs];
+    this.pairCache = { catalog: symbolCatalog, session: this.sessionAbbrevs, pairs };
+    return pairs;
+  }
   private complete(document: TextDocument, position: Position): CompletionItem[] {
     const before = document.lineAt(position.line).text.slice(0,position.character);
-    const pairs: [string,string][] = [...symbolCatalog.entries.flatMap(entry =>
-      entry.abbrevs.map(abbrev => [abbrev,entry.symbol] as [string,string])), ...this.sessionAbbrevs];
+    const pairs = this.pairs();
     const items: CompletionItem[] = [], seen = new Set<string>();
+    // Exact short forms; named backslash input also offers prefix matches.
+    const prefix = /\\[A-Za-z^][A-Za-z0-9_]*$/.exec(before)?.[0];
     for (const [abbrev,replacement] of pairs) {
-      // Exact short forms; named backslash input also offers prefix matches.
-      const prefix = /\\[A-Za-z^][A-Za-z0-9_]*$/.exec(before)?.[0];
       const match = before.endsWith(abbrev) ? abbrev : prefix && abbrev.startsWith(prefix) ? prefix : undefined;
       if (!match) continue;
       const start = position.character - match.length;
