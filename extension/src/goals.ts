@@ -364,13 +364,17 @@ export class Goals implements Disposable {
     return this.caret !== undefined && this.busyBefore(this.caret.uri, this.caret.line, this.caret.character);
   }
 
-  // With exceptRunningAt, a command running at the position does not count: its
-  // output so far is worth showing, as sledgehammer reports each prover's proof.
+  // Whether the state at a position is still to come: text up to it is unprocessed,
+  // or the command there is running. A command waiting for an earlier one is
+  // unprocessed; a proof running elsewhere, such as another lemma's forked proof that
+  // may search forever, does not hold up the state here. With exceptRunningAt, a
+  // running command at the position does not count: its output so far is worth
+  // showing, as sledgehammer reports each prover's proof.
   private busyBefore(uri: string, line: number, character: number, exceptRunningAt = false): boolean {
     const ranges = this.ranges.get(uri);
     return [...busyTypes].some(type => (ranges?.get(type) ?? []).some(range =>
-      (range[0] < line || range[0] === line && range[1] <= character)
-      && !(exceptRunningAt && runningTypes.has(type) && contains(range, line, character))));
+      runningTypes.has(type) ? !exceptRunningAt && contains(range, line, character)
+        : range[0] < line || range[0] === line && range[1] <= character));
   }
 
   private render(): void {
@@ -379,11 +383,9 @@ export class Goals implements Disposable {
     const { uri, line, character } = this.caret;
     if (this.busyBefore(uri, line, character, true) || !this.document) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
     const running = this.busyBefore(uri, line, character);
-    const show = (state: GoalState) => {
-      // Until a running command prints something, there is nothing to show.
-      if (running && !state.text && !state.errors.length) this.publish({ phase: 'checking', text: '', errors: [] });
-      else this.publish(running ? { ...state, running } : state);
-    };
+    // A running command shows its output so far; "running…" even without any, so a
+    // long search is not mistaken for waiting on earlier commands.
+    const show = (state: GoalState) => this.publish(running ? { ...state, running } : state);
     if (this.confirmed !== undefined) { show(this.present(this.document, line, this.confirmedHtml!)); return; }
     // Isabelle sends caret output only when it changes, so nothing may arrive to prompt
     // another render: wait on a timer, counted from the state_init answer.

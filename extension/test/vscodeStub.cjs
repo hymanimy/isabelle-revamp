@@ -12,7 +12,9 @@ class EventEmitter {
   fire(value) { for (const listener of this.listeners) listener(value); }
   dispose() { this.listeners.clear(); }
 }
-const vscode = { Position, Range, EventEmitter, DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 } };
+class ThemeColor { constructor(id) { this.id = id; } }
+const vscode = { Position, Range, EventEmitter, ThemeColor, OverviewRulerLane: { Left: 1, Center: 2, Right: 4, Full: 7 },
+  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 } };
 if (!Module._load.vscodeStub) {
   const load = Module._load;
   Module._load = function (name, ...rest) { return name === 'vscode' ? vscode : load.call(this, name, ...rest); };

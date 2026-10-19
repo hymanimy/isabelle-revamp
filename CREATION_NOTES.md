@@ -95,3 +95,14 @@ showed "checking…" until sledgehammer was done. It now shows a running command
 output as it arrives, as jEdit's Output panel does. Each prover's line is prefixed
 with its name ("algebra: Try this: by algebra"), which the hover's Apply links
 must allow for.
+
+## A goal stuck on "checking…" behind someone else's proof
+
+Deleting a fact from `using … by blast` can leave blast searching for a very long
+time, perhaps forever; Isabelle keeps it running (in one session, for 28 minutes at
+full CPU). Top-level proofs run in parallel, so a later lemma's state does not
+depend on it, but the Goals panel waited for every busy range before the cursor
+and showed "checking…" indefinitely, sledgehammer's results included. A command
+that waits for an earlier one is marked unprocessed, so the panel now waits only
+for unprocessed text up to the cursor or the command at the cursor itself, and
+running commands are highlighted as in jEdit, so a runaway search is visible.

@@ -70,19 +70,25 @@ exports.run = async function () {
 
   // Sledgehammer's provers report one by one; each proof is usable as soon as it arrives.
   const sledge = path.join(path.dirname(file), 'Sledge.thy');
+  // Above it, another lemma's proof that runs for ten minutes, like a blast that never ends.
   fs.writeFileSync(sledge, 'theory Sledge imports Main begin\ndefinition f :: nat where [code del]: "f = 0"\n'
+    + 'lemma slow: True\n  by (tactic \\<open>fn st => (OS.Process.sleep (Time.fromSeconds 600); all_tac st)\\<close>)\n'
     + 'lemma "(a::int) * b + c = c + b * a"\n  sledgehammer\n  sorry\nend\n');
   const hammered = await vscode.workspace.openTextDocument(sledge);
   const hammer = await vscode.window.showTextDocument(hammered);
-  hammer.selection = new vscode.Selection(3, 4, 3, 4);
+  hammer.selection = new vscode.Selection(5, 4, 5, 4);
   await until('sledgehammer shows a proof while running', () => api.getGoalState().running
     && api.getGoalState().text.includes(': Try this: by'));
   assert(api.getGoalState().html.includes('class="sendback"'));
-  const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', hammered.uri, new vscode.Position(3, 4));
+  // Like jEdit, the running command is highlighted.
+  const running = () => (api.getStatusDecorations().background_running1 ?? []).map(([line]) => line);
+  assert(running().includes(5) && running().includes(3), JSON.stringify(api.getStatusDecorations()));
+  const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', hammered.uri, new vscode.Position(5, 4));
   assert(hover.flatMap(h => h.contents.map(c => c.value ?? String(c))).join('\n').includes('command:isabelleRevamp.applySuggestion'),
     'The hover offers sledgehammer proofs');
-  console.log('PASS: sledgehammer proofs show in Goals and the hover while it runs');
+  console.log('PASS: sledgehammer is highlighted as running, and its proofs show in Goals and the hover as they arrive, despite a slow proof above');
   await until('sledgehammer finishes', () => !api.getGoalState().running && api.getGoalState().text.includes('Done'), 120);
+  assert(!running().includes(5) && running().includes(3), 'The highlight goes when it finishes');
 
   // Isabelle/jEdit shows legacy features as warnings.
   const severities = vscode.languages.getDiagnostics(hammered.uri);

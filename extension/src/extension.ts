@@ -10,6 +10,7 @@ import { loadSymbols, unicodeSymbols } from './symbols';
 import { PrettySymbols } from './prettySymbols';
 import { LibraryFiles, libraryRoots as findLibraryRoots } from './libraryFiles';
 import { SemanticColors } from './semanticColors';
+import { StatusDecorations } from './statusDecorations';
 import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
@@ -154,7 +155,8 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(symbolInput);
   goals = new Goals(client, view, settings.outputDelay);
   const semanticColors = new SemanticColors(goals);
-  context.subscriptions.push(semanticColors);
+  const statusDecorations = new StatusDecorations(goals);
+  context.subscriptions.push(semanticColors, statusDecorations);
   const agentEdits = new AgentEdits();
   const theories = new Theories(goals);
   context.subscriptions.push(agentEdits, theories,
@@ -211,6 +213,7 @@ export async function activate(context: ExtensionContext) {
     hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),
     getScriptDecorations: () => window.activeTextEditor ? visibleScripts(window.activeTextEditor) : [],
     getAbbreviations: () => symbolInput.snapshot(),
+    getStatusDecorations: () => window.activeTextEditor ? statusDecorations.snapshot(window.activeTextEditor) : {},
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
     getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [] };
 }

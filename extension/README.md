@@ -13,6 +13,10 @@ mathematical symbol display. The original ASCII theory stays on disk by default.
    theories it imports, with the prover's progress on each. When `try0`,
    `try` or `sledgehammer` finds a proof, apply it from the hover over the
    command or by clicking it in Goals; a `sorry` right after it goes too.
+   As in Isabelle/jEdit, running commands are highlighted purple, unchecked
+   text pink and failed text red; the colours are theme colours
+   (`isabelle.runningBackground` and others) you can change in
+   `workbench.colorCustomizations`.
 4. If Isabelle is not found, choose **Locate…** and select its `bin/isabelle`.
    **Isabelle Revamp: Setup check** prints checks and fixes in Output → Isabelle.
 

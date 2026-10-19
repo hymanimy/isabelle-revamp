@@ -216,6 +216,108 @@
           ]
         }
       }
+    ],
+    "colors": [
+      {
+        "id": "isabelle.unprocessedBackground",
+        "description": "Background of Isabelle commands not yet checked (jEdit: unprocessed1_color).",
+        "defaults": {
+          "light": "#FFA0A032",
+          "dark": "#A040A026",
+          "highContrast": "#A040A026",
+          "highContrastLight": "#FFA0A032"
+        }
+      },
+      {
+        "id": "isabelle.runningBackground",
+        "description": "Background of Isabelle commands still running (jEdit: running1_color).",
+        "defaults": {
+          "light": "#61006164",
+          "dark": "#B040B066",
+          "highContrast": "#B040B066",
+          "highContrastLight": "#61006164"
+        }
+      },
+      {
+        "id": "isabelle.canceledBackground",
+        "description": "Background of Isabelle commands whose execution was canceled.",
+        "defaults": {
+          "light": "#FF6A6A64",
+          "dark": "#FF6A6A40",
+          "highContrast": "#FF6A6A40",
+          "highContrastLight": "#FF6A6A64"
+        }
+      },
+      {
+        "id": "isabelle.badBackground",
+        "description": "Background of failed or admitted (sorry) Isabelle text.",
+        "defaults": {
+          "light": "#FF6A6A64",
+          "dark": "#FF6A6A40",
+          "highContrast": "#FF6A6A40",
+          "highContrastLight": "#FF6A6A64"
+        }
+      },
+      {
+        "id": "isabelle.intensifyBackground",
+        "description": "Background of Isabelle text highlighted by the prover.",
+        "defaults": {
+          "light": "#FFCC6664",
+          "dark": "#CC880033",
+          "highContrast": "#CC880033",
+          "highContrastLight": "#FFCC6664"
+        }
+      },
+      {
+        "id": "isabelle.unprocessedOverview",
+        "description": "Scrollbar mark for Isabelle text not yet checked.",
+        "defaults": {
+          "light": "#FFA0A0FF",
+          "dark": "#D89090FF",
+          "highContrast": "#D89090FF",
+          "highContrastLight": "#FFA0A0FF"
+        }
+      },
+      {
+        "id": "isabelle.runningOverview",
+        "description": "Scrollbar mark for Isabelle commands still running.",
+        "defaults": {
+          "light": "#610061FF",
+          "dark": "#C060C0FF",
+          "highContrast": "#C060C0FF",
+          "highContrastLight": "#610061FF"
+        }
+      },
+      {
+        "id": "isabelle.writelnUnderline",
+        "description": "Dotted underline of Isabelle text with output messages.",
+        "defaults": {
+          "light": "#C0C0C0FF",
+          "dark": "#9C9C9CFF",
+          "highContrast": "#9C9C9CFF",
+          "highContrastLight": "#C0C0C0FF"
+        }
+      },
+      {
+        "id": "isabelle.informationUnderline",
+        "description": "Dotted underline of Isabelle text with information messages.",
+        "defaults": {
+          "light": "#C1DFEEFF",
+          "dark": "#77B800FF",
+          "highContrast": "#77B800FF",
+          "highContrastLight": "#C1DFEEFF"
+        }
+      },
+      {
+        "id": "isabelle.warningUnderline",
+        "description": "Dotted underline of Isabelle text with warnings.",
+        "defaults": {
+          "light": "#FF8C00FF",
+          "dark": "#FF8C00FF",
+          "highContrast": "#FF8C00FF",
+          "highContrastLight": "#FF8C00FF"
+        }
+      }
     ]
   },
   "dependencies": {

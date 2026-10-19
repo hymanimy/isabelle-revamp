@@ -55,11 +55,17 @@ exports.checkCursorRaces = async function () {
     assert(state.html.includes('Try this'));
 
     const at = (line, character = 0) => ({ range: [line, character, line, character + 5] });
-    emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [at(5)] }] });
+    // A command waiting for an earlier one is unprocessed: its state is still to come.
+    emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [at(5)] },
+      { type: 'background_unprocessed1', content: [at(6)] }] });
     assert.equal(state.phase, 'checking');
     assert.equal(state.text, '');
     emit('PIDE/decoration', { uri, entries: [{ type: 'text_overview_error', content: [] }] });
-    assert.equal(state.phase, 'checking'); // Omitted running entry is not cleared.
+    assert.equal(state.phase, 'checking'); // Omitted unprocessed entry is not cleared.
+    emit('PIDE/decoration', { uri, entries: [{ type: 'background_unprocessed1', content: [] }] });
+    // Another lemma's proof still running above, perhaps forever, does not hide this goal.
+    assert.equal(state.phase, 'ready');
+    assert.equal(state.running, undefined);
     emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [] }] });
     assert.equal(state.phase, 'ready');
     // Work and errors after the caret do not hide its goal: Isabelle may never check text out of view.

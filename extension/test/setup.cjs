@@ -50,7 +50,7 @@ async function run() {
   const notices = [], commands = new Map(), called = [], state = new Map(), providers = [];
   const disposable = { dispose() {} };
   const vscode = {
-    SemanticTokensLegend: class {},
+    SemanticTokensLegend: class {}, ThemeColor: class {}, OverviewRulerLane: {},
     window: { visibleTextEditors: [], createOutputChannel: () => ({ ...disposable, show() {}, appendLine() {} }),
       registerWebviewViewProvider: name => { providers.push(name); return disposable; },
       showInformationMessage: async (...args) => { notices.push(args); },
