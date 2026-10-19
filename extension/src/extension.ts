@@ -1,11 +1,9 @@
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-import { commands, ConfigurationTarget, Disposable, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
-import { AskView } from './askView';
-import { demoLayout, ProofStatus } from './demoLayout';
 import { Bridge } from './bridge';
 import { BridgeTools } from './bridgeTools';
 import { AgentEdits } from './agentEdits';
@@ -17,11 +15,7 @@ import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
-import { Swarm } from './swarm';
-import { Ask, openSteps } from './ask';
 import { findIsabelle, setupReport } from './setup';
-import { ProofGraph } from './proofGraph';
-import type { GraphViewOptions } from './proofGraphPanel';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -29,60 +23,20 @@ import type { GraphViewOptions } from './proofGraphPanel';
 let client: LanguageClient | undefined;
 let goals: Goals | undefined;
 let bridge: Bridge | undefined;
-let ask: Ask | undefined;
 
 export async function activate(context: ExtensionContext) {
   const output = window.createOutputChannel('Isabelle', { log: true });
   const view = new GoalsView();
-  const askView = new AskView();
-  let askRegistration: Disposable | undefined;
-  const registerAsk = () => {
-    if (workspace.getConfiguration('isabelleRevamp').get<boolean>('showAsk', true)) {
-      askRegistration ??= window.registerWebviewViewProvider('isabelleRevamp.ask', askView,
-        { webviewOptions: { retainContextWhenHidden: true } });
-    } else { askRegistration?.dispose(); askRegistration = undefined; }
-  };
-  registerAsk();
-  context.subscriptions.push({ dispose: () => askRegistration?.dispose() },
-    workspace.onDidChangeConfiguration(event => { if (event.affectsConfiguration('isabelleRevamp.showAsk')) registerAsk(); }));
   let theoryEditor = window.activeTextEditor;
   const visibleTheory = () => theoryEditor && !theoryEditor.document.isClosed && window.tabGroups.all.some(group =>
     group.tabs.some(tab => tab.input instanceof TabInputText && tab.input.uri.toString() === theoryEditor!.document.uri.toString()))
     ? theoryEditor : undefined;
   const serverRoot = existsSync(resolve(context.extensionPath, 'src/extension.ts'))
     ? resolve(context.extensionPath, '..') : context.extensionPath;
-  let askActive = false;
-  let startProofTimer = () => {};
-  ask = new Ask(serverRoot, state => {
-    if (state.active && !askActive) startProofTimer();
-    askActive = state.active;
-    askView.update(state);
-  });
-  const sendAsk = async (text: string) => {
-    const editor = visibleTheory();
-    const folder = editor && workspace.getWorkspaceFolder(editor.document.uri);
-    if (!editor || editor.document.isClosed || editor.document.languageId !== 'isabelle' || !folder) {
-      ask?.notice('Open a theory in this workspace before asking Isabelle.');
-      askView.update(ask!.snapshot()); return false;
-    }
-    if (!bridge) { ask?.notice('Locate Isabelle, then reload the window to start checking.'); return false; }
-    return ask!.send({ file: editor.document.uri.fsPath, line: editor.selection.active.line + 1,
-      cwd: folder.uri.fsPath, portFile: bridge.portFile,
-      openSteps: openSteps(editor.document.getText()) }, text);
-  };
-  askView.onAsk = text => { void sendAsk(text); };
-  askView.onStop = () => ask?.stop();
-  askView.onClear = () => ask?.clear();
   context.subscriptions.push(output, view,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
     commands.registerCommand('isabelleRevamp.showGoals', () =>
-      commands.executeCommand('isabelleRevamp.goals.focus')),
-    commands.registerCommand('isabelleRevamp.ask', async () => {
-      if (!askRegistration) return;
-      askView.focus();
-      await commands.executeCommand('isabelleRevamp.ask.focus');
-      askView.focus();
-    }));
+      commands.executeCommand('isabelleRevamp.goals.focus')));
 
   const locate = () => findIsabelle(workspace.getConfiguration('isabelleRevamp').get<string>('executable', 'isabelle'));
   context.subscriptions.push(commands.registerCommand('isabelleRevamp.setupCheck', async () => {
@@ -167,35 +121,18 @@ export async function activate(context: ExtensionContext) {
   goals = new Goals(client, view);
   const semanticColors = new SemanticColors(goals);
   context.subscriptions.push(semanticColors);
-  const swarm = new Swarm(goals);
-  const graph = new ProofGraph(goals, context.extensionPath);
   const agentEdits = new AgentEdits();
   context.subscriptions.push(agentEdits);
-  startProofTimer = () => graph.resetTimer(visibleTheory()?.document);
-  const proofStatus = new ProofStatus(graph);
-  context.subscriptions.push(swarm,
-    proofStatus,
-    graph.onDidUpdate(state => view.updateGraph(state)),
-    commands.registerCommand('isabelleRevamp.demoLayout', () => demoLayout(visibleTheory(), graph, view)),
-    graph,
-    window.registerWebviewViewProvider('isabelleRevamp.proofGraph', graph.panel, { webviewOptions: { retainContextWhenHidden: true } }),
-    window.registerWebviewViewProvider('isabelleRevamp.swarm', swarm.view),
-    commands.registerCommand('isabelleRevamp.showProofGraph', () => graph.show()),
-    commands.registerCommand('isabelleRevamp.showSwarm', () => commands.executeCommand('isabelleRevamp.swarm.focus')));
-  swarm.follow(window.activeTextEditor);
-  graph.follow(window.activeTextEditor);
   context.subscriptions.push(goals,
-    workspace.onDidOpenTextDocument(document => graph.resetTimer(document)),
     window.onDidChangeTextEditorSelection(event => {
-      if (event.textEditor === window.activeTextEditor) { goals?.follow(event.textEditor); swarm.follow(event.textEditor); graph.follow(event.textEditor); }
+      if (event.textEditor === window.activeTextEditor) goals?.follow(event.textEditor);
     }),
     window.onDidChangeActiveTextEditor(editor => {
       if (editor) theoryEditor = editor;
-      goals?.follow(editor ?? visibleTheory()); swarm.follow(editor); graph.follow(editor);
+      goals?.follow(editor ?? visibleTheory());
     }),
     workspace.onDidChangeTextDocument(event => {
       goals?.observe(event.document);
-      if (event.contentChanges.length) { swarm.changed(event.document); graph.changed(event.document); }
       if (event.document === window.activeTextEditor?.document) goals?.follow(window.activeTextEditor);
     }),
     client.onDidChangeState(event => {
@@ -216,7 +153,7 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, view, swarm, graph, agentEdits));
+  bridge = new Bridge(new BridgeTools(goals, view, agentEdits));
   try {
     await bridge.start();
     output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);
@@ -226,36 +163,19 @@ export async function activate(context: ExtensionContext) {
     output.error(`MCP bridge failed: ${String(error)}`);
     await window.showErrorMessage('The MCP bridge could not start. See Output → Isabelle.');
   }
-  if (workspace.getConfiguration('isabelleRevamp').get<boolean>('demoLayoutOnStartup', false)) {
-    await demoLayout(visibleTheory(), graph, view);
-  }
   // The integration check reads the same model that the webview renders.
-  return { getGoalState: () => view.snapshot(), getSwarmState: () => swarm.view.snapshot(),
-    getProofGraph: () => graph.snapshot(),
-    getGraphAnchors: () => graph.anchors.snapshot(),
+  return { getGoalState: () => view.snapshot(),
     getAgentEdits: () => agentEdits.snapshot(),
-    hoverProofNode: (uri: string, version: number, id: string) => graph.hover(uri, version, id),
-    getProofStatus: () => proofStatus.snapshot(),
-    getAskView: () => askView.snapshot(),
-    isAskRegistered: () => askRegistration !== undefined,
-    inspectGoals: () => view.inspect(),
-    inspectProofGraph: (action: 'snapshot' | 'benchmark' | 'replay', options?: GraphViewOptions) => graph.panel.inspect(action, options),
-    fullscreenProofGraph: () => graph.panel.fullscreen(),
-    selectProofNode: (uri: string, version: number, id: string) => graph.select(uri, version, id),
     getGoalLinks: () => view.linkSnapshot(),
     followGoalLink: (index: number, revision: number) => view.followLink(index,revision),
     hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),
     getScriptDecorations: () => window.activeTextEditor ? visibleScripts(window.activeTextEditor) : [],
     getAbbreviations: () => symbolInput.snapshot(),
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
-    getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [],
-    getAskState: () => ask!.snapshot(), sendAsk, stopAsk: () => ask?.stop(), clearAsk: () => ask?.clear(),
-    selectSwarmStep: (uri: string, version: number, id: string) => swarm.select(uri, version, id) };
+    getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [] };
 }
 
 export async function deactivate(): Promise<void> {
-  ask?.dispose();
-  ask = undefined;
   await bridge?.close();
   bridge = undefined;
   goals?.dispose();

@@ -146,12 +146,6 @@ async def processing_status() -> dict:
     return await bridge.request('processing_status')
 
 
-@mcp.tool(annotations=READ)
-async def proof_graph(file: str) -> dict:
-    """Return named proof nodes (id, name, line, status, range, parent) and directed edges from the same model as the Proof Graph view. line is one-based; range uses zero-based UTF-16 coordinates. Nested proof commands contribute to their enclosing named step. complete=false means annotations are provisional. Pick an open leaf with proved dependencies; one step per edit. An accepted separate X_refuted lemma makes X refuted, with a refutation edge; the original sorry still prevents fully_checked."""
-    return await bridge.request('proof_graph', file=file)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port-file', type=Path, default=bridge.port_file)

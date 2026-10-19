@@ -2,7 +2,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 npm run compile --prefix extension
-node extension/test/ask.cjs
 node extension/test/goalHtml.cjs
 export ISABELLE_REVAMP_PORT_FILE="$PWD/.dev-host/m10-port"
 exec "${1:-/Applications/Visual Studio Code.app/Contents/MacOS/Code}" \

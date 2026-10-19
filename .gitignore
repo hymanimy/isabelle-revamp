@@ -10,7 +10,3 @@ extension/mcp/*
 !extension/mcp/README.md
 extension/LICENSE
 mcp/.setup-lock/
-extension/media/proofGraph.js
-# Expanded from the committed demo/.mcp.json.template by scripts/demo-env.sh.
-demo/.demo/
-demo/.mcp.json

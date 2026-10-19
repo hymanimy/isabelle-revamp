@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FILE = ROOT / '.dev-host/m5-fixture/Sqrt2.thy'
 ORIGINAL = (ROOT / 'examples/Sqrt2.thy').read_text()
 PORT_FILE = Path(os.environ['ISABELLE_REVAMP_PORT_FILE'])
-TOOLS = {'open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positions', 'processing_status', 'proof_graph'}
+TOOLS = {'open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positions', 'processing_status'}
 
 
 async def receipt(check, result=None):
@@ -81,12 +81,6 @@ async def main():
         assert sorry['complete'] and sorry['positions'] == [[7, 2, 7, 7]], sorry
         assert (await call('errors', file=str(FILE)))['errors'] == []
         await receipt('sorry positions are exact', sorry)
-        graph = await call('proof_graph', file=str(FILE))
-        assert all(node['line'] == node['range'][0] + 1 for node in graph['nodes'])
-        assert graph['complete'] and not graph['fully_checked'], graph
-        assert len(graph['nodes']) == 1 and graph['nodes'][0]['status'] == 'open', graph
-        assert graph['nodes'][0]['parent'] is None
-        await receipt('proof graph matches editor model', graph)
 
         # This call submits the full actual M4 proof, not a trivial solved control.
         await replace(ORIGINAL)
@@ -97,13 +91,6 @@ async def main():
         goal = await call('goals_at', file=str(FILE), line=49, col=5)
         assert 'No subgoals!' in goal['text']
         await receipt('sidebar matches MCP goals', goal)
-
-        graph = await call('proof_graph', file=str(FILE))
-        assert all(node['line'] == node['range'][0] + 1 for node in graph['nodes'])
-        assert graph['fully_checked'] and graph['nodes'] and graph['edges'], graph
-        assert all(node['status'] == 'proved' for node in graph['nodes']), graph
-        assert any(node['parent'] is not None for node in graph['nodes'])
-        await receipt('proof graph matches editor model', graph)
 
         broken = ORIGINAL.replace('    by simp\nqed', '    by (rule TrueI)\nqed')
         await replace(broken)

@@ -14,7 +14,7 @@ import venv
 
 def main():
     if sys.version_info < (3, 11):
-        raise RuntimeError('Ask Isabelle needs Python 3.11 or newer.')
+        raise RuntimeError('The Isabelle MCP server needs Python 3.11 or newer.')
     root = Path(__file__).resolve().parent
     environment = root / '.venv'
     python = environment / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')

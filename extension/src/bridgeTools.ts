@@ -3,9 +3,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { DiagnosticSeverity, EndOfLine, languages, Position, Range, Selection, TabInputText, TextDocument, Uri, window, workspace } from 'vscode';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
-import { Swarm } from './swarm';
 import { encodeSymbols } from './symbols';
-import { ProofGraph } from './proofGraph';
 import { AgentEdits } from './agentEdits';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
@@ -13,8 +11,7 @@ export interface AgentSession { name: string; versions: Map<string, number> }
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BridgeTools {
-  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm, private graph: ProofGraph,
-    private agentEdits: AgentEdits) {}
+  constructor(private goals: Goals, private view: GoalsView, private agentEdits: AgentEdits) {}
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');
@@ -70,7 +67,7 @@ export class BridgeTools {
         ? { fully_checked: files.length > 0 && files.every(file => 'fully_checked' in file && file.fully_checked), files }
         : { processing: files.some(file => file.processing), files };
     }
-    if (!['open', 'edit', 'goals_at', 'errors', 'sorry_positions', 'proof_graph'].includes(method)) {
+    if (!['open', 'edit', 'goals_at', 'errors', 'sorry_positions'].includes(method)) {
       throw new Error('Unknown method: ' + method);
     }
     const document = await this.document(params.file);
@@ -88,12 +85,9 @@ export class BridgeTools {
       return { ...identity(), complete: processing.processed,
         positions: processing.known ? this.goals.sorryPositions(document) : [] };
     }
-    if (method === 'proof_graph') return this.graph.snapshot(document);
     const column = window.tabGroups.all.find(group => group.tabs.some(tab =>
       tab.input instanceof TabInputText && tab.input.uri.toString() === document.uri.toString()))?.viewColumn;
-    const keepGraph = this.graph.panel.active;
-    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: method === 'edit' || keepGraph });
-    this.graph.follow(editor);
+    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: method === 'edit' });
     this.goals.follow(editor);
     if (method === 'open') {
       agent.versions.set(document.uri.toString(), document.version);
@@ -107,8 +101,6 @@ export class BridgeTools {
       const end = this.position(document, params.end_line, params.end_col);
       if (start.isAfter(end)) throw new Error('Edit start must not be after its end.');
       if (typeof params.text !== 'string') throw new Error('Edit text must be a string.');
-      const ids = this.swarm.editedCards(document, new Range(start, end));
-      const graphIds = this.graph.editedNodes(document, new Range(start, end));
       const version = document.version;
       const offset = document.offsetAt(start);
       // Match VS Code's newline normalization when computing the new range.
@@ -125,11 +117,8 @@ export class BridgeTools {
       // restore old coordinates or put the caret on the agent's proof step.
       this.goals.observe(document);
       this.goals.follow(editor);
-      this.swarm.tag(document, ids, agent.name);
-      // An appended counter-lemma has no node in the pre-edit document.
       const inserted = new Range(start, document.positionAt(offset + text.length));
       this.agentEdits.applied(editor, inserted, agent.name);
-      this.graph.tag(document, [...new Set([...graphIds, ...this.graph.editedNodes(document, inserted)])], agent.name);
       agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };
@@ -141,7 +130,7 @@ export class BridgeTools {
     const version = document.version;
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline) {
-      if (document.version !== version || (window.activeTextEditor !== editor && !this.graph.panel.active)
+      if (document.version !== version || window.activeTextEditor !== editor
         || !editor.selection.active.isEqual(position) || !this.goals.matches(document, position.line, position.character)) {
         throw new Error('The document or cursor changed during the query. Retry goals_at.');
       }

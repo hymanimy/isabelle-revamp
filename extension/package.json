@@ -16,18 +16,11 @@
   "activationEvents": [
     "onLanguage:isabelle",
     "onView:isabelleRevamp.goals",
-    "onView:isabelleRevamp.swarm",
-    "onCommand:isabelleRevamp.ask",
     "onCommand:isabelleRevamp.showGoals",
-    "onCommand:isabelleRevamp.showSwarm",
-    "onCommand:isabelleRevamp.setupCheck",
-    "onCommand:isabelleRevamp.showProofGraph",
-    "onView:isabelleRevamp.ask",
-    "onCommand:isabelleRevamp.demoLayout",
-    "onView:isabelleRevamp.proofGraph"
+    "onCommand:isabelleRevamp.setupCheck"
   ],
   "scripts": {
-    "compile": "tsc -p . && node build-webview.cjs",
+    "compile": "tsc -p .",
     "vscode:prepublish": "npm run build",
     "build": "tsc -p . --noEmit && node build.cjs",
     "package": "vsce package"
@@ -39,25 +32,6 @@
           "id": "isabelleRevamp.goals",
           "name": "Isabelle Goals",
           "type": "webview"
-        },
-        {
-          "id": "isabelleRevamp.swarm",
-          "name": "Isabelle Swarm",
-          "type": "webview"
-        }
-      ],
-      "isabelle-revamp-ask": [
-        {
-          "id": "isabelleRevamp.ask",
-          "name": "Ask Isabelle",
-          "type": "webview",
-          "when": "config.isabelleRevamp.showAsk"
-        },
-        {
-          "id": "isabelleRevamp.proofGraph",
-          "name": "Proof Graph",
-          "type": "webview",
-          "when": "!isabelleRevamp.demoLayout"
         }
       ]
     },
@@ -67,16 +41,8 @@
         "title": "Isabelle: Toggle Pretty Symbols"
       },
       {
-        "command": "isabelleRevamp.ask",
-        "title": "Isabelle: Ask"
-      },
-      {
         "command": "isabelleRevamp.showGoals",
         "title": "Isabelle: Show Goals"
-      },
-      {
-        "command": "isabelleRevamp.showSwarm",
-        "title": "Isabelle: Show Swarm"
       },
       {
         "command": "isabelleRevamp.convertQuotes",
@@ -86,14 +52,6 @@
       {
         "command": "isabelleRevamp.setupCheck",
         "title": "Isabelle Revamp: Setup check"
-      },
-      {
-        "command": "isabelleRevamp.showProofGraph",
-        "title": "Isabelle: Show Proof Graph"
-      },
-      {
-        "command": "isabelleRevamp.demoLayout",
-        "title": "Isabelle: Demo Layout"
       }
     ],
     "languages": [
@@ -153,18 +111,6 @@
           "default": false,
           "scope": "resource",
           "description": "Save recognised Isabelle symbols as Unicode. Off by default: completions and saved source use ASCII Isabelle spellings."
-        },
-        "isabelleRevamp.demoLayoutOnStartup": {
-          "type": "boolean",
-          "default": false,
-          "scope": "window",
-          "description": "Open the source left, Goals above Proof Graph right, and Terminal across the bottom when this window starts."
-        },
-        "isabelleRevamp.showAsk": {
-          "type": "boolean",
-          "default": true,
-          "scope": "window",
-          "description": "Register the Ask Isabelle view. Demo Layout turns this off and uses the Terminal for Claude Code."
         }
       }
     },
@@ -224,19 +170,9 @@
           ]
         }
       }
-    ],
-    "viewsContainers": {
-      "panel": [
-        {
-          "id": "isabelle-revamp-ask",
-          "title": "Isabelle",
-          "icon": "media/ask.svg"
-        }
-      ]
-    }
+    ]
   },
   "dependencies": {
-    "@dagrejs/dagre": "3.1.1",
     "vscode-languageclient": "10.1.2"
   },
   "devDependencies": {

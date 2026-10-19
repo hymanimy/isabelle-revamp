@@ -2,8 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
-const { findIsabelle, setupReport } = require('../out/setup');
-const { registrationCommand, claudeArgs } = require('../out/ask');
+const { findIsabelle, registrationCommand, setupReport } = require('../out/setup');
 const root = path.resolve(__dirname, '../..');
 
 async function run() {
@@ -34,9 +33,6 @@ async function run() {
   } finally { process.env.PATH = previousPath; }
   const installed = '/Applications/Extensions/Isabelle Revamp';
   assert(registrationCommand(installed).includes("'/Applications/Extensions/Isabelle Revamp/mcp/launch.py'"));
-  const args = claudeArgs({ portFile: '/tmp/port', file: '/tmp/A.thy', line: 1, openSteps: [] }, installed);
-  const config = JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.isabelle;
-  assert.equal(config.command, 'python3'); assert(config.args[0].startsWith(installed));
 
   // Missing Isabelle must stop before the language client or bridge is created.
   const notices = [], commands = new Map(), called = [], state = new Map(), providers = [];
@@ -48,8 +44,7 @@ async function run() {
       showInformationMessage: async (...args) => { notices.push(args); },
       showErrorMessage: () => { throw new Error('Unexpected error notification'); } },
     workspace: { textDocuments: [{ languageId: 'isabelle' }], onDidOpenTextDocument: () => disposable,
-      onDidChangeConfiguration: () => disposable,
-      getConfiguration: () => ({ get: (key, fallback) => key === 'executable' ? 'missing' : key === 'showAsk' ? false : fallback }) },
+      getConfiguration: () => ({ get: (key, fallback) => key === 'executable' ? 'missing' : fallback }) },
     commands: { registerCommand: (name, action) => { commands.set(name, action); return disposable; },
       executeCommand: async name => { called.push(name); } },
   };
@@ -68,7 +63,7 @@ async function run() {
     assert.deepEqual(notices[0], ['Isabelle not found', 'Locate…', 'Download']);
     assert(called.includes('isabelleRevamp.showGoals'));
     assert(commands.has('isabelleRevamp.setupCheck'));
-    assert(!providers.includes('isabelleRevamp.ask'), 'showAsk=false must not register Ask, even on first activation');
+    assert.deepEqual(providers, ['isabelleRevamp.goals']);
     await extension.deactivate();
   } finally { Module._load = load; }
   console.log('PASS: discovery priority, setup fixes, absolute bundled MCP command, one missing-Isabelle notification and first-theory Goals');

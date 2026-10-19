@@ -4,11 +4,14 @@ import { access, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
-import { registrationCommand } from './ask';
 
 const execute = promisify(execFile);
 async function executableFile(file: string): Promise<boolean> {
   try { await access(file, constants.X_OK); return (await stat(file)).isFile(); } catch { return false; }
+}
+export function registrationCommand(serverRoot: string): string {
+  const launcher = join(serverRoot, 'mcp/launch.py').replace(/'/g, "'\\''");
+  return `claude mcp add --transport stdio --scope local isabelle -- python3 '${launcher}'`;
 }
 export async function onPath(name: string, path = process.env.PATH ?? ''): Promise<string | undefined> {
   for (const directory of path.split(delimiter).filter(Boolean)) {
@@ -50,12 +53,12 @@ export async function setupReport(executable: string | undefined, cwd: string, s
     lines.push('✓ HOL heap present (isabelle build -n -l HOL exited 0).');
   } catch { lines.push('✗ HOL heap: unavailable — run isabelle build -b HOL with this installation.'); }
   const claude = await onPath('claude');
-  lines.push(claude ? `✓ Claude on PATH: ${claude}` : '✗ Claude: not on PATH — install Claude Code and sign in to use Ask Isabelle.');
+  lines.push(claude ? `✓ Claude on PATH: ${claude}` : '✗ Claude: not on PATH — install Claude Code and sign in to use the Isabelle MCP server.');
   try {
     if (!claude) throw new Error('missing');
     const result = await execute(claude, ['mcp', 'get', 'isabelle'], { cwd, timeout: 15000 });
     if (!/^isabelle:/m.test(result.stdout)) throw new Error('unregistered');
-    lines.push('✓ MCP registered: isabelle (Ask uses this extension’s bundled server).');
+    lines.push('✓ MCP registered: isabelle (this extension’s bundled server).');
   } catch { lines.push(`✗ MCP: not registered — ${registrationCommand(serverRoot)}`); }
   return lines;
 }
