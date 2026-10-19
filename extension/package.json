@@ -17,7 +17,8 @@
     "onLanguage:isabelle",
     "onView:isabelleRevamp.goals",
     "onCommand:isabelleRevamp.showGoals",
-    "onCommand:isabelleRevamp.setupCheck"
+    "onCommand:isabelleRevamp.setupCheck",
+    "onView:isabelleRevamp.theories"
   ],
   "scripts": {
     "compile": "tsc -p .",
@@ -34,6 +35,10 @@
           "id": "isabelleRevamp.goals",
           "name": "Isabelle Goals",
           "type": "webview"
+        },
+        {
+          "id": "isabelleRevamp.theories",
+          "name": "Isabelle Theories"
         }
       ]
     },
@@ -45,6 +50,10 @@
       {
         "command": "isabelleRevamp.showGoals",
         "title": "Isabelle: Show Goals"
+      },
+      {
+        "command": "isabelleRevamp.showTheories",
+        "title": "Isabelle: Show Theories"
       },
       {
         "command": "isabelleRevamp.convertQuotes",

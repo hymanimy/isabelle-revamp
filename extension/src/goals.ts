@@ -283,6 +283,9 @@ export class Goals implements Disposable {
       .filter(range => document.getText(new Range(...range)) === 'sorry');
   }
 
+  // Whether the server has sent any decorations for this file, i.e. it is a checked node.
+  annotated(uri: string): boolean { return this.ranges.has(uri); }
+
   decorationRanges(document: TextDocument | string, type: string): SourceRange[] {
     return this.ranges.get(typeof document === 'string' ? document : document.uri.toString())?.get(type) ?? [];
   }

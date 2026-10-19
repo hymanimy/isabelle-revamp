@@ -17,6 +17,7 @@ import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
 import { findIsabelle, setupReport } from './setup';
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
+import { Theories } from './theories';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -121,7 +122,9 @@ export async function activate(context: ExtensionContext) {
   const semanticColors = new SemanticColors(goals);
   context.subscriptions.push(semanticColors);
   const agentEdits = new AgentEdits();
-  context.subscriptions.push(agentEdits);
+  const theories = new Theories(goals);
+  context.subscriptions.push(agentEdits, theories,
+    commands.registerCommand('isabelleRevamp.showTheories', () => commands.executeCommand('isabelleRevamp.theories.focus')));
   context.subscriptions.push(goals,
     window.onDidChangeTextEditorSelection(event => {
       if (event.textEditor === window.activeTextEditor) goals?.follow(event.textEditor);
@@ -164,6 +167,7 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(),
+    getTheories: async () => { await theories.refresh(); return theories.snapshot(); },
     getAgentEdits: () => agentEdits.snapshot(),
     getGoalLinks: () => view.linkSnapshot(),
     followGoalLink: (index: number, revision: number) => view.followLink(index,revision),

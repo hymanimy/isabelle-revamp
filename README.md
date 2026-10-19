@@ -10,6 +10,8 @@ and Isar syntax are untouched: everything here is a client of Isabelle's own
 - `.thy` files in ordinary VS Code: highlighting, Unicode rendering of `∑ ∉ ℚ`, ASCII
   symbol input and completion.
 - Goal state that follows the cursor, errors inline, Ctrl-click into the HOL library.
+- Like jEdit, Isabelle checks the text near the cursor; the **Isabelle Theories** view shows the
+  progress of every open theory and the theories it imports.
 - An optional [MCP](https://modelcontextprotocol.io) server exposing the live proof state
   (`goals_at`, `errors`, `sorry_positions`, …) so an agent such as Claude Code sees exactly
   what you see.
@@ -84,8 +86,8 @@ at their usual install locations; set `VSCODE_EXECUTABLE` or `ISABELLE_EXECUTABL
 Run selected suites with `npm run test:integration --prefix extension -- goals,proof`, and check
 an installed VSIX with `-- installed`. The `mcp` suite creates `mcp/.venv` on first run.
 
-Layout: `extension/` (VS Code extension), `mcp/` (MCP server), `examples/` (theories used by
-the tests), `scripts/` (checks), `docs/`.
+Layout: `extension/` (VS Code extension, with its tests in `extension/test/`), `mcp/` (MCP
+server), `examples/` (example theories), `scripts/` (packaging check, LSP probe), `docs/`.
 
 ## Docs
 

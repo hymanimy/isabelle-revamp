@@ -26,7 +26,30 @@ function checkServerSettings() {
   console.log('PASS: server arguments for default, custom and invalid settings');
 }
 
+function checkTheoryHeader() {
+  const { theoryHeader, importFile } = require('../out/theoryHeader');
+  const source = String.raw`(* comment mentioning theory X imports Y begin *)
+section \<open>A cartouche with theory and begin\<close>
+text ‹nested ‹cartouche› imports Z›
+theory "Top" imports Base "../Shared/Util" "HOL-Library.Multiset" Main
+  keywords "foo" :: thy_decl
+begin
+theory Ignored imports After begin`;
+  assert.deepEqual(theoryHeader(source), { name: 'Top', imports: ['Base', '../Shared/Util', 'HOL-Library.Multiset', 'Main'] });
+  assert.deepEqual(theoryHeader('theory A begin'), { name: 'A', imports: [] });
+  assert.equal(theoryHeader('theory A imports B'), undefined, 'An unfinished header has no begin yet');
+  const files = new Set(['/p/Base.thy', '/Shared/Util.thy']);
+  const exists = file => files.has(file);
+  assert.equal(importFile('Base', '/p', exists), '/p/Base.thy');
+  assert.equal(importFile('../Shared/Util', '/p', exists), '/Shared/Util.thy');
+  assert.equal(importFile('Main', '/p', exists), undefined, 'Not a local file: a theory of the logic image');
+  assert.equal(importFile('HOL-Library.Multiset', '/p', () => true), undefined, 'Session-qualified');
+  assert.equal(importFile('~~/src/HOL/Library/Multiset', '/p', () => true), undefined);
+  console.log('PASS: theory headers skip comments and cartouches; local imports resolve, library imports do not');
+}
+
 (async () => {
+  checkTheoryHeader();
   require('./goalHtml.cjs').checkGoalHtml();
   checkScriptRanges();
   checkServerSettings();

@@ -1,6 +1,6 @@
 // Entry point for --extensionTestsPath: runs inside VS Code against a real Isabelle.
 // Order matters: goalsPanel reads proof's receipts from .dev-host/.
-const suites = ['goals', 'proof', 'mcp', 'goalsPanel', 'prettySymbols', 'editor', 'agentEdits'];
+const suites = ['goals', 'proof', 'mcp', 'goalsPanel', 'prettySymbols', 'editor', 'theories', 'agentEdits'];
 exports.run = async function () {
   const selected = process.env.ISABELLE_REVAMP_SUITES?.split(',').filter(Boolean) ?? suites;
   for (const name of selected) {
