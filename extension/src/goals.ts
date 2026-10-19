@@ -17,9 +17,10 @@ const outputSettle = 700;
 // document update; it publishes output (diagnostics included) only for an up-to-date
 // snapshot. Leave the caret still this long between holds so output can flush.
 const caretQuiet = 1000;
-// A proof state arrives promptly. Without one by then, the command has no proof
-// state (it closes a proof, like `by simp`, or is a theory command): show its messages.
-const stateGrace = 1500;
+// A proof state follows the state_init answer within ~0.3 s. Without one by then, the
+// command has no proof state (it closes a proof, like `by simp`, or is a theory
+// command): show its messages. A later state still replaces them.
+const stateGrace = 400;
 
 // PIDE/decoration messages are deltas: omitted entries retain their old value.
 const busyTypes = new Set([
@@ -62,13 +63,16 @@ export class Goals implements Disposable {
   // The server handles a caret move before answering the next state_init on the same
   // channel, so caret output arriving after that answer is for the new caret.
   private outputSince = 0;
+  // Counts caret outputs, to order them against state_init answers exactly.
+  private dynamicCount = 0;
   private confirmed?: string;
   private confirmedHtml?: string;
   // Mirrors the server's caret panel, which only sends changed output.
   private dynamic = '';
   private dynamicHtml = '';
   private available = false;
-  private requestedAt = 0;
+  // When the state_init for the current caret was answered; undefined until then.
+  private stateRequestedAt?: number;
   private decorations = new Map<string, Map<string, boolean>>();
   private badRanges = new Map<string, SourceRange[]>();
   private diagnostics = new Map<string, { message: string; range: SourceRange }[]>();
@@ -84,6 +88,7 @@ export class Goals implements Disposable {
       client.onNotification('PIDE/dynamic_output', ({ content }: { content: string }) => {
         this.dynamic = outputText(content);
         this.dynamicHtml = content;
+        this.dynamicCount++;
         this.outputAt = Date.now();
         this.render();
       }),
@@ -153,7 +158,7 @@ export class Goals implements Disposable {
     this.releasePanel();
     this.confirmed = undefined;
     this.confirmedHtml = undefined;
-    this.requestedAt = Date.now();
+    this.stateRequestedAt = undefined;
     this.publish({ phase: next ? 'checking' : 'idle', text: '', errors: [] });
     if (!this.available) return;
     if (!next) {
@@ -186,14 +191,16 @@ export class Goals implements Disposable {
         // Dynamic output has no cursor/version ID. A fresh built-in state panel
         // supplies a tagged confirmation and re-emits identical goal text.
         const { state_id } = await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {});
-        this.outputSince = Date.now();
+        this.outputSince = this.dynamicCount;
         if (generation !== this.generation) {
           await this.client.sendNotification('PIDE/state_exit', { id: state_id });
           return;
         }
+        this.stateRequestedAt = Date.now();
         this.panel = state_id;
         const early = this.earlyStates.get(state_id);
         if (early !== undefined) this.acceptState(early);
+        else this.render();
       } catch {
         if (generation === this.generation) {
           clearTimeout(this.deadline);
@@ -222,7 +229,7 @@ export class Goals implements Disposable {
         if (existing !== undefined) await this.client.sendNotification('PIDE/state_auto_update', { id: existing, enabled: false });
         await this.client.sendNotification('PIDE/caret_update', { uri, line, character });
         id = (await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {})).state_id;
-        probe.since = Date.now();
+        probe.since = this.dynamicCount;
         this.probes.set(id, probe);
         const early = this.earlyStates.get(id);
         if (early !== undefined) this.acceptProbe(probe, early);
@@ -342,7 +349,10 @@ export class Goals implements Disposable {
     clearTimeout(this.deadline);
     if (this.busyBeforeCaret() || !this.document) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
     if (this.confirmed !== undefined) { this.publish(this.present(this.document, this.caret.line, this.confirmedHtml!)); return; }
-    const wait = Math.max(stateGrace - (Date.now() - this.requestedAt), outputSettle - (Date.now() - this.outputAt));
+    // Isabelle sends caret output only when it changes, so nothing may arrive to prompt
+    // another render: wait on a timer, counted from the state_init answer.
+    if (this.stateRequestedAt === undefined) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
+    const wait = Math.max(this.stateRequestedAt + stateGrace - Date.now(), outputSettle - (Date.now() - this.outputAt));
     if (wait <= 0) { this.publish(this.present(this.document, this.caret.line)); return; }
     this.publish({ phase: 'checking', text: '', errors: [] });
     this.deadline = setTimeout(() => this.render(), wait);
@@ -355,7 +365,7 @@ export class Goals implements Disposable {
     // Untagged dynamic output prints the command's messages, usually after its state;
     // a diagnostic command like try0 prints its messages without the state.
     const state = stateHtml === undefined ? undefined : outputText(stateHtml);
-    const fresh = this.outputAt > since && this.dynamic !== '';
+    const fresh = this.dynamicCount > since && this.dynamic !== '';
     let text = this.dynamic, html: string | undefined = this.dynamicHtml;
     if (state !== undefined && !(state !== '' && this.dynamic.includes(state))) {
       text = fresh ? state + '\n\n' + this.dynamic : state;

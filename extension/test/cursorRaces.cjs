@@ -115,12 +115,25 @@ exports.checkCursorRaces = async function () {
     await pause(180);
     replies[4]({ state_id: -105 });
     emit('PIDE/dynamic_output', { content: '<pre>theorem foo: x = x</pre>' });
-    await pause(1000);
+    await pause(200);
     assert.equal(state.phase, 'checking');
     await pause(800);
     assert.equal(state.phase, 'ready');
     assert.equal(state.stateless, true);
     assert.equal(state.text, 'theorem foo: x = x');
+    // Moving within the same command: the server sends no new output at all, since
+    // its output has not changed. The messages must still come back.
+    goals.follow(editor(10, 1, 6));
+    assert.equal(state.phase, 'checking');
+    await pause(180);
+    replies[5]({ state_id: -106 });
+    await pause(600);
+    assert.equal(state.phase, 'ready');
+    assert.equal(state.text, 'theorem foo: x = x');
+    // A state that turns up after the grace period still replaces the messages.
+    emit('PIDE/state_output', { id: -106, content: '<pre>LATE STATE</pre>' });
+    assert.equal(state.stateless, undefined);
+    assert.equal(state.text, 'LATE STATE');
     goals.follow(undefined);
     assert.equal(state.phase, 'idle');
     console.log('PASS: stale replies, early replies, caret messages, version changes, decoration deltas, caret-scoped work and errors, and messages without a proof state');

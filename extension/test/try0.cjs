@@ -45,6 +45,17 @@ exports.run = async function () {
   await until('closing by shows its theorem', () => ['ready', 'unfinished'].includes(api.getGoalState().phase) && api.getGoalState().stateless
     && api.getGoalState().text.includes('theorem first'));
   console.log('PASS: Goals shows the theorem message on a closing by, not "checking…"');
+  // Moving within the same command sends no new output; the messages must come back each time.
+  const timings = [];
+  for (const column of [7, document.lineAt(2).text.length, 4]) {
+    const started = Date.now();
+    editor.selection = new vscode.Selection(2, column, 2, column);
+    await pause(30);
+    await until(`theorem again at column ${column}`, () => api.getGoalState().stateless
+      && api.getGoalState().text.includes('theorem first'), 10);
+    timings.push(Date.now() - started);
+  }
+  console.log(`PASS: moving within the closing by keeps showing its messages (${timings.join(', ')} ms)`);
 
   const second = document.getText().split('\n').findIndex(line => line.trim() === 'try0');
   editor.selection = new vscode.Selection(second, 3, second, 3);
