@@ -14,7 +14,7 @@ async function run() {
     fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, source, { mode: 0o755 }); return file;
   }
   assert.equal(await findIsabelle('missing', home, bin, apps), undefined);
-  const usual = executable(path.join(home, 'hack/isabelle-env/Isabelle2025-2.app/bin/isabelle'));
+  const usual = executable(path.join(home, 'Isabelle2025-2/bin/isabelle'));
   assert.equal(await findIsabelle('missing', home, bin, apps), usual);
   const application = executable(path.join(apps, 'Isabelle2025-2.app/bin/isabelle'));
   assert.equal(await findIsabelle('', home, bin, apps), application);
@@ -26,7 +26,8 @@ async function run() {
   try {
     process.env.PATH = bin;
     let report = await setupReport(undefined, root, root);
-    assert.equal(report.length, 4); assert(report.every(line => line.startsWith('✗')));
+    assert.equal(report.length, 4);
+    assert.deepEqual(report.map(line => line[0]), ['✗', '✗', '–', '–'], report.join('\n'));
     executable(path.join(bin, 'claude'), '#!/bin/sh\necho isabelle:\n');
     report = await setupReport(command, root, root);
     assert(report.every(line => line.startsWith('✓')), report.join('\n'));

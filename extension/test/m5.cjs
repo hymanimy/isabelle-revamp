@@ -14,7 +14,7 @@ exports.run = async function () {
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(path.join(directory, 'Sqrt2.thy'), source.split('\nproof\n')[0] + '\n  sorry\n\nend\n');
   const outside = path.join(directory, 'Outside.thy');
-  if (!fs.existsSync(outside)) fs.symlinkSync(path.resolve(root, '../Isabelle2025-2.app/src/HOL/Main.thy'), outside);
+  if (!fs.existsSync(outside)) fs.symlinkSync(require('./isabelle.cjs').library('src/HOL/Main.thy'), outside);
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
   const receipts = [];
   try {

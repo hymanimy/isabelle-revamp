@@ -213,7 +213,7 @@ async function checkGoalLinks(root,api) {
   }
   const index=snapshot.links.findIndex(link=>link.label==='sqrt');assert(index>=0,JSON.stringify(snapshot));
   const link=snapshot.links[index];assert(link.file.endsWith('/HOL/NthRoot.thy'));assert.equal(link.line,396);
-  const driver=new GoalLinks([path.resolve(root,'../Isabelle2025-2.app')]);
+  const driver=new GoalLinks([require('./isabelle.cjs').home]);
   await assert.rejects(()=>driver.target({file:'/etc/hosts',line:0,label:'localhost'}),/outside/);
   const target=await driver.target(link);
   let tooltip='';
