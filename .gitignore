@@ -14,3 +14,11 @@ extension/media/proofGraph.js
 # Expanded from the committed demo/.mcp.json.template by scripts/demo-env.sh.
 demo/.demo/
 demo/.mcp.json
+
+# Headless evaluation: keep reports, omit private traces and temporary theories.
+eval/.venv/
+eval/results/**
+!eval/results/**/
+!eval/results/**/summary.md
+!eval/results/**/EVAL_RESULTS.md
+.pytest_cache/

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "isabelle",
+    "process_theories",
+    "-D",
+    "eval/results/m0/work",
+    "-O",
+    "E_method_failed"
+  ],
+  "exit_code": 1,
+  "stdout": "Running Draft ...\n\nOutput (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_method_failed.thy\"):\ntheorem probe: ?x = ?y\n\nError (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_method_failed.thy\"):\n*** Failed to apply initial proof method (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_method_failed.thy\"):\n*** goal (1 subgoal):\n***  1. x = y\nDraft FAILED (see also \"isabelle build_log -H Error Draft\")\n*** Failed to apply initial proof method (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_method_failed.thy\"):\n*** goal (1 subgoal):\n***  1. x =\n***     y\n*** At command \"by\" (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_method_failed.thy\")\nUnfinished session(s): Draft\n",
+  "stderr": "",
+  "wall_s": 7.028859750000265,
+  "theory_text": "theory E_method_failed\nimports Main\nbegin\nlemma probe: \"(x::nat) = y\" by simp\nend\n"
+}

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "isabelle",
+    "process_theories",
+    "-D",
+    "eval/results/m0/work",
+    "-O",
+    "E_unknown_fact"
+  ],
+  "exit_code": 1,
+  "stdout": "Running Draft ...\n\nOutput (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_unknown_fact.thy\"):\ntheorem probe: True\n\nError (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_unknown_fact.thy\"):\n*** Undefined fact: \"nonexistent_eval_fact_3819\" (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_unknown_fact.thy\")\nDraft FAILED (see also \"isabelle build_log -H Error Draft\")\n*** Undefined fact: \"nonexistent_eval_fact_3819\" (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_unknown_fact.thy\")\n*** At command \"by\" (line 4 of \"~/Mathematical-proof-revamp/eval/results/m0/work/E_unknown_fact.thy\")\nUnfinished session(s): Draft\n",
+  "stderr": "",
+  "wall_s": 8.046399375001783,
+  "theory_text": "theory E_unknown_fact\nimports Main\nbegin\nlemma probe: \"True\" by (rule nonexistent_eval_fact_3819)\nend\n"
+}
