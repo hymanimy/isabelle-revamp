@@ -20,6 +20,10 @@ const busyTypes = new Set([
   'background_unprocessed1', 'background_running1', 'background_canceled',
   'text_overview_unprocessed', 'text_overview_running',
 ]);
+const runningTypes = new Set(['background_running1', 'text_overview_running']);
+const contains = ([startLine, startColumn, endLine, endColumn]: SourceRange, line: number, character: number) =>
+  (startLine < line || startLine === line && startColumn <= character)
+  && (line < endLine || line === endLine && character <= endColumn);
 // background_bad also marks `sorry`; it is not an error diagnostic.
 
 // Commands that run inside a proof, so the prover prints a proof state for them.
@@ -360,22 +364,32 @@ export class Goals implements Disposable {
     return this.caret !== undefined && this.busyBefore(this.caret.uri, this.caret.line, this.caret.character);
   }
 
-  private busyBefore(uri: string, line: number, character: number): boolean {
+  // With exceptRunningAt, a command running at the position does not count: its
+  // output so far is worth showing, as sledgehammer reports each prover's proof.
+  private busyBefore(uri: string, line: number, character: number, exceptRunningAt = false): boolean {
     const ranges = this.ranges.get(uri);
-    return [...busyTypes].some(type => (ranges?.get(type) ?? []).some(([start, column]) =>
-      start < line || start === line && column <= character));
+    return [...busyTypes].some(type => (ranges?.get(type) ?? []).some(range =>
+      (range[0] < line || range[0] === line && range[1] <= character)
+      && !(exceptRunningAt && runningTypes.has(type) && contains(range, line, character))));
   }
 
   private render(): void {
     if (!this.caret || !this.available) return;
     clearTimeout(this.deadline);
-    if (this.busyBeforeCaret() || !this.document) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
-    if (this.confirmed !== undefined) { this.publish(this.present(this.document, this.caret.line, this.confirmedHtml!)); return; }
+    const { uri, line, character } = this.caret;
+    if (this.busyBefore(uri, line, character, true) || !this.document) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
+    const running = this.busyBefore(uri, line, character);
+    const show = (state: GoalState) => {
+      // Until a running command prints something, there is nothing to show.
+      if (running && !state.text && !state.errors.length) this.publish({ phase: 'checking', text: '', errors: [] });
+      else this.publish(running ? { ...state, running } : state);
+    };
+    if (this.confirmed !== undefined) { show(this.present(this.document, line, this.confirmedHtml!)); return; }
     // Isabelle sends caret output only when it changes, so nothing may arrive to prompt
     // another render: wait on a timer, counted from the state_init answer.
     if (this.stateRequestedAt === undefined) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
     const wait = Math.max(this.stateRequestedAt + stateGrace - Date.now(), this.outputSettle - (Date.now() - this.outputAt));
-    if (wait <= 0) { this.publish(this.present(this.document, this.caret.line)); return; }
+    if (wait <= 0) { show(this.present(this.document, line)); return; }
     this.publish({ phase: 'checking', text: '', errors: [] });
     this.deadline = setTimeout(() => this.render(), wait);
   }

@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { commands, ConfigurationTarget, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, DiagnosticSeverity, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
@@ -138,7 +138,13 @@ export async function activate(context: ExtensionContext) {
         return resolved ? asciiCompletion(resolved) : resolved;
       },
       handleDiagnostics: (uri, diagnostics, next) => {
-        for (const diagnostic of diagnostics) diagnostic.message = unicodeSymbols(diagnostic.message);
+        for (const diagnostic of diagnostics) {
+          diagnostic.message = unicodeSymbols(diagnostic.message);
+          // The server means legacy messages as warnings, but looks their severity up by
+          // "legacy" while messages are named "legacy_message", so none is sent and
+          // VS Code assumes Error. Output.legacy_feature always starts them like this.
+          if (diagnostic.message.startsWith('Legacy feature!')) diagnostic.severity = DiagnosticSeverity.Warning;
+        }
         next(uri, diagnostics);
         goals?.setDiagnostics(uri.toString(), diagnostics);
       },

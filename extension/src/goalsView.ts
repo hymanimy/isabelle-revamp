@@ -13,11 +13,13 @@ export interface GoalState {
   checkStatus?: 'checking' | 'fully_checked' | 'unfinished' | 'error';
   // The command at the cursor has no proof state; text holds its messages.
   stateless?: boolean;
+  // The command at the cursor is still running; text holds its output so far.
+  running?: boolean;
 }
 
 function presentation(state: GoalState) {
   const checking = state.phase === 'checking';
-  const status = checking ? 'checking…' : {
+  const status = checking ? 'checking…' : state.running && state.phase !== 'error' ? 'running…' : {
     idle: 'Open a theory and place the cursor in a proof.',
     checking: 'checking…',
     ready: state.stateless ? (state.text ? 'No proof state here · messages' : 'No proof state here')

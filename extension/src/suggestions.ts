@@ -2,15 +2,15 @@
 // sendback, a suggestion replaces the command that found it.
 
 // "Try this: by simp" first, then other "Found proof:" lines; timings dropped.
+// Sledgehammer prefixes each with its prover: "algebra: Try this: by algebra (4 ms)".
 export function suggestedProofs(messages: string[]): string[] {
-  const found: string[] = [];
+  const tried: string[] = [], found: string[] = [];
   for (const message of messages) {
-    for (const match of message.matchAll(/^(Try this|Found proof):\s*(.+?)(?:\s+\(\d+(?:\.\d+)?\s*m?s\))?$/gm)) {
-      const proof = match[2].trim();
-      if (match[1] === 'Try this') found.unshift(proof); else found.push(proof);
+    for (const match of message.matchAll(/^(?:[\w.-]+:\s*)?(Try this|Found proof):\s*(.+?)(?:\s+\(\d+(?:\.\d+)?\s*m?s\))?$/gm)) {
+      (match[1] === 'Try this' ? tried : found).push(match[2].trim());
     }
   }
-  return [...new Set(found)];
+  return [...new Set([...tried, ...found])];
 }
 
 // The try0/try/sledgehammer command on `line` at `character`, else the last one before

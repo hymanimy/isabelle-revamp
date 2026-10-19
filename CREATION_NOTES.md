@@ -73,3 +73,25 @@ snapshot catches a command mid-run, the server never reports that command finish
 because from its side nothing changed. This was always possible; more frequent
 output made it likelier. The extension now asks again once output settles, until
 two snapshots agree.
+
+## Legacy features showed as errors: a server bug
+
+Isabelle/jEdit shows "Legacy feature!" messages as warnings, and the VS Code server
+intends the same: `vscode_rendering.scala` maps `Markup.LEGACY` to Warning and
+`Markup.ERROR` to Error. But it looks severities up by the stored message's name,
+which is `legacy_message` or `error_message` (`Protocol.make_message` renames them),
+so the lookup always misses and no diagnostic carries a severity. The LSP client
+then assumes Error for all of them. Every legacy message comes from
+`Output.legacy_feature`, which prefixes "Legacy feature! ", so the extension
+downgrades diagnostics with that prefix to warnings. Real errors are unaffected:
+they are still sent without a severity, and still shown as errors.
+
+## Sledgehammer: output while a command runs
+
+Sledgehammer's provers report one at a time, and the server streams each to the
+caret output as it arrives (a quick `by algebra` long before the final "Done").
+The Goals panel used to wait for everything up to the cursor to finish, so it
+showed "checking…" until sledgehammer was done. It now shows a running command's
+output as it arrives, as jEdit's Output panel does. Each prover's line is prefixed
+with its name ("algebra: Try this: by algebra"), which the hover's Apply links
+must allow for.

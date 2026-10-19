@@ -75,7 +75,11 @@ function checkSuggestions() {
   const { suggestedProofs, suggestionRange } = require('../out/suggestions');
   const messages = ['Trying "simp", "auto"...', 'Found proof: by simp (0 ms)', 'Found proof: by auto (0 ms)',
     'Try this: by force\n(force: 0 ms; simp: 0 ms; auto: 0 ms)', 'Try this: by (metis add_0 dvd_refl) (12 ms)'];
-  assert.deepEqual(suggestedProofs(messages), ['by (metis add_0 dvd_refl)', 'by force', 'by simp', 'by auto']);
+  assert.deepEqual(suggestedProofs(messages), ['by force', 'by (metis add_0 dvd_refl)', 'by simp', 'by auto']);
+  // Sledgehammer, as its hover shows it: prover-prefixed, in the order the provers finished.
+  const sledgehammer = ['Sledgehammering...', 'algebra found a proof...', 'algebra: Try this: by algebra (4 ms)',
+    'metis found a proof...', 'metis: Try this: by (metis mult.commute add.commute) (5 ms)', 'metis: Duplicate proof', 'Done'];
+  assert.deepEqual(suggestedProofs(sledgehammer), ['by algebra', 'by (metis mult.commute add.commute)']);
   const lines = ['lemma "x = x"', '  using foo try0', '', '  sorry', 'lemma "y = y"', '  apply simp try0 sledgehammer [z3]'];
   assert.deepEqual(suggestionRange(lines, 1, 14, 'by simp'), { start: [1, 12], end: [3, 7] }, 'try0 and the following sorry');
   assert.deepEqual(suggestionRange(lines, 1, 14, 'apply simp'), { start: [1, 12], end: [1, 16] }, 'A non-terminal step keeps the sorry');
