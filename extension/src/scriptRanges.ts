@@ -1,23 +1,31 @@
 import { decodeSymbols } from './symbols';
 export interface ScriptGroup { controls: [number,number][]; content: [number,number]; style: 'sup'|'sub'|'bold' }
+type Control = 'sub'|'sup'|'bold'|'bsub'|'esub'|'bsup'|'esup';
+const names: Control[] = ['sub','sup','bold','bsub','esub','bsup','esup'];
+// Visit only symbols and decoded control characters; tokenizing every character is too slow for large theories.
 export function scriptRanges(source: string): ScriptGroup[] {
-  const tokens = [...source.matchAll(/\\<[^>\n]+>|[\s\S]/gu)].map(match =>
-    ({ start:match.index,end:match.index+match[0].length,text:decodeSymbols(match[0]) }));
-  const control = Object.fromEntries(['sub','sup','bold','bsub','esub','bsup','esup']
-    .map(name=>[name,decodeSymbols('\\<^'+name+'>')]));
+  const control = new Map<string,Control>();
+  for (const name of names) { control.set('\\<^'+name+'>',name); control.set(decodeSymbols('\\<^'+name+'>'),name); }
+  const glyphs = [...control.keys()].filter(key=>!key.startsWith('\\<')).map(key=>key.replace(/[\\^$.*+?()[\]{}|-]/g,'\\$&'));
+  const pattern = new RegExp('\\\\<[^>\\n]+>' + (glyphs.length ? '|' + glyphs.join('|') : ''), 'gu');
+  const next = /\\<[^>\n]+>|[\s\S]/uy;
   const groups: ScriptGroup[] = [];
-  const stack: { index:number; style:'sup'|'sub'; close:string }[] = [];
-  for(let i=0;i<tokens.length;i++) {
-    const token=tokens[i], next=tokens[i+1];
-    const style = token.text===control.sup ? 'sup' : token.text===control.sub ? 'sub' : token.text===control.bold ? 'bold' : undefined;
-    if (style && next && !/\s/u.test(next.text) && !Object.values(control).includes(next.text)) {
-      groups.push({controls:[[token.start,token.end]],content:[next.start,next.end],style});
-    } else if(token.text===control.bsup || token.text===control.bsub) {
-      stack.push({index:i,style:token.text===control.bsup?'sup':'sub',close:token.text===control.bsup?control.esup:control.esub});
-    } else if(token.text===stack.at(-1)?.close) {
+  const stack: { start:number; end:number; style:'sup'|'sub'; close:Control }[] = [];
+  for (const match of source.matchAll(pattern)) {
+    const name = control.get(match[0]);
+    if (!name) continue;
+    const start = match.index, end = start + match[0].length;
+    if (name==='sup' || name==='sub' || name==='bold') {
+      next.lastIndex = end;
+      const token = next.exec(source)?.[0];
+      if (token && !/\s/u.test(token) && !control.has(decodeSymbols(token)) && !control.has(token)) {
+        groups.push({controls:[[start,end]],content:[end,end+token.length],style:name});
+      }
+    } else if (name==='bsup' || name==='bsub') {
+      stack.push({start,end,style:name==='bsup'?'sup':'sub',close:name==='bsup'?'esup':'esub'});
+    } else if (name===stack.at(-1)?.close) {
       const open=stack.pop()!;
-      if (i>open.index+1) groups.push({controls:[[tokens[open.index].start,tokens[open.index].end],[token.start,token.end]],
-        content:[tokens[open.index].end,token.start],style:open.style});
+      if (start>open.end) groups.push({controls:[[open.start,open.end],[start,end]],content:[open.end,start],style:open.style});
     }
   }
   return groups;
