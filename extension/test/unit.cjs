@@ -48,8 +48,17 @@ theory Ignored imports After begin`;
   console.log('PASS: theory headers skip comments and cartouches; local imports resolve, library imports do not');
 }
 
+function checkLastProofLine() {
+  const { lastProofLine } = require('../out/goals');
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures/Sqrt2.thy'), 'utf8');
+  assert.equal(source.split('\n')[lastProofLine(source)].trim(), 'by simp', 'qed and end have no proof state');
+  assert.equal(lastProofLine('theory A imports Main begin\ndefinition f where "f x = x"\nend\n'), undefined);
+  console.log('PASS: whole-theory checks confirm with the last proof command, not qed or end');
+}
+
 (async () => {
   checkTheoryHeader();
+  checkLastProofLine();
   require('./goalHtml.cjs').checkGoalHtml();
   checkScriptRanges();
   checkServerSettings();

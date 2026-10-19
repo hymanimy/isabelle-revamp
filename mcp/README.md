@@ -73,25 +73,26 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 
 | Tool | Result and behavior |
 | --- | --- |
-| `open(file)` | Opens the editor and returns its current `text`, `version`, and `saved` flag. Includes unsaved user edits. |
+| `open(file)` | Returns the file's current `text`, `version`, and `saved` flag as VS Code holds it, including unsaved user edits. Does not open a tab or move the user's cursor. |
 | `edit(file, start_line, start_col, end_line, end_col, text)` | Replaces the range through VS Code, saves the buffer, and returns its new version/status. Uses the editor's undo history. A stale client version is rejected; read with `open` immediately before editing. |
-| `goals_at(file, line, col)` | Moves the visible cursor to a proof command and waits up to 30 seconds. Returns Unicode `text` identical to the sidebar, plus `phase`, diagnostics, the file/version/position, `theory` and `checkStatus`. |
+| `goals_at(file, line, col)` | Waits up to 30 seconds until Isabelle has checked up to a proof command and its output has settled. Returns Unicode `text` (the proof state plus messages such as try0 suggestions), `phase`, diagnostics of that command, the file/version/position, `theory` and `checkStatus`. Does not move the user's cursor. |
 | `errors(file)` | Returns error messages/ranges, `has_errors`, and `complete`. `complete=false` means an empty or partial list is inconclusive. |
-| `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag for all open theory tabs. |
+| `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag, for the theories open in the user's tabs plus those this client has read or edited. |
 | `sorry_positions(file)` | Returns server-marked `[start_line,start_col,end_line,end_col]` ranges and a `complete` flag. Comments and strings containing the word are ignored. |
 | `processing_status()` | Returns per-file `known`, `processed`, `processing`, version, and pending ranges; the top-level `processing` flag is true if any open theory is pending. |
 
 `sorry_positions` and `processing_status` follow the purposes of I/Q's `get_sorry_positions` and
 `get_processing_status`, read before implementation in the
 [AutoCorrode I/Q tool list](https://github.com/awslabs/AutoCorrode/blob/main/iq/README.md#mcp-tools).
-Our parameter-free processing query lists open theory tabs rather than accepting
+Our parameter-free processing query lists those same theories rather than accepting
 I/Q's file argument. We do not load I/Q or modify Isabelle.
 
 ## Agent workflow
 
 1. Call `open` to read the current buffer, then `goals_at` on the theorem or a
    `have` command. Blank lines, the final `end`, and a completed top-level `by`
-   tactic need not return a proof state. The sidebar follows this same cursor.
+   tactic need not return a proof state. Queries never move the user's cursor;
+   while one runs, the user's Goals panel waits for it.
 2. Use `sorry_positions` for the exact admitted command ranges. If `complete`
    is false, obtain a goal for that document version and poll
    `processing_status`.
@@ -100,8 +101,13 @@ I/Q's file argument. We do not load I/Q or modify Isabelle.
    **unfinished (sorry)** is distinct from an error. `No subgoals!` alone is not
    completion: an admitted or failed command can also produce that text.
 4. Check the target file's `fully_checked` and `saved` fields. The aggregate is
-   true only when every open theory tab passes; closing a tab removes it from
-   that aggregate. No tabs means `fully_checked=false`.
+   true only when every listed theory passes. No theories means
+   `fully_checked=false`.
+
+Isabelle checks only near the user's cursor, like Isabelle/jEdit. `status`,
+`errors`, `sorry_positions` and `processing_status` therefore check each theory
+in full first, for a bounded time per call; checking progress is kept between
+calls, so poll until `complete` or `fully_checked`.
 
 Completion is conservative: a fresh goal query and full decoration snapshot
 must confirm the current version; there must be no pending work, errors, bad
@@ -113,8 +119,8 @@ axioms or admissions in arbitrary imported libraries.
 
 `edit` saves the whole current buffer, including existing unsaved edits. It does
 not retry on network failure. If a response is lost, read the buffer before
-retrying: the edit may already have applied. A user moving the cursor or editing
-the document while `goals_at` waits causes that query to fail explicitly.
+retrying: the edit may already have applied. Editing the document while
+`goals_at` waits makes that query fail explicitly.
 
 Editor operations from both clients are serialized. Each connection remembers
 the version returned by its last `open` or successful `edit`; a change by the
@@ -129,17 +135,14 @@ mechanism.
 ## Verify end to end
 
 ```sh
-bash scripts/check_m5.sh
+npm run test:integration --prefix extension -- mcp,agentEdits
 ```
 
-This uses the installed VS Code application and Isabelle, runs M3/M4 regressions,
-then drives all seven tools through a real FastMCP stdio client. It compares
-goals with the actual sidebar model, replaces a `sorry` with the complete M4
-proof in a disposable Sqrt2 copy, and checks completion, errors, processing,
-connection refusal, and file boundaries. The real example remains unchanged.
-Receipts are in `.dev-host/m5-results.json`. Profiles and discovery files stay
-under `.dev-host/` during tests. Pass another VS Code application executable as
-the script's first argument if needed.
+This drives all seven tools through a real FastMCP stdio client against VS Code
+and Isabelle: it replaces a `sorry` with a complete proof in a disposable copy of
+the sqrt-2 fixture, and checks goals, completion, errors, processing, connection
+refusal and file boundaries. Receipts are in `.dev-host/m5-results.json`.
+Profiles and discovery files stay under `.dev-host/` during tests.
 
 The bridge binds only to `127.0.0.1` on a random port. The discovery file is JSON
 containing the port and a random connection token, written with mode `0600`.

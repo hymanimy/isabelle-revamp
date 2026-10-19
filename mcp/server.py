@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Eight MCP tools, one named connection per client to the VS Code extension."""
+"""Seven MCP tools, one named connection per client to the VS Code extension."""
 import argparse
 import asyncio
 from contextlib import asynccontextmanager
@@ -105,7 +105,7 @@ READ = {'readOnlyHint': True, 'openWorldHint': False}
 
 @mcp.tool(annotations=READ)
 async def open(file: str) -> dict:
-    """Open an existing workspace .thy file in VS Code; return its current text and version."""
+    """Read an existing workspace .thy file as VS Code holds it, including unsaved edits; return its text and version. Does not change the user's editor."""
     return await bridge.request('open', file=file)
 
 
@@ -118,31 +118,31 @@ async def edit(file: str, start_line: int, start_col: int, end_line: int, end_co
 
 @mcp.tool(annotations=READ)
 async def goals_at(file: str, line: int, col: int) -> dict:
-    """Move the visible cursor to a proof command; wait up to 30s for the same plain text shown in the sidebar. Includes phase and version."""
+    """Return the proof state and messages (e.g. try0 suggestions) at a proof command, once Isabelle has checked up to it; waits up to 30s. Includes phase and version. Does not move the user's cursor."""
     return await bridge.request('goals_at', file=file, line=line, col=col)
 
 
 @mcp.tool(annotations=READ)
 async def errors(file: str) -> dict:
-    """Return inline error messages and source ranges. complete=false means checking is pending; an empty list is then inconclusive."""
+    """Check the whole theory (up to 15s per call), then return error messages and source ranges. complete=false means checking is still pending; call again, as progress is kept."""
     return await bridge.request('errors', file=file)
 
 
 @mcp.tool(annotations=READ)
 async def status() -> dict:
-    """Report completion of open workspace theories, including versions, errors, admissions and saved state. Checking or sorry is never fully_checked."""
+    """Check open workspace theories in full (up to 15s each per call) and report completion, including versions, errors, admissions and saved state. Checking or sorry is never fully_checked; call again while checking."""
     return await bridge.request('status')
 
 
 @mcp.tool(annotations=READ)
 async def sorry_positions(file: str) -> dict:
-    """Find server-marked sorry commands as [start_line,start_col,end_line,end_col] ranges. Ignores comments/strings; complete=false means the list is provisional."""
+    """Check the whole theory (up to 15s per call), then list sorry commands as [start_line,start_col,end_line,end_col] ranges. Ignores comments/strings; complete=false means the list is provisional."""
     return await bridge.request('sorry_positions', file=file)
 
 
 @mcp.tool(annotations=READ)
 async def processing_status() -> dict:
-    """Report processing/known flags and pending ranges for each open workspace theory. A new or inactive edited file stays unknown until a goal query confirms it."""
+    """Advance checking of each open workspace theory (up to 5s each), then report processing/known flags and pending ranges."""
     return await bridge.request('processing_status')
 
 

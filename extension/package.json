@@ -103,7 +103,7 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Reveal MCP edits without moving your caret; preview replaced text for 200 ms, highlight new text for 2 seconds, and show the agent name for 3 seconds."
+          "description": "Highlight MCP edits in editors that show the file, without scrolling or moving your caret: preview replaced text for 200 ms, highlight new text for 2 seconds, and show the agent name for 3 seconds."
         },
         "isabelleRevamp.prettySymbols": {
           "type": "boolean",

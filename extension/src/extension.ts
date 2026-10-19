@@ -155,7 +155,7 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, view, agentEdits));
+  bridge = new Bridge(new BridgeTools(goals, agentEdits));
   try {
     await bridge.start();
     output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);

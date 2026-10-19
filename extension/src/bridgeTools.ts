@@ -1,17 +1,15 @@
 import { realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import { DiagnosticSeverity, EndOfLine, languages, Position, Range, Selection, TabInputText, TextDocument, Uri, window, workspace } from 'vscode';
+import { DiagnosticSeverity, EndOfLine, languages, Position, Range, TabInputText, TextDocument, Uri, window, workspace, WorkspaceEdit } from 'vscode';
 import { Goals } from './goals';
-import { GoalsView } from './goalsView';
 import { encodeSymbols } from './symbols';
 import { AgentEdits } from './agentEdits';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
 
-const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BridgeTools {
-  constructor(private goals: Goals, private view: GoalsView, private agentEdits: AgentEdits) {}
+  constructor(private goals: Goals, private agentEdits: AgentEdits) {}
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');
@@ -45,22 +43,23 @@ export class BridgeTools {
     return new Position(line, col);
   }
 
-  private async documents(): Promise<TextDocument[]> {
+  // Theories open in the user's tabs, plus those this agent has read or edited.
+  private async documents(agent: AgentSession): Promise<TextDocument[]> {
+    const uris = new Set(window.tabGroups.all.flatMap(group => group.tabs.flatMap(tab =>
+      tab.input instanceof TabInputText && tab.input.uri.scheme === 'file' ? [tab.input.uri.toString()] : [])));
+    for (const uri of agent.versions.keys()) uris.add(uri);
     const result = [];
-    // textDocuments also contains cached buffers whose tabs have already closed.
-    const tabs = new Set(window.tabGroups.all.flatMap(group => group.tabs.flatMap(tab =>
-      tab.input instanceof TabInputText ? [tab.input.uri.toString()] : [])));
-    for (const document of workspace.textDocuments) {
-      if (document.isClosed || !tabs.has(document.uri.toString())
-        || document.languageId !== 'isabelle' || document.uri.scheme !== 'file') continue;
-      try { await this.filePath(document.uri.fsPath); result.push(document); } catch { /* outside workspace */ }
+    for (const uri of uris) {
+      try { result.push(await this.document(Uri.parse(uri).fsPath)); } catch { /* not a workspace theory, or deleted */ }
     }
     return result;
   }
 
   async call(method: string, params: Record<string, unknown>, agent: AgentSession): Promise<unknown> {
+    // Isabelle checks only near the user's cursor; status answers cover whole theories.
     if (method === 'status' || method === 'processing_status') {
-      const documents = await this.documents();
+      const documents = await this.documents(agent);
+      for (const document of documents) await this.goals.checkWhole(document, method === 'status' ? 15000 : 5000);
       const files = documents.map(document => method === 'status'
         ? this.goals.documentStatus(document) : this.goals.processing(document));
       return method === 'status'
@@ -73,6 +72,7 @@ export class BridgeTools {
     const document = await this.document(params.file);
     const identity = () => ({ file: document.uri.fsPath, version: document.version });
     if (method === 'errors') {
+      await this.goals.checkWhole(document);
       const errors = languages.getDiagnostics(document.uri).filter(d => d.severity === DiagnosticSeverity.Error)
         .map(d => ({ message: d.message, range: [d.range.start.line, d.range.start.character, d.range.end.line, d.range.end.character] }));
       const status = this.goals.documentStatus(document);
@@ -81,14 +81,13 @@ export class BridgeTools {
         has_errors: hasErrors, errors };
     }
     if (method === 'sorry_positions') {
+      await this.goals.checkWhole(document);
       const processing = this.goals.processing(document);
       return { ...identity(), complete: processing.processed,
         positions: processing.known ? this.goals.sorryPositions(document) : [] };
     }
-    const column = window.tabGroups.all.find(group => group.tabs.some(tab =>
-      tab.input instanceof TabInputText && tab.input.uri.toString() === document.uri.toString()))?.viewColumn;
-    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: method === 'edit' });
-    this.goals.follow(editor);
+    // Agents work on the document model, never on the user's editor: no tab
+    // switches, cursor moves or scrolling.
     if (method === 'open') {
       agent.versions.set(document.uri.toString(), document.version);
       return { ...identity(), text: document.getText(), saved: !document.isDirty };
@@ -106,42 +105,28 @@ export class BridgeTools {
       // Match VS Code's newline normalization when computing the new range.
       const eol = document.eol === EndOfLine.LF ? '\n' : '\r\n';
       const text = encodeSymbols(params.text as string).replace(/\r\n|\r|\n/g, eol);
-      await this.agentEdits.preview(editor, new Range(start, end));
+      const visible = () => window.visibleTextEditors.find(editor => editor.document === document);
+      const shown = visible();
+      if (shown) await this.agentEdits.preview(shown, new Range(start, end));
       if (document.isClosed || document.version !== version) {
         throw new Error('The buffer changed during the edit preview. Call open and recompute the edit range.');
       }
-      if (!await editor.edit(edit => edit.replace(new Range(start, end), text))) {
+      // A workspace edit joins the document's undo history without needing an editor.
+      const edit = new WorkspaceEdit();
+      edit.replace(document.uri, new Range(start, end), text);
+      if (!await workspace.applyEdit(edit) || document.version === version) {
         throw new Error('Document changed during the edit; read it again with open.');
       }
-      // VS Code tracks all user selections through the replacement. Do not
-      // restore old coordinates or put the caret on the agent's proof step.
       this.goals.observe(document);
-      this.goals.follow(editor);
       const inserted = new Range(start, document.positionAt(offset + text.length));
-      this.agentEdits.applied(editor, inserted, agent.name);
+      const editor = visible();
+      if (editor) this.agentEdits.applied(editor, inserted, agent.name);
       agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };
     }
     const position = this.position(document, params.line, params.col);
-    editor.selection = new Selection(position, position);
-    editor.revealRange(new Range(position, position));
-    this.goals.follow(editor);
-    const version = document.version;
-    const deadline = Date.now() + 30000;
-    while (Date.now() < deadline) {
-      if (document.version !== version || window.activeTextEditor !== editor
-        || !editor.selection.active.isEqual(position) || !this.goals.matches(document, position.line, position.character)) {
-        throw new Error('The document or cursor changed during the query. Retry goals_at.');
-      }
-      const state = this.view.snapshot();
-      if (['ready', 'unfinished', 'error'].includes(state.phase) && this.goals.processing(document).processed) {
-        const { html: _html, ...plain } = state;
-        return { ...identity(), line: position.line, col: position.character, ...plain };
-      }
-      if (state.phase === 'unavailable') throw new Error('No goal state at this position; choose a proof command.');
-      await pause(25);
-    }
-    throw new Error('Isabelle is still checking; query processing_status and retry goals_at.');
+    const { html: _html, ...state } = await this.goals.stateAt(document, position.line, position.character);
+    return { ...identity(), line: position.line, col: position.character, ...state };
   }
 }

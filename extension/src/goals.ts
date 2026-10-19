@@ -8,6 +8,15 @@ interface Caret { uri: string; line: number; character: number; version: number 
 export type SourceRange = [number, number, number, number];
 interface Decoration { uri: string; entries: { type: string; content: { range: SourceRange }[] }[] }
 interface StateOutput { id: number; content: string }
+interface Probe { uri: string; version: number; state?: string }
+const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Isabelle batches output every vscode_output_delay (0.5 s); a command's messages
+// can follow its proof state by one batch.
+const outputSettle = 700;
+// Each caret move changes the checking perspective, which Isabelle treats as a
+// document update; it publishes output (diagnostics included) only for an up-to-date
+// snapshot. Leave the caret still this long between holds so output can flush.
+const caretQuiet = 1000;
 
 // PIDE/decoration messages are deltas: omitted entries retain their old value.
 const busyTypes = new Set([
@@ -15,6 +24,21 @@ const busyTypes = new Set([
   'text_overview_unprocessed', 'text_overview_running',
 ]);
 // background_bad also marks `sorry`; it is not an error diagnostic.
+
+// Commands that run inside a proof, so the prover prints a proof state for them.
+const proofCommands = new Set(['lemma', 'theorem', 'corollary', 'proposition', 'schematic_goal', 'proof', 'by', 'apply',
+  'apply_end', 'subgoal', 'have', 'show', 'hence', 'thus', 'obtain', 'consider', 'fix', 'assume', 'presume', 'define',
+  'let', 'note', 'from', 'with', 'then', 'using', 'unfolding', 'supply', 'next', 'case', 'also', 'finally', 'moreover',
+  'ultimately', 'sorry']);
+
+// The last line starting with a proof command, if any.
+export function lastProofLine(source: string): number | undefined {
+  const lines = source.split('\n');
+  for (let line = lines.length - 1; line >= 0; line--) {
+    if (proofCommands.has(/^\s*([a-z_]+)/.exec(lines[line])?.[1] ?? '')) return line;
+  }
+  return undefined;
+}
 
 export class Goals implements Disposable {
   private updates = new EventEmitter<void>();
@@ -29,6 +53,9 @@ export class Goals implements Disposable {
   private pending = 0;
   private navigation: Promise<void> = Promise.resolve();
   private earlyStates = new Map<number, string>();
+  private probes = new Map<number, Probe>();
+  private outputAt = 0;
+  private caretRestoredAt = 0;
   private confirmed?: string;
   private confirmedHtml?: string;
   // Mirrors the server's caret panel, which only sends changed output.
@@ -43,6 +70,7 @@ export class Goals implements Disposable {
   private versions = new Map<string, number>();
   private confirmedVersions = new Map<string, number>();
   private annotatedVersions = new Map<string, number>();
+  private changedAt = new Map<string, number>();
   private subscriptions: Disposable[] = [];
 
   constructor(private client: LanguageClient, private view: GoalsView) {
@@ -50,11 +78,14 @@ export class Goals implements Disposable {
       client.onNotification('PIDE/dynamic_output', ({ content }: { content: string }) => {
         this.dynamic = outputText(content);
         this.dynamicHtml = content;
+        this.outputAt = Date.now();
         this.render();
       }),
       client.onNotification('PIDE/state_output', (message: StateOutput) => {
         const text = message.content;
-        if (message.id === this.panel) this.acceptState(text);
+        const probe = this.probes.get(message.id);
+        if (probe) this.acceptProbe(probe, text);
+        else if (message.id === this.panel) this.acceptState(text);
         else if (this.pending) this.earlyStates.set(message.id, text);
       }),
       client.onNotification('PIDE/decoration', (message: Decoration) => {
@@ -170,6 +201,110 @@ export class Goals implements Disposable {
     });
   }
 
+  // Point the prover at a position other than the user's cursor while `work` runs,
+  // then restore the user's caret. Isabelle checks text near its caret, so this also
+  // checks text out of the user's view; results persist after the caret returns.
+  // Holds the prover's single caret, so the user's own goal waits until `work` ends.
+  private hold<T>(document: TextDocument, line: number, character: number, work: (probe: Probe) => Promise<T>): Promise<T> {
+    if (!this.available) return Promise.reject(new Error('Isabelle is not running.'));
+    this.observe(document);
+    return this.navigate(async () => {
+      await pause(this.caretRestoredAt + caretQuiet - Date.now());
+      const uri = document.uri.toString(), existing = this.panel;
+      const probe: Probe = { uri, version: document.version };
+      this.pending++;
+      let id: number | undefined;
+      try {
+        if (existing !== undefined) await this.client.sendNotification('PIDE/state_auto_update', { id: existing, enabled: false });
+        await this.client.sendNotification('PIDE/caret_update', { uri, line, character });
+        id = (await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {})).state_id;
+        this.probes.set(id, probe);
+        const early = this.earlyStates.get(id);
+        if (early !== undefined) this.acceptProbe(probe, early);
+        return await work(probe);
+      } finally {
+        if (id !== undefined) {
+          this.probes.delete(id);
+          void this.client.sendNotification('PIDE/state_exit', { id }).catch(() => {});
+        }
+        if (--this.pending === 0) this.earlyStates.clear();
+        const caret = this.caret;
+        await this.client.sendNotification('PIDE/caret_update', caret
+          ? { uri: caret.uri, line: caret.line, character: caret.character } : {}).catch(() => {});
+        this.caretRestoredAt = Date.now();
+        if (existing !== undefined && existing === this.panel) {
+          await this.client.sendNotification('PIDE/state_auto_update', { id: existing, enabled: true }).catch(() => {});
+        }
+      }
+    });
+  }
+
+  private acceptProbe(probe: Probe, text: string): void {
+    probe.state = text;
+    this.outputAt = Date.now();
+    // Like the user's panel, a tagged state confirms the annotations of this version.
+    if (this.versions.get(probe.uri) === probe.version) {
+      this.confirmedVersions.set(probe.uri, probe.version);
+      this.refreshDecorations(probe.uri);
+    }
+  }
+
+  // The goal and messages at a position, once everything up to it is checked and
+  // its output has settled. Never moves the user's cursor.
+  async stateAt(document: TextDocument, line: number, character: number, timeout = 30000): Promise<GoalState> {
+    return this.hold(document, line, character, async probe => {
+      const deadline = Date.now() + timeout;
+      let checkedAt: number | undefined;
+      while (Date.now() < deadline) {
+        if (document.isClosed || document.version !== probe.version) {
+          throw new Error('The document changed during the query. Retry goals_at.');
+        }
+        const checked = this.annotatedVersions.get(probe.uri) === probe.version
+          && !this.busyBefore(probe.uri, line, character);
+        checkedAt = checked ? checkedAt ?? Date.now() : undefined;
+        if (checked && probe.state !== undefined && Date.now() - this.outputAt >= outputSettle) {
+          return { ...this.present(document, line, probe.state),
+            theory: basename(document.uri.fsPath, '.thy'), checkStatus: this.documentStatus(document).state };
+        }
+        // A blank line or the theory header has no proof state.
+        if (checkedAt !== undefined && probe.state === undefined && Date.now() - checkedAt > 3000) {
+          throw new Error('No goal state at this position; choose a proof command.');
+        }
+        await pause(25);
+      }
+      throw new Error('Isabelle is still checking; query processing_status and retry goals_at.');
+    });
+  }
+
+  // Check all of a theory, not just near the user's cursor, for up to `budget` ms.
+  // An unfinished check keeps its progress, so repeated calls converge.
+  async checkWhole(document: TextDocument, budget = 15000): Promise<void> {
+    const deadline = Date.now() + budget, uri = document.uri.toString(), version = document.version;
+    const current = () => Date.now() < deadline && !document.isClosed && document.version === version;
+    if (this.processing(document).processed) return;
+    // Holding the prover at the end makes Isabelle check everything before it.
+    await this.hold(document, Math.max(0, document.lineCount - 1), 0, async () => {
+      while (current() && [...busyTypes].some(type => this.decorationRanges(uri, type).length)) await pause(50);
+    });
+    if (this.processing(document).known || !current()) return;
+    // Annotations count only once a tagged proof state confirms their version, and
+    // theory-level commands (qed, end, definitions) have no proof state.
+    const line = lastProofLine(document.getText());
+    if (line !== undefined) {
+      await this.hold(document, line, 0, async () => {
+        while (current() && !this.processing(document).known) await pause(50);
+      });
+    } else {
+      // No proof to confirm with: trust annotations once the text has been stable well
+      // past Isabelle's input and output delays (0.1 s + 0.5 s).
+      while (current() && Date.now() - (this.changedAt.get(uri) ?? 0) < 1500) await pause(50);
+      if (!current()) return;
+      this.confirmedVersions.set(uri, version);
+      this.refreshDecorations(uri);
+      while (current() && !this.processing(document).known) await pause(50);
+    }
+  }
+
   private acceptState(text: string): void {
     this.confirmed = outputText(text);
     this.confirmedHtml = text;
@@ -190,40 +325,46 @@ export class Goals implements Disposable {
   // Isabelle checks only near the cursor, so later commands may stay unprocessed
   // indefinitely. The goal at the caret waits only for work at or before it.
   private busyBeforeCaret(): boolean {
-    const caret = this.caret;
-    if (!caret) return false;
-    const ranges = this.ranges.get(caret.uri);
-    return [...busyTypes].some(type => (ranges?.get(type) ?? []).some(([line, character]) =>
-      line < caret.line || line === caret.line && character <= caret.character));
+    return this.caret !== undefined && this.busyBefore(this.caret.uri, this.caret.line, this.caret.character);
+  }
+
+  private busyBefore(uri: string, line: number, character: number): boolean {
+    const ranges = this.ranges.get(uri);
+    return [...busyTypes].some(type => (ranges?.get(type) ?? []).some(([start, column]) =>
+      start < line || start === line && column <= character));
   }
 
   private render(): void {
     if (!this.caret || !this.available) return;
     const busy = this.busyBeforeCaret();
-    // Like jEdit, report errors of the command at the caret, not elsewhere in the theory.
-    const line = this.caret.line;
-    const atCaret = ([start, , end]: SourceRange) => start <= line && line <= end;
-    const errors = (this.diagnostics.get(this.caret.uri) ?? []).filter(d => atCaret(d.range)).map(d => d.message);
-    const failed = errors.length > 0 || this.decorationRanges(this.caret.uri, 'text_overview_error').some(atCaret);
-    if (busy || this.confirmed === undefined) {
+    if (busy || this.confirmed === undefined || !this.document) {
       const phase = !busy && Date.now() - this.requestedAt >= 10000 ? 'unavailable' : 'checking';
       this.publish({ phase, text: '', errors: [] });
       return;
     }
+    this.publish(this.present(this.document, this.caret.line, this.confirmedHtml!));
+  }
+
+  private present(document: TextDocument, line: number, stateHtml: string): GoalState {
+    const uri = document.uri.toString();
     // Untagged dynamic output prints the state plus the command's messages
     // (e.g. try0's "Try this"). Accept it only if it contains the tagged state.
-    const messages = this.confirmed !== '' && this.dynamic.includes(this.confirmed);
-    const text = messages ? this.dynamic : this.confirmed;
-    const html = messages ? this.dynamicHtml : this.confirmedHtml;
+    const state = outputText(stateHtml);
+    const messages = state !== '' && this.dynamic.includes(state);
+    const text = messages ? this.dynamic : state;
+    const html = messages ? this.dynamicHtml : stateHtml;
+    // Like jEdit, report errors of the command at the caret, not elsewhere in the theory.
+    const atCaret = ([start, , end]: SourceRange) => start <= line && line <= end;
+    const errors = (this.diagnostics.get(uri) ?? []).filter(d => atCaret(d.range)).map(d => d.message);
+    const failed = errors.length > 0 || this.decorationRanges(uri, 'text_overview_error').some(atCaret);
     // Isabelle marks an admitted command as background_bad. Match its actual
     // source range: mentions in comments/quoted text are not admissions, and
     // other bad markup must not be mistaken for `sorry`.
-    const unfinished = (this.badRanges.get(this.caret.uri) ?? []).some(range =>
-      this.document?.getText(new Range(...range)) === 'sorry');
+    const unfinished = (this.badRanges.get(uri) ?? []).some(range => document.getText(new Range(...range)) === 'sorry');
     // A failed method can inherit a parent's "No subgoals!" state. Show its
     // diagnostic instead, never that misleading state under an error banner.
     const phase = failed ? 'error' : unfinished ? 'unfinished' : 'ready';
-    this.publish({ phase, text: failed ? '' : text, html: failed ? undefined : html, errors });
+    return { phase, text: failed ? '' : text, html: failed ? undefined : html, errors };
   }
 
   private publish(state: GoalState): void {
@@ -256,6 +397,7 @@ export class Goals implements Disposable {
     const uri = document.uri.toString();
     if (this.versions.get(uri) !== document.version) {
       this.versions.set(uri, document.version);
+      this.changedAt.set(uri, Date.now());
       // Imports may depend on this file, so invalidate their cached completion too.
       this.confirmedVersions.clear();
       this.annotatedVersions.clear();

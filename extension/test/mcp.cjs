@@ -27,11 +27,12 @@ exports.run = async function () {
       readline.createInterface({ input: child.stdout }).on('line', line => {
         try {
           const receipt = JSON.parse(line);
-          if (receipt.check === 'sidebar matches MCP goals') {
-            const state = api.getGoalState();
-            for (const key of ['phase', 'text', 'errors', 'theory', 'checkStatus']) {
-              assert.deepEqual(state[key], receipt.result[key], key);
-            }
+          if (receipt.check === 'goals_at leaves the user editor alone') {
+            // MCP works on the document model: no tab opens, the Goals panel stays on the user's own cursor.
+            const tabs = vscode.window.tabGroups.all.flatMap(group => group.tabs);
+            assert(!tabs.some(tab => tab.input?.uri?.fsPath === path.join(directory, 'Sqrt2.thy')), 'MCP opened a tab');
+            assert.notEqual(api.getGoalState().theory, 'Sqrt2');
+            assert.equal(receipt.result.theory, 'Sqrt2');
           }
           receipts.push(receipt);
           console.log('PASS: ' + receipt.check);

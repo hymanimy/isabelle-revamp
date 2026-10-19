@@ -1,5 +1,5 @@
 import { DecorationOptions, DecorationRangeBehavior, Disposable, Range, TextDocumentChangeEvent,
-  TextEditor, TextEditorDecorationType, TextEditorRevealType, ThemeColor, window, workspace } from 'vscode';
+  TextEditor, TextEditorDecorationType, ThemeColor, window, workspace } from 'vscode';
 
 interface Flash {
   editor: TextEditor;
@@ -50,7 +50,6 @@ export class AgentEdits implements Disposable {
     if (!this.enabled(editor) || range.isEmpty) return;
     this.clearPreview();
     this.previewing = { editor, range };
-    editor.revealRange(range, TextEditorRevealType.InCenter);
     editor.setDecorations(this.strike, [range]);
     try { await new Promise(resolve => setTimeout(resolve, 200)); }
     finally { this.clearPreview(); }
@@ -63,7 +62,6 @@ export class AgentEdits implements Disposable {
 
   applied(editor: TextEditor, range: Range, agent: string): void {
     if (!this.enabled(editor)) return;
-    editor.revealRange(range, TextEditorRevealType.InCenter);
     this.flashes.push({ editor, start: editor.document.offsetAt(range.start),
       end: editor.document.offsetAt(range.end), agent, at: Date.now() });
     this.render();

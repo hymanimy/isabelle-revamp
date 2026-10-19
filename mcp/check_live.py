@@ -75,7 +75,7 @@ async def main():
         assert 'sorry' in initial['text']
         goal = await call('goals_at', file=str(FILE), line=6, col=4)
         assert 'sqrt 2 ∉ ℚ' in goal['text']
-        await receipt('sidebar matches MCP goals', goal)
+        await receipt('goals_at leaves the user editor alone', goal)
         await until('sorry is processed but not fully checked', lambda item: item['processed'] and item['state'] == 'unfinished')
         sorry = await call('sorry_positions', file=str(FILE))
         assert sorry['complete'] and sorry['positions'] == [[7, 2, 7, 7]], sorry
@@ -90,7 +90,10 @@ async def main():
         assert (await call('sorry_positions', file=str(FILE)))['positions'] == []
         goal = await call('goals_at', file=str(FILE), line=49, col=5)
         assert 'No subgoals!' in goal['text']
-        await receipt('sidebar matches MCP goals', goal)
+        await receipt('goals_at leaves the user editor alone', goal)
+        # Messages arrive one output batch after the proof state; goals_at waits for them.
+        assert 'Successful attempt to solve goal' in goal['text'], goal
+        await receipt('goals_at includes the command messages', goal)
 
         broken = ORIGINAL.replace('    by simp\nqed', '    by (rule TrueI)\nqed')
         await replace(broken)
@@ -103,9 +106,8 @@ async def main():
         assert errors['complete'] and errors['has_errors'] and any('Failed to apply' in error['message'] for error in errors['errors']), errors
         await receipt('MCP returns inline errors with ranges', errors)
 
-        # Keep the theorem cursor on a stable command while a later command runs.
-        await call('goals_at', file=str(FILE), line=6, col=4)
-        slow = ORIGINAL.replace('proof\n', 'proof\n  ML_prf \\<open>OS.Process.sleep (Time.fromReal 2.0)\\<close>\n', 1)
+        # processing_status checks for at most 5 s and status for 15 s, so a 25 s command is still running.
+        slow = ORIGINAL.replace('proof\n', 'proof\n  ML_prf \\<open>OS.Process.sleep (Time.fromReal 25.0)\\<close>\n', 1)
         await replace(slow)
         await asyncio.sleep(0.7)
         pending = await call('processing_status')
@@ -136,6 +138,8 @@ async def main():
 
     await asyncio.sleep(0.1)
     async with Client(StdioTransport(command=sys.executable, args=[str(ROOT / 'mcp/server.py'), '--port-file', str(PORT_FILE)], keep_alive=False)) as client:
+        # status covers the user's tabs and this client's files; a new client has read none yet.
+        await client.call_tool('open', {'file': str(FILE)})
         assert (await client.call_tool('status')).data['fully_checked']
         await receipt('agent slot released on disconnect')
 

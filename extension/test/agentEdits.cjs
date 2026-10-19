@@ -71,6 +71,7 @@ exports.run = async function () {
     editor.selections = [new vscode.Selection(1, 7, 1, 7), new vscode.Selection(below, below)];
     editor.revealRange(new vscode.Range(0, 0, 0, 0), vscode.TextEditorRevealType.AtTop);
     await pause(100);
+    const top = editor.visibleRanges[0].start.line;
     const old = find('sorry'), version = document.version, started = Date.now();
     const replacement = 'proof -\n    show True by simp\n  qed';
     const first = claude.call('edit', params(old, replacement));
@@ -86,8 +87,9 @@ exports.run = async function () {
     assert.equal(state().preview, undefined); assert.equal(state().flashes[0].marker, '✎ Claude');
     assert(state().flashes[0].opacity >= 24);
     assert.deepEqual(editor.selections.map(s => [s.active.line, s.active.character]), [[1, 8], [below.line + 2, below.character]]);
-    await until('edited range on screen', () => editor.visibleRanges.some(r => r.contains(old.start)));
-    receipt('200 ms strike preview keeps sorry, one replacement, centered range, multi-caret tracking and Claude marker');
+    await pause(100);
+    assert.equal(editor.visibleRanges[0].start.line, top, 'An agent edit must not scroll the user\'s view');
+    receipt('200 ms strike preview keeps sorry, one replacement, no scrolling, multi-caret tracking and Claude marker');
 
     // Insert above the first flash: its text/range and marker must follow.
     await codex.call('open', { file });
