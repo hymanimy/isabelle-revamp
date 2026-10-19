@@ -5,9 +5,8 @@ const vscode = require('vscode');
 const { loadSymbols, unicodeSymbols, symbolReplacements } = require('../out/symbols');
 const pause = ms => new Promise(r => setTimeout(r, ms));
 exports.run = async function () {
-  if (!process.env.M9A_ONLY) await require('./m5.cjs').run();
   const root = path.resolve(__dirname, '../..');
-  const original = fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8');
+  const original = fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8');
   const table = await loadSymbols(require('./isabelle.cjs').executable);
   assert(table.count > 400);
   assert.equal(unicodeSymbols(String.raw`\<Sum>i<n. \<And> \<Longrightarrow> \<notin> \<rat> \<open>x\<close> n^2 x^n x^12 x^foo`), '∑\u2009i<n. ⋀ ⟹ ∉ ℚ ‹x› n² xⁿ x^12 x^foo');
@@ -66,7 +65,7 @@ end
     assert(doc.getText().includes(String.raw`\<Sum>`),doc.getText());
     assert(!doc.getText().includes('∑'));
     console.log('PASS: real server completion and stock suggestion acceptance insert ASCII \\<Sum>');
-    assert.equal(fs.readFileSync(path.join(root,'examples/Sqrt2.thy'),'utf8'),original);
+    assert.equal(fs.readFileSync(path.join(root,'extension/test/fixtures/Sqrt2.thy'),'utf8'),original);
     fs.writeFileSync(path.join(root,'.dev-host/m9a-results.json'),JSON.stringify({table,replacements,completion,passed:true},null,2));
   } finally {
     await settings.update('prettySymbols', prior, vscode.ConfigurationTarget.Workspace);

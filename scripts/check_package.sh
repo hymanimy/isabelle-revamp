@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 npm run compile --prefix extension
-node extension/test/setup.cjs
+npm test --prefix extension
 npm run package --prefix extension
 (cd extension && npx vsce ls)
 python3 - <<'PY'

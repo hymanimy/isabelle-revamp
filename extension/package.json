@@ -23,7 +23,9 @@
     "compile": "tsc -p .",
     "vscode:prepublish": "npm run build",
     "build": "tsc -p . --noEmit && node build.cjs",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "tsc -p . && node test/unit.cjs",
+    "test:integration": "tsc -p . && node test/runIntegration.cjs"
   },
   "contributes": {
     "views": {

@@ -11,7 +11,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 exports.run = async function () {
   const root = path.resolve(__dirname, '../..');
-  const original = fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8');
+  const original = fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8');
   // Keep the M3 unfinished control independent of the completed M4 demo.
   const placeholder = String.raw`theory Sqrt2
   imports Complex_Main
@@ -117,7 +117,7 @@ end
     await move(6);
     await until('restore the original sqrt-2 placeholder', () => ready() && api.getGoalState().text === first);
     fs.writeFileSync(path.join(root, '.dev-host/m3-results.json'), JSON.stringify(snapshots, null, 2));
-    assert.equal(fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8'), original);
+    assert.equal(fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8'), original);
     console.log('M3 integration checks passed. Original example unchanged.');
   } catch (error) {
     fs.writeFileSync(path.join(root, '.dev-host/m3-results.json'), JSON.stringify({

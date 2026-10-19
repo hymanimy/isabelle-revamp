@@ -4,7 +4,6 @@ const path = require('node:path');
 const vscode = require('vscode');
 const pause = ms => new Promise(r=>setTimeout(r,ms));
 async function run() {
-  if (!process.env.M10_ONLY) await require('./m6.cjs').run();
   const root = path.resolve(__dirname,'../..');
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
   const file = path.join(root,'.dev-host/m10-fixture/Library.thy');
@@ -151,7 +150,7 @@ z\<^bsup>n`).length,0);
 async function checkGoalMarkup(root,api) {
   require('./goalHtml.cjs').checkGoalHtml();
   const {goalsHtml}=require('../out/goalsView');
-  const file=path.join(root,'examples/Sqrt2.thy');
+  const file=path.join(root,'extension/test/fixtures/Sqrt2.thy');
   const doc=await vscode.workspace.openTextDocument(file),editor=await vscode.window.showTextDocument(doc);
   editor.selection=new vscode.Selection(16,4,16,4);
   for(let i=0;i<200;i++) { await pause(50);if(api.getGoalState().text.includes('(sqrt 2)²') && api.getGoalState().checkStatus==='fully_checked')break; }
@@ -203,7 +202,7 @@ async function checkCartouches(root,api) {
 async function checkGoalLinks(root,api) {
   const {GoalLinks,hoverText}=require('../out/goalLinks');
   const {goalMarkup}=require('../out/goalHtml');
-  const doc=await vscode.workspace.openTextDocument(path.join(root,'examples/Sqrt2.thy'));
+  const doc=await vscode.workspace.openTextDocument(path.join(root,'extension/test/fixtures/Sqrt2.thy'));
   const editor=await vscode.window.showTextDocument(doc);
   editor.selection=new vscode.Selection(16,4,16,4);
   let snapshot;

@@ -74,8 +74,15 @@ details discovered empirically are in [docs/PROTOCOL_NOTES.md](docs/PROTOCOL_NOT
 ```sh
 npm ci --prefix extension
 # open this folder in VS Code, Run → Start Debugging (F5)
-npm run package --prefix extension      # builds dist/isabelle-revamp-0.1.0.vsix
+npm test --prefix extension                # unit tests: no VS Code window, no Isabelle
+npm run test:integration --prefix extension  # drives a real VS Code window against Isabelle
+npm run package --prefix extension         # builds dist/isabelle-revamp-0.1.0.vsix
 ```
+
+The integration tests open a VS Code window and need a display. They find VS Code and Isabelle
+at their usual install locations; set `VSCODE_EXECUTABLE` or `ISABELLE_EXECUTABLE` otherwise.
+Run selected suites with `npm run test:integration --prefix extension -- goals,proof`, and check
+an installed VSIX with `-- installed`. The `mcp` suite creates `mcp/.venv` on first run.
 
 Layout: `extension/` (VS Code extension), `mcp/` (MCP server), `examples/` (theories used by
 the tests), `scripts/` (checks), `docs/`.

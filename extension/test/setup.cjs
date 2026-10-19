@@ -69,4 +69,5 @@ async function run() {
   } finally { Module._load = load; }
   console.log('PASS: discovery priority, setup fixes, absolute bundled MCP command, one missing-Isabelle notification and first-theory Goals');
 }
-run().catch(error => { console.error(error); process.exitCode = 1; });
+exports.run = run;
+if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1; });

@@ -76,7 +76,7 @@ exports.checkHighlighting = async function (app) {
     }
     let state = textmate.INITIAL;
     let commands = 0;
-    const source = fs.readFileSync(path.join(extension, '../examples/Sqrt2.thy'), 'utf8');
+    const source = fs.readFileSync(path.join(extension, 'test/fixtures/Sqrt2.thy'), 'utf8');
     for (const line of source.split('\n')) {
       const result = tokenize(line, state);
       state = result.ruleStack;

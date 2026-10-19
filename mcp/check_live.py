@@ -10,7 +10,7 @@ from fastmcp.client.transports import StdioTransport
 
 ROOT = Path(__file__).resolve().parents[1]
 FILE = ROOT / '.dev-host/m5-fixture/Sqrt2.thy'
-ORIGINAL = (ROOT / 'examples/Sqrt2.thy').read_text()
+ORIGINAL = (ROOT / 'extension/test/fixtures/Sqrt2.thy').read_text()
 PORT_FILE = Path(os.environ['ISABELLE_REVAMP_PORT_FILE'])
 TOOLS = {'open', 'edit', 'goals_at', 'errors', 'status', 'sorry_positions', 'processing_status'}
 
@@ -39,7 +39,7 @@ async def main():
     transport = StdioTransport(command=sys.executable, args=[str(ROOT / 'mcp/server.py'), '--port-file', str(PORT_FILE)], keep_alive=False)
     async with Client(transport) as client:
         assert {tool.name for tool in await client.list_tools()} == TOOLS
-        await receipt('exactly eight MCP tools')
+        await receipt('exactly seven MCP tools')
         info = json.loads(PORT_FILE.read_text())
         second_reader, second_writer = await asyncio.open_connection('127.0.0.1', info['port'])
         try:

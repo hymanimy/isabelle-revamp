@@ -8,10 +8,9 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 exports.run = async function () {
   // Retain the cursor-race, slow-prover, diagnostic, and unfinished controls.
-  await require('./m3.cjs').run();
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   const root = path.resolve(__dirname, '../..');
-  const original = fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8');
+  const original = fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8');
   assert(!/\bsorry\b|\boops\b/.test(original));
   const directory = path.join(root, '.dev-host/m4-fixture');
   fs.mkdirSync(directory, { recursive: true });
@@ -80,14 +79,18 @@ exports.run = async function () {
     assert(goalsHtml(api.getGoalState()).includes('unfinished (sorry)'));
     assert(!goalsHtml(api.getGoalState()).includes('Proof error'));
 
-    // Keep a genuine sorry and add a separate failed command: errors still win.
+    // Keep a genuine sorry and add a separate failed command. Like jEdit, the panel shows
+    // the command at the caret; the error shows at its own command and in the document status.
     const broken = unfinished.replace('  then show contradiction: False\n    sorry',
       '  have bad: False by (rule TrueI)\n  then show contradiction: False\n    sorry');
     assert.notEqual(broken, unfinished, 'The error control must actually insert a wrong tactic');
     await replace(broken);
     await lastStep();
-    await until('real error takes precedence over sorry', () => api.getGoalState().phase === 'error'
-      && errors().some(d => d.message.includes('Failed to apply')));
+    await until('a failed command elsewhere does not hide the goal at the caret', () => api.getGoalState().phase === 'unfinished'
+      && api.getGoalState().checkStatus === 'error' && errors().some(d => d.message.includes('Failed to apply')));
+    await move(document.getText().split('\n').findIndex(text => text.includes('have bad:')), 4);
+    await until('the failed command shows its error', () => api.getGoalState().phase === 'error'
+      && api.getGoalState().errors.some(message => message.includes('Failed to apply')));
     assert.equal(api.getGoalState().text, '');
 
     // Merely discussing sorry, even inside nested comments, is not an admission.
@@ -105,7 +108,7 @@ text \<open>sorry\<close>
     await lastStep();
     await until('restored demo proof is complete', () => api.getGoalState().phase === 'ready'
       && api.getGoalState().text.includes('No subgoals!') && errors().length === 0);
-    assert.equal(fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8'), original);
+    assert.equal(fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8'), original);
     fs.writeFileSync(path.join(root, '.dev-host/m4-results.json'), JSON.stringify(snapshots, null, 2));
     console.log('M4 integration checks passed. All 11 have goals are distinct.');
   } catch (error) {

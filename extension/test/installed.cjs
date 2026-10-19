@@ -10,7 +10,7 @@ exports.run = async function () {
   assert(extension, 'The VSIX must be installed in real VS Code first');
   assert(!extension.extensionPath.startsWith(root), extension.extensionPath);
   assert(!fs.existsSync(path.join(extension.extensionPath, 'node_modules')));
-  const doc = await vscode.workspace.openTextDocument(path.join(root, 'examples/Sqrt2.thy'));
+  const doc = await vscode.workspace.openTextDocument(path.join(root, 'extension/test/fixtures/Sqrt2.thy'));
   const editor = await vscode.window.showTextDocument(doc);
   assert.equal(doc.languageId, 'isabelle');
   const api = await extension.activate();

@@ -6,10 +6,9 @@ const readline = require('node:readline');
 const vscode = require('vscode');
 
 exports.run = async function () {
-  await require('./m4.cjs').run();
   await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   const root = path.resolve(__dirname, '../..');
-  const source = fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8');
   const directory = path.join(root, '.dev-host/m5-fixture');
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(path.join(directory, 'Sqrt2.thy'), source.split('\nproof\n')[0] + '\n  sorry\n\nend\n');
@@ -45,7 +44,7 @@ exports.run = async function () {
         code === 0 ? resolve() : reject(new Error('MCP client exit ' + code + '\n' + stderr));
       });
     });
-    assert.equal(fs.readFileSync(path.join(root, 'examples/Sqrt2.thy'), 'utf8'), source);
+    assert.equal(fs.readFileSync(path.join(root, 'extension/test/fixtures/Sqrt2.thy'), 'utf8'), source);
     assert.equal(fs.readFileSync(path.join(directory, 'Sqrt2.thy'), 'utf8'), source);
     console.log('M5 end-to-end MCP checks passed. Actual demo source unchanged.');
   } finally {

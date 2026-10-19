@@ -16,9 +16,12 @@ exports.run = async function () {
   assert.equal(unicodeSymbols(String.raw`\<constructor>`), String.raw`\<constructor>`);
   const escaped = goalsHtml({ theory: '<img>', phase: 'error', text: '', errors: ['<script>'] });
   assert(escaped.includes('<h1>&lt;img&gt;</h1>') && escaped.includes('&lt;script&gt;'));
-  const hidden = goalsHtml({ phase: 'ready', checkStatus: 'checking', text: 'STALE', errors: ['STALE_ERROR'] });
+  const hidden = goalsHtml({ phase: 'checking', text: 'STALE', errors: ['STALE_ERROR'] });
   assert(!hidden.includes('STALE'));
   assert(hidden.includes('checking…'));
+  // The rest of the theory may stay unchecked out of view; that must not hide a ready goal.
+  const ready = goalsHtml({ phase: 'ready', checkStatus: 'checking', text: 'CURRENT', errors: [] });
+  assert(ready.includes('CURRENT') && ready.includes('Goal at cursor'));
   // Exercise the actual WebviewView provider, including retained state on reopen.
   const view = new GoalsView();
   const state = { theory: 'Sqrt2', phase: 'ready', checkStatus: 'fully_checked', text: 'm² = 2 * n²', errors: [] };
@@ -34,7 +37,6 @@ exports.run = async function () {
   }
   console.log('PASS: Unicode output/diagnostics, escaped header, hidden pending state, and theme-aware webview');
 
-  await require('./m5.cjs').run();
   const root = path.resolve(__dirname, '../..');
   const snapshots = JSON.parse(fs.readFileSync(path.join(root, '.dev-host/m4-results.json'), 'utf8'));
   assert(snapshots.find(s => s.check === 'goal at line 17').text.includes('(sqrt 2)² = 2'));
@@ -43,6 +45,11 @@ exports.run = async function () {
   assert(diagnosticStates.some(s => s.errors.some(error => error.includes('sqrt 2 ∉ ℚ'))));
   assert(diagnosticStates.every(s => s.errors.every(error => !error.includes('\\<notin>'))));
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
+  const sqrt2 = await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(
+    path.join(root, 'extension/test/fixtures/Sqrt2.thy')));
+  sqrt2.selection = new vscode.Selection(16, 4, 16, 4);
+  const checked = Date.now() + 60000;
+  while (Date.now() < checked && api.getGoalState().checkStatus !== 'fully_checked') await pause(25);
   assert.equal(api.getGoalState().theory, 'Sqrt2');
   assert.equal(api.getGoalState().checkStatus, 'fully_checked', JSON.stringify(api.getGoalState()));
 
