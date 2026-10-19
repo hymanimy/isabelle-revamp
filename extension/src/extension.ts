@@ -17,6 +17,7 @@ import { GoalLinks } from './goalLinks';
 import { findIsabelle, mcpLaunch, onPath, registerWithClaude, setupReport } from './setup';
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
+import { applySuggestion, withSuggestionLinks } from './tryButtons';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -104,9 +105,15 @@ export async function activate(context: ExtensionContext) {
   const goalLinks = new GoalLinks(libraryRoots);
   view.onNavigate = link => goalLinks.open(link);
   view.onHover = link => goalLinks.hover(link);
+  // A proof clicked in Goals replaces the try0/sledgehammer at the cursor that found it.
+  view.onSendback = async proof => {
+    const caret = goals?.caretPosition();
+    if (caret) await applySuggestion(caret.uri, caret.line, caret.character, proof);
+  };
   const prettySymbols = new PrettySymbols();
   context.subscriptions.push(prettySymbols,
     commands.registerCommand('isabelleRevamp.convertQuotes', convertQuotes),
+    commands.registerCommand('isabelleRevamp.applySuggestion', applySuggestion),
     commands.registerCommand('isabelleRevamp.togglePrettySymbols', () => prettySymbols.toggle()));
   const settings = currentSettings();
   const args = serverArgs(settings);
@@ -122,6 +129,8 @@ export async function activate(context: ExtensionContext) {
     documentSelector: [{ scheme: 'file', language: 'isabelle' }],
     outputChannel: output,
     middleware: {
+      provideHover: async (document, position, token, next) =>
+        withSuggestionLinks(await next(document, position, token), document.uri.toString(), position),
       provideCompletionItem: async (document,position,context,token,next) =>
         asciiCompletions(await next(document,position,context,token)),
       resolveCompletionItem: async (item,token,next) => {
@@ -188,6 +197,7 @@ export async function activate(context: ExtensionContext) {
   }
   // The integration check reads the same model that the webview renders.
   return { getGoalState: () => view.snapshot(),
+    useProofFromGoals: (proof: string) => view.onSendback?.(proof),
     getTheories: async () => { await theories.refresh(); return theories.snapshot(); },
     getAgentEdits: () => agentEdits.snapshot(),
     getGoalLinks: () => view.linkSnapshot(),

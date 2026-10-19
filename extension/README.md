@@ -10,7 +10,9 @@ mathematical symbol display. The original ASCII theory stays on disk by default.
    `isabelle-revamp-0.1.0.vsix`.
 3. Open a folder containing your `.thy` files, then open a theory. Goals opens
    automatically. **Isabelle: Show Theories** lists each open theory and the
-   theories it imports, with the prover's progress on each.
+   theories it imports, with the prover's progress on each. When `try0`,
+   `try` or `sledgehammer` finds a proof, apply it from the hover over the
+   command or by clicking it in Goals; a `sorry` right after it goes too.
 4. If Isabelle is not found, choose **Locate…** and select its `bin/isabelle`.
    **Isabelle Revamp: Setup check** prints checks and fixes in Output → Isabelle.
 

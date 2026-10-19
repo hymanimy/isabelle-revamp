@@ -1,0 +1,59 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vscode = require('vscode');
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// try0 finds a proof; the user applies it from the hover or the Goals panel.
+exports.run = async function () {
+  const root = path.resolve(__dirname, '../..');
+  const file = path.join(root, '.dev-host/try0-fixture/Try.thy');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, 'theory Try imports Main begin\nlemma first: "x + 0 = (x::nat)"\n  try0\n  sorry\n\n'
+    + 'lemma second: "(y::nat) * 1 = y"\n  try0\n  sorry\nend\n');
+  const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  const document = await vscode.workspace.openTextDocument(file);
+  const editor = await vscode.window.showTextDocument(document);
+  async function until(label, predicate, seconds = 60) {
+    const end = Date.now() + seconds * 1000;
+    while (Date.now() < end) { if (await predicate()) return; await pause(100); }
+    throw new Error(label + ': ' + JSON.stringify(api.getGoalState()));
+  }
+  editor.selection = new vscode.Selection(2, 3, 2, 3);
+  await until('try0 reports a proof', () => api.getGoalState().text.includes('Try this:'));
+  assert(api.getGoalState().html.includes('class="sendback"'), 'Found proofs keep their sendback markup');
+
+  let links;
+  await until('hover offers the proofs', async () => {
+    const hovers = await vscode.commands.executeCommand('vscode.executeHoverProvider', document.uri, new vscode.Position(2, 3));
+    links = hovers.flatMap(hover => hover.contents.map(content => content.value ?? String(content)))
+      .join('\n').match(/command:isabelleRevamp\.applySuggestion\?[^)]+/g);
+    return links?.length;
+  });
+  const args = JSON.parse(decodeURIComponent(links[0].split('?')[1]));
+  assert.equal(args[1], 2);
+  assert(await vscode.commands.executeCommand('isabelleRevamp.applySuggestion', ...args));
+  const lines = document.getText().split('\n');
+  assert.match(lines[2], /^  by \w+/, lines.join('\n'));
+  assert.equal(lines[3], '', 'The sorry after try0 is gone');
+  console.log(`PASS: hover link applies "${args[3]}" in place of try0 and drops the sorry`);
+
+  // The original bug: a closing `by` has no proof state, so show its messages.
+  editor.selection = new vscode.Selection(2, 5, 2, 5);
+  // "unfinished" is the document's status: the second lemma still has its sorry.
+  await until('closing by shows its theorem', () => ['ready', 'unfinished'].includes(api.getGoalState().phase) && api.getGoalState().stateless
+    && api.getGoalState().text.includes('theorem first'));
+  console.log('PASS: Goals shows the theorem message on a closing by, not "checking…"');
+
+  const second = document.getText().split('\n').findIndex(line => line.trim() === 'try0');
+  editor.selection = new vscode.Selection(second, 3, second, 3);
+  await until('second try0 reports a proof', () => api.getGoalState().text.includes('Try this:'));
+  const proof = /Try this: (by [^\n(]+)/.exec(api.getGoalState().text)[1].trim();
+  assert(await api.useProofFromGoals(proof) !== false);
+  await until('Goals click replaced try0', () => document.getText().split('\n')[second] === '  ' + proof, 10);
+  assert(!document.getText().includes('sorry'));
+  console.log(`PASS: clicking "${proof}" in Goals replaces the try0 at the cursor`);
+  await document.save();
+  await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+};

@@ -11,6 +11,8 @@ export interface GoalState {
   errors: string[];
   theory?: string;
   checkStatus?: 'checking' | 'fully_checked' | 'unfinished' | 'error';
+  // The command at the cursor has no proof state; text holds its messages.
+  stateless?: boolean;
 }
 
 function presentation(state: GoalState) {
@@ -18,11 +20,12 @@ function presentation(state: GoalState) {
   const status = checking ? 'checking…' : {
     idle: 'Open a theory and place the cursor in a proof.',
     checking: 'checking…',
-    ready: state.checkStatus === 'fully_checked' ? 'fully checked'
+    ready: state.stateless ? (state.text ? 'No proof state here · messages' : 'No proof state here')
+      : state.checkStatus === 'fully_checked' ? 'fully checked'
       : state.checkStatus === 'unfinished' ? 'unfinished' : 'Goal at cursor',
     unfinished: 'unfinished (sorry)',
     error: 'Proof error — see editor diagnostics.',
-    unavailable: 'Goal state unavailable. Move the cursor to retry.',
+    unavailable: 'Isabelle is not running.',
   }[state.phase];
   const markup = checking || state.html === undefined ? undefined : goalMarkup(state.html);
   return { theory: state.theory ?? 'Isabelle Goals', status, phase: state.phase,
@@ -38,6 +41,9 @@ export function goalsHtml(state: GoalState, nonce = randomBytes(16).toString('he
 <style>${viewTheme}
 html, body, .source, .source pre { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .source, .source pre, .errors { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+/* Isabelle's sendback markup: proofs found by try0 or sledgehammer. */
+.source .sendback { cursor: pointer; color: var(--vscode-textLink-foreground); text-decoration: underline; }
+.source .sendback:hover { color: var(--vscode-textLink-activeForeground); }
 </style></head><body class="${goal.phase}">
 ${viewHeader(goal.theory, goal.status)}
 <div id="goal" class="source" aria-label="Goal at cursor">${goal.html ?? escapeText(goal.text)}</div>
@@ -53,7 +59,13 @@ function entity(event) {
   const index = Number(token?.slice('isabelle-link-'.length));
   return Number.isInteger(index) ? { node, index } : undefined;
 }
+function titleProofs() {
+  for (const node of goalNode.querySelectorAll('.sendback')) node.title = 'Click to use this proof in place of the command that found it';
+}
+titleProofs();
 goalNode.addEventListener('click', event => {
+  const proof = event.target.closest?.('.sendback');
+  if (proof && goalNode.contains(proof)) { vscode.postMessage({ type:'sendback', text:proof.textContent, revision }); return; }
   const link = entity(event); if (!link) return;
   event.preventDefault();
   if (event.ctrlKey || event.metaKey) vscode.postMessage({ type:'goalLink', action:'open', index:link.index, revision });
@@ -78,6 +90,7 @@ window.addEventListener('message', event => {
     document.body.classList.toggle('error', goal.phase === 'error');
     if (goal.html === undefined) document.getElementById('goal').textContent = goal.text;
     else document.getElementById('goal').innerHTML = goal.html;
+    titleProofs();
     document.getElementById('errors').textContent = goal.errors;
   }
 });
@@ -92,6 +105,7 @@ export class GoalsView implements WebviewViewProvider, Disposable {
   private links: GoalLink[] = [];
   onNavigate?: (link: GoalLink) => Promise<void>;
   onHover?: (link: GoalLink) => Promise<string>;
+  onSendback?: (proof: string) => Promise<unknown>;
 
   resolveWebviewView(view: WebviewView): void {
     this.view = view;
@@ -104,6 +118,8 @@ export class GoalsView implements WebviewViewProvider, Disposable {
     const messages = webview.onDidReceiveMessage(message => {
       if (message?.type === 'ready') {
         this.update(this.state);
+      } else if (message?.type === 'sendback') {
+        if (message.revision === this.revision && typeof message.text === 'string') void this.onSendback?.(message.text);
       } else if (message?.type === 'goalLink') {
         if (message.action === 'open') void this.followLink(message.index,message.revision).catch(() => {});
         else if (message.action === 'hover') void this.hoverLink(message.index,message.revision).then(text =>

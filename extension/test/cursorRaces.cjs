@@ -38,6 +38,9 @@ exports.checkCursorRaces = async function () {
     assert.equal(state.text, '');
     assert(exits.includes(-101));
 
+    // Caret output for the old caret can only arrive before the state_init response:
+    // the server handles the caret move first, on the same ordered channel.
+    emit('PIDE/dynamic_output', { content: '<pre>UNTAGGED OLD</pre>' });
     // The current state's notification can precede its init response.
     emit('PIDE/state_output', { id: -102, content: '<pre>CURRENT</pre>' });
     replies[1]({ state_id: -102 });
@@ -45,7 +48,6 @@ exports.checkCursorRaces = async function () {
     assert.equal(state.phase, 'ready');
     assert.equal(state.text, 'CURRENT');
     emit('PIDE/state_output', { id: -101, content: '<pre>LATE OLD</pre>' });
-    emit('PIDE/dynamic_output', { content: '<pre>UNTAGGED OLD</pre>' });
     assert.equal(state.text, 'CURRENT');
     // Caret output adds the command's messages, such as try0's suggestion.
     emit('PIDE/dynamic_output', { content: '<pre>CURRENT<br><br>Try this: by simp</pre>' });
@@ -88,25 +90,40 @@ exports.checkCursorRaces = async function () {
     replies[3]({ state_id: -104 });
     await pause(0);
     assert.equal(state.text, 'NEXT');
+    // try0 prints its messages without the proof state; show both.
+    emit('PIDE/dynamic_output', { content: '<pre>Try this: by auto</pre>' });
+    assert.equal(state.text, 'NEXT\n\nTry this: by auto');
 
     goals.follow(editor(8, 2)); // Same cursor, changed document version.
     emit('PIDE/state_output', { id: -104, content: '<pre>OLD VERSION</pre>' });
     assert.equal(state.phase, 'checking');
     assert.equal(state.text, '');
-    // A long-running command must not become "unavailable" at the wait deadline.
+    // A long-running command stays "checking", however long it takes.
     const now = Date.now;
     try {
       Date.now = () => now() + 11000;
       emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [at(2)] }] });
       assert.equal(state.phase, 'checking');
-      emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [] }] });
-      assert.equal(state.phase, 'unavailable');
     } finally {
       Date.now = now;
     }
+    emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [] }] });
+
+    // A command that closes a proof (by simp) has no proof state: once checked and
+    // quiet, show its messages, as jEdit does, instead of waiting forever.
+    goals.follow(editor(10));
+    await pause(180);
+    replies[4]({ state_id: -105 });
+    emit('PIDE/dynamic_output', { content: '<pre>theorem foo: x = x</pre>' });
+    await pause(1000);
+    assert.equal(state.phase, 'checking');
+    await pause(800);
+    assert.equal(state.phase, 'ready');
+    assert.equal(state.stateless, true);
+    assert.equal(state.text, 'theorem foo: x = x');
     goals.follow(undefined);
     assert.equal(state.phase, 'idle');
-    console.log('PASS: stale replies, early replies, caret messages, version changes, decoration deltas, and caret-scoped work and errors');
+    console.log('PASS: stale replies, early replies, caret messages, version changes, decoration deltas, caret-scoped work and errors, and messages without a proof state');
   } finally {
     goals.dispose();
   }

@@ -8,7 +8,7 @@ interface Caret { uri: string; line: number; character: number; version: number 
 export type SourceRange = [number, number, number, number];
 interface Decoration { uri: string; entries: { type: string; content: { range: SourceRange }[] }[] }
 interface StateOutput { id: number; content: string }
-interface Probe { uri: string; version: number; state?: string }
+interface Probe { uri: string; version: number; state?: string; since?: number }
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Isabelle batches output every vscode_output_delay (0.5 s); a command's messages
 // can follow its proof state by one batch.
@@ -17,6 +17,9 @@ const outputSettle = 700;
 // document update; it publishes output (diagnostics included) only for an up-to-date
 // snapshot. Leave the caret still this long between holds so output can flush.
 const caretQuiet = 1000;
+// A proof state arrives promptly. Without one by then, the command has no proof
+// state (it closes a proof, like `by simp`, or is a theory command): show its messages.
+const stateGrace = 1500;
 
 // PIDE/decoration messages are deltas: omitted entries retain their old value.
 const busyTypes = new Set([
@@ -56,6 +59,9 @@ export class Goals implements Disposable {
   private probes = new Map<number, Probe>();
   private outputAt = 0;
   private caretRestoredAt = 0;
+  // The server handles a caret move before answering the next state_init on the same
+  // channel, so caret output arriving after that answer is for the new caret.
+  private outputSince = 0;
   private confirmed?: string;
   private confirmedHtml?: string;
   // Mirrors the server's caret panel, which only sends changed output.
@@ -155,9 +161,6 @@ export class Goals implements Disposable {
       return;
     }
     this.timer = setTimeout(() => { void this.refresh(generation, next); }, 150);
-    this.deadline = setTimeout(() => {
-      if (generation === this.generation) this.render();
-    }, 10000);
   }
 
   setDiagnostics(uri: string, diagnostics: Diagnostic[]): void {
@@ -183,6 +186,7 @@ export class Goals implements Disposable {
         // Dynamic output has no cursor/version ID. A fresh built-in state panel
         // supplies a tagged confirmation and re-emits identical goal text.
         const { state_id } = await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {});
+        this.outputSince = Date.now();
         if (generation !== this.generation) {
           await this.client.sendNotification('PIDE/state_exit', { id: state_id });
           return;
@@ -218,6 +222,7 @@ export class Goals implements Disposable {
         if (existing !== undefined) await this.client.sendNotification('PIDE/state_auto_update', { id: existing, enabled: false });
         await this.client.sendNotification('PIDE/caret_update', { uri, line, character });
         id = (await this.client.sendRequest<{ state_id: number }>('PIDE/state_init', {})).state_id;
+        probe.since = Date.now();
         this.probes.set(id, probe);
         const early = this.earlyStates.get(id);
         if (early !== undefined) this.acceptProbe(probe, early);
@@ -259,17 +264,15 @@ export class Goals implements Disposable {
         if (document.isClosed || document.version !== probe.version) {
           throw new Error('The document changed during the query. Retry goals_at.');
         }
-        const checked = this.annotatedVersions.get(probe.uri) === probe.version
-          && !this.busyBefore(probe.uri, line, character);
+        const result = (stateHtml?: string) => ({ ...this.present(document, line, stateHtml, probe.since),
+          theory: basename(document.uri.fsPath, '.thy'), checkStatus: this.documentStatus(document).state });
+        const quiet = Date.now() - this.outputAt >= outputSettle;
+        const checked = !this.busyBefore(probe.uri, line, character);
+        if (checked && quiet && probe.state !== undefined && this.annotatedVersions.get(probe.uri) === probe.version) {
+          return result(probe.state);
+        }
         checkedAt = checked ? checkedAt ?? Date.now() : undefined;
-        if (checked && probe.state !== undefined && Date.now() - this.outputAt >= outputSettle) {
-          return { ...this.present(document, line, probe.state),
-            theory: basename(document.uri.fsPath, '.thy'), checkStatus: this.documentStatus(document).state };
-        }
-        // A blank line or the theory header has no proof state.
-        if (checkedAt !== undefined && probe.state === undefined && Date.now() - checkedAt > 3000) {
-          throw new Error('No goal state at this position; choose a proof command.');
-        }
+        if (checked && quiet && probe.state === undefined && Date.now() - checkedAt! >= stateGrace) return result();
         await pause(25);
       }
       throw new Error('Isabelle is still checking; query processing_status and retry goals_at.');
@@ -336,23 +339,28 @@ export class Goals implements Disposable {
 
   private render(): void {
     if (!this.caret || !this.available) return;
-    const busy = this.busyBeforeCaret();
-    if (busy || this.confirmed === undefined || !this.document) {
-      const phase = !busy && Date.now() - this.requestedAt >= 10000 ? 'unavailable' : 'checking';
-      this.publish({ phase, text: '', errors: [] });
-      return;
-    }
-    this.publish(this.present(this.document, this.caret.line, this.confirmedHtml!));
+    clearTimeout(this.deadline);
+    if (this.busyBeforeCaret() || !this.document) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
+    if (this.confirmed !== undefined) { this.publish(this.present(this.document, this.caret.line, this.confirmedHtml!)); return; }
+    const wait = Math.max(stateGrace - (Date.now() - this.requestedAt), outputSettle - (Date.now() - this.outputAt));
+    if (wait <= 0) { this.publish(this.present(this.document, this.caret.line)); return; }
+    this.publish({ phase: 'checking', text: '', errors: [] });
+    this.deadline = setTimeout(() => this.render(), wait);
   }
 
-  private present(document: TextDocument, line: number, stateHtml: string): GoalState {
+  // Without stateHtml, the command has no proof state: its messages are all there is.
+  // Caret output counts if it contains the state or arrived after `since` (see outputSince).
+  private present(document: TextDocument, line: number, stateHtml?: string, since = this.outputSince): GoalState {
     const uri = document.uri.toString();
-    // Untagged dynamic output prints the state plus the command's messages
-    // (e.g. try0's "Try this"). Accept it only if it contains the tagged state.
-    const state = outputText(stateHtml);
-    const messages = state !== '' && this.dynamic.includes(state);
-    const text = messages ? this.dynamic : state;
-    const html = messages ? this.dynamicHtml : stateHtml;
+    // Untagged dynamic output prints the command's messages, usually after its state;
+    // a diagnostic command like try0 prints its messages without the state.
+    const state = stateHtml === undefined ? undefined : outputText(stateHtml);
+    const fresh = this.outputAt > since && this.dynamic !== '';
+    let text = this.dynamic, html: string | undefined = this.dynamicHtml;
+    if (state !== undefined && !(state !== '' && this.dynamic.includes(state))) {
+      text = fresh ? state + '\n\n' + this.dynamic : state;
+      html = fresh ? stateHtml! + this.dynamicHtml : stateHtml;
+    }
     // Like jEdit, report errors of the command at the caret, not elsewhere in the theory.
     const atCaret = ([start, , end]: SourceRange) => start <= line && line <= end;
     const errors = (this.diagnostics.get(uri) ?? []).filter(d => atCaret(d.range)).map(d => d.message);
@@ -364,7 +372,8 @@ export class Goals implements Disposable {
     // A failed method can inherit a parent's "No subgoals!" state. Show its
     // diagnostic instead, never that misleading state under an error banner.
     const phase = failed ? 'error' : unfinished ? 'unfinished' : 'ready';
-    return { phase, text: failed ? '' : text, html: failed ? undefined : html, errors };
+    return { phase, text: failed ? '' : text, html: failed ? undefined : html, errors,
+      ...(stateHtml === undefined ? { stateless: true } : {}) };
   }
 
   private publish(state: GoalState): void {
@@ -423,6 +432,10 @@ export class Goals implements Disposable {
   sorryPositions(document: TextDocument): SourceRange[] {
     return (this.badRanges.get(document.uri.toString()) ?? [])
       .filter(range => document.getText(new Range(...range)) === 'sorry');
+  }
+
+  caretPosition(): { uri: string; line: number; character: number } | undefined {
+    return this.caret && { uri: this.caret.uri, line: this.caret.line, character: this.caret.character };
   }
 
   // Whether the server has sent any decorations for this file, i.e. it is a checked node.

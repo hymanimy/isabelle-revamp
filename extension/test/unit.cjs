@@ -69,8 +69,23 @@ function checkWindowChoice() {
   console.log('PASS: MCP servers pick the VS Code window whose workspace contains the agent');
 }
 
+function checkSuggestions() {
+  const { suggestedProofs, suggestionRange } = require('../out/suggestions');
+  const messages = ['Trying "simp", "auto"...', 'Found proof: by simp (0 ms)', 'Found proof: by auto (0 ms)',
+    'Try this: by force\n(force: 0 ms; simp: 0 ms; auto: 0 ms)', 'Try this: by (metis add_0 dvd_refl) (12 ms)'];
+  assert.deepEqual(suggestedProofs(messages), ['by (metis add_0 dvd_refl)', 'by force', 'by simp', 'by auto']);
+  const lines = ['lemma "x = x"', '  using foo try0', '', '  sorry', 'lemma "y = y"', '  apply simp try0 sledgehammer [z3]'];
+  assert.deepEqual(suggestionRange(lines, 1, 14, 'by simp'), { start: [1, 12], end: [3, 7] }, 'try0 and the following sorry');
+  assert.deepEqual(suggestionRange(lines, 1, 14, 'apply simp'), { start: [1, 12], end: [1, 16] }, 'A non-terminal step keeps the sorry');
+  assert.deepEqual(suggestionRange(lines, 5, 33, 'by blast'), { start: [5, 18], end: [5, 35] }, 'The command at the position');
+  assert.deepEqual(suggestionRange(lines, 5, 2, 'by blast'), { start: [5, 13], end: [5, 17] }, 'Else the first on the line');
+  assert.equal(suggestionRange(lines, 0, 3, 'by simp'), undefined);
+  console.log('PASS: try0/sledgehammer suggestions parse, and replace their command plus a following sorry');
+}
+
 (async () => {
   checkTheoryHeader();
+  checkSuggestions();
   checkWindowChoice();
   checkLastProofLine();
   require('./goalHtml.cjs').checkGoalHtml();
