@@ -19,10 +19,12 @@ function checkServerSettings() {
   const defaults = serverArgs(serverSettings(config({}), '/work'));
   assert.deepEqual(defaults.slice(0, 4), ['vscode_server', '-n', '-l', 'HOL']);
   assert(defaults.includes('vscode_caret_perspective=50'));
+  assert(defaults.includes('vscode_output_delay=0.2'));
+  assert(serverArgs(serverSettings(config({ outputDelay: 0.5 }), '/work')).includes('vscode_output_delay=0.5'));
   const custom = serverSettings(config({ logic: 'HOL-Analysis', sessionDirs: ['~/afp/thys', 'sessions', ' '], checkingPerspective: 0 }), '/work');
   assert.deepEqual(custom.sessionDirs, [require('node:os').homedir() + '/afp/thys', '/work/sessions']);
   assert(serverArgs(custom).join(' ').includes(`-d /work/sessions -l HOL-Analysis`));
-  assert.deepEqual(serverSettings(config({ logic: ' ', checkingPerspective: -1 }), '/work'), { logic: 'HOL', sessionDirs: [], perspective: 50 });
+  assert.deepEqual(serverSettings(config({ logic: ' ', checkingPerspective: -1, outputDelay: 0 }), '/work'), { logic: 'HOL', sessionDirs: [], perspective: 50, outputDelay: 0.2 });
   console.log('PASS: server arguments for default, custom and invalid settings');
 }
 

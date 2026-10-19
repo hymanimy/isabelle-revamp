@@ -10,13 +10,6 @@ interface Decoration { uri: string; entries: { type: string; content: { range: S
 interface StateOutput { id: number; content: string }
 interface Probe { uri: string; version: number; state?: string; since?: number }
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-// Isabelle batches output every vscode_output_delay (0.5 s); a command's messages
-// can follow its proof state by one batch.
-const outputSettle = 700;
-// Each caret move changes the checking perspective, which Isabelle treats as a
-// document update; it publishes output (diagnostics included) only for an up-to-date
-// snapshot. Leave the caret still this long between holds so output can flush.
-const caretQuiet = 1000;
 // A proof state follows the state_init answer within ~0.3 s. Without one by then, the
 // command has no proof state (it closes a proof, like `by simp`, or is a theory
 // command): show its messages. A later state still replaces them.
@@ -81,9 +74,21 @@ export class Goals implements Disposable {
   private confirmedVersions = new Map<string, number>();
   private annotatedVersions = new Map<string, number>();
   private changedAt = new Map<string, number>();
+  private busySnapshots = new Map<string, string>();
+  private verifyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private subscriptions: Disposable[] = [];
+  // Isabelle batches output every vscode_output_delay; a command's messages can follow
+  // its proof state by one batch.
+  private outputSettle: number;
+  // Each caret move changes the checking perspective, which Isabelle treats as a
+  // document update; it publishes output (diagnostics included) only for an up-to-date
+  // snapshot. Leave the caret still this long between holds so output can flush.
+  private caretQuiet: number;
 
-  constructor(private client: LanguageClient, private view: GoalsView) {
+  // outputDelay is the server's vscode_output_delay in seconds.
+  constructor(private client: LanguageClient, private view: GoalsView, outputDelay = 0.2) {
+    this.outputSettle = outputDelay * 1000 + 200;
+    this.caretQuiet = outputDelay * 1000 + 500;
     this.subscriptions.push(
       client.onNotification('PIDE/dynamic_output', ({ content }: { content: string }) => {
         this.dynamic = outputText(content);
@@ -119,6 +124,7 @@ export class Goals implements Disposable {
           if (version !== undefined && version === this.versions.get(message.uri)) {
             this.annotatedVersions.set(message.uri, version);
           }
+          this.verifySnapshot(message.uri, ranges);
         }
         if (message.uri === this.caret?.uri) {
           this.render();
@@ -220,7 +226,7 @@ export class Goals implements Disposable {
     if (!this.available) return Promise.reject(new Error('Isabelle is not running.'));
     this.observe(document);
     return this.navigate(async () => {
-      await pause(this.caretRestoredAt + caretQuiet - Date.now());
+      await pause(this.caretRestoredAt + this.caretQuiet - Date.now());
       const uri = document.uri.toString(), existing = this.panel;
       const probe: Probe = { uri, version: document.version };
       this.pending++;
@@ -273,7 +279,7 @@ export class Goals implements Disposable {
         }
         const result = (stateHtml?: string) => ({ ...this.present(document, line, stateHtml, probe.since),
           theory: basename(document.uri.fsPath, '.thy'), checkStatus: this.documentStatus(document).state });
-        const quiet = Date.now() - this.outputAt >= outputSettle;
+        const quiet = Date.now() - this.outputAt >= this.outputSettle;
         const checked = !this.busyBefore(probe.uri, line, character);
         if (checked && quiet && probe.state !== undefined && this.annotatedVersions.get(probe.uri) === probe.version) {
           return result(probe.state);
@@ -327,6 +333,22 @@ export class Goals implements Disposable {
     this.updates.fire();
   }
 
+  // Full snapshots are forced, and force_decorations may read an outdated snapshot
+  // without advancing the server's delta baseline: a command still running there
+  // may never be reported finished. Ask again once output has settled, until two
+  // snapshots agree. Busy text out of the perspective agrees at once, so this stops.
+  private verifySnapshot(uri: string, ranges: Map<string, SourceRange[]>): void {
+    const busy = JSON.stringify([...busyTypes].map(type => ranges.get(type) ?? []));
+    const settled = this.busySnapshots.get(uri) === busy;
+    this.busySnapshots.set(uri, busy);
+    clearTimeout(this.verifyTimers.get(uri));
+    if (settled || ![...busyTypes].some(type => ranges.get(type)?.length)) return;
+    this.verifyTimers.set(uri, setTimeout(() => {
+      this.verifyTimers.delete(uri);
+      if (this.available) this.refreshDecorations(uri);
+    }, this.outputSettle));
+  }
+
   private refreshDecorations(uri: string): void {
     void this.client.sendNotification('PIDE/decoration_request', { uri })
       .catch(() => this.unavailable());
@@ -352,7 +374,7 @@ export class Goals implements Disposable {
     // Isabelle sends caret output only when it changes, so nothing may arrive to prompt
     // another render: wait on a timer, counted from the state_init answer.
     if (this.stateRequestedAt === undefined) { this.publish({ phase: 'checking', text: '', errors: [] }); return; }
-    const wait = Math.max(this.stateRequestedAt + stateGrace - Date.now(), outputSettle - (Date.now() - this.outputAt));
+    const wait = Math.max(this.stateRequestedAt + stateGrace - Date.now(), this.outputSettle - (Date.now() - this.outputAt));
     if (wait <= 0) { this.publish(this.present(this.document, this.caret.line)); return; }
     this.publish({ phase: 'checking', text: '', errors: [] });
     this.deadline = setTimeout(() => this.render(), wait);
@@ -401,6 +423,9 @@ export class Goals implements Disposable {
     clearTimeout(this.timer);
     clearTimeout(this.deadline);
     clearTimeout(this.decorationTimer);
+    for (const timer of this.verifyTimers.values()) clearTimeout(timer);
+    this.verifyTimers.clear();
+    this.busySnapshots.clear();
     this.confirmed = undefined;
     this.confirmedHtml = undefined;
     this.dynamic = '';

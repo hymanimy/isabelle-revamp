@@ -61,7 +61,8 @@ exports.run = async function () {
   assert.equal(document.languageId, 'isabelle');
   const editor = await vscode.window.showTextDocument(document);
   editor.selection = new vscode.Selection(1, 1, 1, 1); // The lemma's open goal, before its closing tactic.
-  await pause(30);
+  // Within the 150 ms caret debounce, allowing for a lagging selection event.
+  for (const end = Date.now() + 140; api.getGoalState().theory !== 'Header' && Date.now() < end;) await pause(5);
   assert.equal(api.getGoalState().theory, 'Header');
   assert.equal(api.getGoalState().phase, 'checking');
   const end = Date.now() + 20000;

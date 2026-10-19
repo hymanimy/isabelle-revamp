@@ -146,7 +146,7 @@ export async function activate(context: ExtensionContext) {
   });
   const symbolInput = new SymbolInput(client);
   context.subscriptions.push(symbolInput);
-  goals = new Goals(client, view);
+  goals = new Goals(client, view, settings.outputDelay);
   const semanticColors = new SemanticColors(goals);
   context.subscriptions.push(semanticColors);
   const agentEdits = new AgentEdits();

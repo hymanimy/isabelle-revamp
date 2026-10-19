@@ -37,7 +37,10 @@ exports.run = async function () {
   }
   async function move(line, col) {
     editor.selection = new vscode.Selection(line, col, line, col);
-    await pause(30);
+    // The selection event can lag on a busy extension host; a new state cannot
+    // arrive before the 150 ms caret debounce, so the old one must go by then.
+    const end = Date.now() + 140;
+    while (api.getGoalState().phase !== 'checking' && Date.now() < end) await pause(5);
     assert.equal(api.getGoalState().phase, 'checking');
   }
   async function replace(text) {

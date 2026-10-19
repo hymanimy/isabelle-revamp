@@ -144,6 +144,14 @@
           "scope": "window",
           "description": "Like Isabelle/jEdit, check only the text near the cursor: this many lines above and below it, plus everything before. 0 checks every open theory in full, which is slower on large theories. Reload the window after changing this setting."
         },
+        "isabelleRevamp.outputDelay": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0.05,
+          "maximum": 2,
+          "scope": "window",
+          "description": "Seconds Isabelle waits for checking to go quiet before sending results (vscode_output_delay). Lower shows results sooner; higher sends less on very large theories. Isabelle's own default is 0.5, Isabelle/jEdit uses 0.1. Reload the window after changing this setting."
+        },
         "isabelleRevamp.unicodeOnSave": {
           "type": "boolean",
           "default": false,
