@@ -1,9 +1,4 @@
 {
-  "isabelleRevamp.executable": "/home/alex-hyman/isabelle/Isabelle2025-2/bin/isabelle",
-  "files.readonlyInclude": {
-    "/home/alex-hyman/isabelle/Isabelle2025-2/**": true,
-    "/home/alex-hyman/.isabelle/**": true
-  },
   "editor.tokenColorCustomizations": {
     "[Default Dark Modern][Default Dark+][Dark+][Default High Contrast]": {
       "textMateRules": [

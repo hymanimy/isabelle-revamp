@@ -9,7 +9,7 @@ import { BridgeTools } from './bridgeTools';
 import { AgentEdits } from './agentEdits';
 import { loadSymbols, unicodeSymbols } from './symbols';
 import { PrettySymbols } from './prettySymbols';
-import { lockLibraryFiles } from './libraryFiles';
+import { LibraryFiles, libraryRoots as findLibraryRoots } from './libraryFiles';
 import { SemanticColors } from './semanticColors';
 import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
@@ -61,9 +61,8 @@ export async function activate(context: ExtensionContext) {
         const files = await window.showOpenDialog({ canSelectMany: false, canSelectFiles: true, canSelectFolders: false,
           openLabel: 'Locate Isabelle', title: 'Select bin/isabelle in your Isabelle installation' });
         if (files?.[0]) {
-          // An explicit Locate choice saves only this setting. Prefer the workspace.
-          await workspace.getConfiguration('isabelleRevamp').update('executable', files[0].fsPath,
-            workspace.workspaceFolders?.length ? ConfigurationTarget.Workspace : ConfigurationTarget.Global);
+          // The path belongs to this machine, not to the project: save it in user settings.
+          await workspace.getConfiguration('isabelleRevamp').update('executable', files[0].fsPath, ConfigurationTarget.Global);
           await commands.executeCommand('workbench.action.reloadWindow');
         }
       }
@@ -72,9 +71,9 @@ export async function activate(context: ExtensionContext) {
   }
   let libraryRoots: string[] = [];
   try {
-    const patterns = await lockLibraryFiles(executable);
-    libraryRoots = patterns.map(pattern=>pattern.slice(0,-3));
-    output.info(`Library read-only patterns: ${patterns.join(', ')}`);
+    libraryRoots = await findLibraryRoots(executable);
+    context.subscriptions.push(new LibraryFiles(libraryRoots));
+    output.info(`Library files open read-only: ${libraryRoots.join(', ')}`);
   } catch (error) { output.warn(`Library read-only setup failed: ${String(error)}`); }
   try {
     const table = await loadSymbols(executable);

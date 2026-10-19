@@ -4,13 +4,9 @@ const path = require('node:path');
 const vscode = require('vscode');
 const pause = ms => new Promise(r=>setTimeout(r,ms));
 async function run() {
-  if (!process.env.M10_ONLY) await require('./m8.cjs').run();
+  if (!process.env.M10_ONLY) await require('./m6.cjs').run();
   const root = path.resolve(__dirname,'../..');
   const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
-  const home = path.resolve(root,'../Isabelle2025-2.app');
-  const includes = vscode.workspace.getConfiguration('files').get('readonlyInclude');
-  assert.equal(includes[home+'/**'],true);
-  assert.equal(includes[path.resolve(process.env.HOME,'.isabelle')+'/**'],true);
   const file = path.join(root,'.dev-host/m10-fixture/Library.thy');
   fs.mkdirSync(path.dirname(file),{recursive:true});
   fs.writeFileSync(file,'theory Library imports Complex_Main begin\nlemma "(0::real) = 0" by simp\nend\n');
@@ -29,7 +25,8 @@ async function run() {
   const bytes = fs.readFileSync(target.fsPath);
   const library = await vscode.workspace.openTextDocument(target);
   const libEditor = await vscode.window.showTextDocument(library);
-  // readonlyInclude guards editor typing, not trusted extension API edits.
+  // Session read-only guards editor typing, not trusted extension API edits.
+  await pause(200);
   assert.equal(vscode.workspace.getConfiguration('files',target).get('autoSave'),'off');
   const before = library.getText();
   await vscode.commands.executeCommand('type',{text:'X'});
