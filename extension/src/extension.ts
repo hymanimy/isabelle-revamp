@@ -16,6 +16,7 @@ import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
 import { findIsabelle, setupReport } from './setup';
+import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 
 // Minimal startup adapted from Isabelle2025-2:
 // src/Tools/VSCode/extension/src/extension.ts:97–128.
@@ -38,10 +39,11 @@ export async function activate(context: ExtensionContext) {
     commands.registerCommand('isabelleRevamp.showGoals', () =>
       commands.executeCommand('isabelleRevamp.goals.focus')));
 
+  const currentSettings = () => serverSettings(workspace.getConfiguration('isabelleRevamp'), workspace.workspaceFolders?.[0]?.uri.fsPath);
   const locate = () => findIsabelle(workspace.getConfiguration('isabelleRevamp').get<string>('executable', 'isabelle'));
   context.subscriptions.push(commands.registerCommand('isabelleRevamp.setupCheck', async () => {
     output.show(true);
-    const report = await setupReport(await locate(), workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, serverRoot);
+    const report = await setupReport(await locate(), workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, serverRoot, currentSettings());
     report.forEach(line => output.appendLine(line));
     return report;
   }));
@@ -86,15 +88,13 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(prettySymbols,
     commands.registerCommand('isabelleRevamp.convertQuotes', convertQuotes),
     commands.registerCommand('isabelleRevamp.togglePrettySymbols', () => prettySymbols.toggle()));
-  const args = [
-    'vscode_server', '-n', '-l', 'HOL',
-    '-o', 'vscode_html_output=true',
-    '-o', 'editor_output_state=true',
-    '-o', 'vscode_pide_extensions=true',
-    '-o', 'vscode_unicode_symbols_edits=true',
-    '-o', 'vscode_unicode_symbols_output=true',
-    '-o', 'vscode_caret_perspective=0',
-  ];
+  const settings = currentSettings();
+  const args = serverArgs(settings);
+  context.subscriptions.push(workspace.onDidChangeConfiguration(event => {
+    if (!serverSettingKeys.some(key => event.affectsConfiguration(key))) return;
+    void window.showInformationMessage('Reload the window to restart Isabelle with the new settings.', 'Reload')
+      .then(choice => { if (choice === 'Reload') void commands.executeCommand('workbench.action.reloadWindow'); });
+  }));
   const server: ServerOptions = { command: executable, args };
 
   output.info(`Starting ${executable} ${args.join(' ')}`);
@@ -142,7 +142,7 @@ export async function activate(context: ExtensionContext) {
   try {
     await client.start();
     await symbolInput.request();
-    output.info('Isabelle language server ready (HOL).');
+    output.info(`Isabelle language server ready (${settings.logic}).`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     output.error(`Startup failed: ${message}`);

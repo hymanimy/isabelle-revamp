@@ -14,7 +14,7 @@ export interface GoalState {
 }
 
 function presentation(state: GoalState) {
-  const checking = state.phase === 'checking' || state.phase === 'ready' && state.checkStatus === 'checking';
+  const checking = state.phase === 'checking';
   const status = checking ? 'checking…' : {
     idle: 'Open a theory and place the cursor in a proof.',
     checking: 'checking…',

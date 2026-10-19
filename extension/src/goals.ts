@@ -15,7 +15,6 @@ const busyTypes = new Set([
   'text_overview_unprocessed', 'text_overview_running',
 ]);
 // background_bad also marks `sorry`; it is not an error diagnostic.
-const errorTypes = new Set(['text_overview_error']);
 
 export class Goals implements Disposable {
   private updates = new EventEmitter<void>();
@@ -39,7 +38,7 @@ export class Goals implements Disposable {
   private requestedAt = 0;
   private decorations = new Map<string, Map<string, boolean>>();
   private badRanges = new Map<string, SourceRange[]>();
-  private diagnostics = new Map<string, string[]>();
+  private diagnostics = new Map<string, { message: string; range: SourceRange }[]>();
   private ranges = new Map<string, Map<string, SourceRange[]>>();
   private versions = new Map<string, number>();
   private confirmedVersions = new Map<string, number>();
@@ -85,7 +84,7 @@ export class Goals implements Disposable {
           // force_decorations does not advance the server's delta baseline.
           // A transient busy range in a forced snapshot might never be cleared
           // by a normal delta. Refresh while busy so it cannot stick forever.
-          if (this.available && [...busyTypes].some(type => flags.get(type))) {
+          if (this.available && this.busyBeforeCaret()) {
             this.decorationTimer = setTimeout(() => this.refreshDecorations(message.uri), 250);
           }
         }
@@ -132,7 +131,7 @@ export class Goals implements Disposable {
 
   setDiagnostics(uri: string, diagnostics: Diagnostic[]): void {
     this.diagnostics.set(uri, diagnostics.filter(d => d.severity === DiagnosticSeverity.Error)
-      .map(d => d.message));
+      .map(d => ({ message: d.message, range: [d.range.start.line, d.range.start.character, d.range.end.line, d.range.end.character] })));
     if (uri === this.caret?.uri) this.render();
     this.updates.fire();
   }
@@ -188,12 +187,24 @@ export class Goals implements Disposable {
       .catch(() => this.unavailable());
   }
 
+  // Isabelle checks only near the cursor, so later commands may stay unprocessed
+  // indefinitely. The goal at the caret waits only for work at or before it.
+  private busyBeforeCaret(): boolean {
+    const caret = this.caret;
+    if (!caret) return false;
+    const ranges = this.ranges.get(caret.uri);
+    return [...busyTypes].some(type => (ranges?.get(type) ?? []).some(([line, character]) =>
+      line < caret.line || line === caret.line && character <= caret.character));
+  }
+
   private render(): void {
     if (!this.caret || !this.available) return;
-    const flags = this.decorations.get(this.caret.uri);
-    const busy = [...busyTypes].some(type => flags?.get(type));
-    const errors = this.diagnostics.get(this.caret.uri) ?? [];
-    const failed = errors.length > 0 || [...errorTypes].some(type => flags?.get(type));
+    const busy = this.busyBeforeCaret();
+    // Like jEdit, report errors of the command at the caret, not elsewhere in the theory.
+    const line = this.caret.line;
+    const atCaret = ([start, , end]: SourceRange) => start <= line && line <= end;
+    const errors = (this.diagnostics.get(this.caret.uri) ?? []).filter(d => atCaret(d.range)).map(d => d.message);
+    const failed = errors.length > 0 || this.decorationRanges(this.caret.uri, 'text_overview_error').some(atCaret);
     if (busy || this.confirmed === undefined) {
       const phase = !busy && Date.now() - this.requestedAt >= 10000 ? 'unavailable' : 'checking';
       this.publish({ phase, text: '', errors: [] });
@@ -272,8 +283,8 @@ export class Goals implements Disposable {
       .filter(range => document.getText(new Range(...range)) === 'sorry');
   }
 
-  decorationRanges(document: TextDocument, type: string): SourceRange[] {
-    return this.ranges.get(document.uri.toString())?.get(type) ?? [];
+  decorationRanges(document: TextDocument | string, type: string): SourceRange[] {
+    return this.ranges.get(typeof document === 'string' ? document : document.uri.toString())?.get(type) ?? [];
   }
 
   documentStatus(document: TextDocument) {
@@ -286,7 +297,7 @@ export class Goals implements Disposable {
       .map(range => document.getText(new Range(...range)));
     const theoryClosed = keywords[0] === 'theory' && keywords.at(-1) === 'end'
       && keywords.filter(word => word === 'begin').length === keywords.filter(word => word === 'end').length;
-    const errors = this.diagnostics.get(uri) ?? [];
+    const errors = (this.diagnostics.get(uri) ?? []).map(d => d.message);
     const failed = errors.length > 0 || this.decorations.get(uri)?.get('text_overview_error') === true;
     const sorry = this.sorryPositions(document);
     const incomplete = sorry.length > 0 || keywords.includes('oops') || !theoryClosed

@@ -106,6 +106,28 @@
           "scope": "machine-overridable",
           "description": "Path to the Isabelle executable (~/ is supported), or isabelle on PATH. Reload the window after changing this setting."
         },
+        "isabelleRevamp.logic": {
+          "type": "string",
+          "default": "HOL",
+          "scope": "window",
+          "description": "Logic session the prover starts from (isabelle vscode_server -l), e.g. HOL-Analysis. Its heap must be built: isabelle build -b <logic>. Reload the window after changing this setting."
+        },
+        "isabelleRevamp.sessionDirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "window",
+          "description": "Extra session directories (isabelle vscode_server -d), e.g. ~/afp/thys. Relative paths resolve against the first workspace folder. Reload the window after changing this setting."
+        },
+        "isabelleRevamp.checkingPerspective": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 0,
+          "scope": "window",
+          "description": "Like Isabelle/jEdit, check only the text near the cursor: this many lines above and below it, plus everything before. 0 checks every open theory in full, which is slower on large theories. Reload the window after changing this setting."
+        },
         "isabelleRevamp.unicodeOnSave": {
           "type": "boolean",
           "default": false,

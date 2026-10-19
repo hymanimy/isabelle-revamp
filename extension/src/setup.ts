@@ -4,6 +4,7 @@ import { access, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
+import { ServerSettings, sessionArgs } from './serverSettings';
 
 const execute = promisify(execFile);
 async function executableFile(file: string): Promise<boolean> {
@@ -38,7 +39,8 @@ export async function findIsabelle(configured: string, home = homedir(), path = 
   }
 }
 
-export async function setupReport(executable: string | undefined, cwd: string, serverRoot: string): Promise<string[]> {
+export async function setupReport(executable: string | undefined, cwd: string, serverRoot: string,
+  session: Pick<ServerSettings, 'logic' | 'sessionDirs'> = { logic: 'HOL', sessionDirs: [] }): Promise<string[]> {
   const lines: string[] = [];
   if (!executable) lines.push('✗ Isabelle: not found — use Locate… or set isabelleRevamp.executable.');
   else {
@@ -49,9 +51,13 @@ export async function setupReport(executable: string | undefined, cwd: string, s
   }
   try {
     if (!executable) throw new Error('missing');
-    await execute(executable, ['build', '-n', '-l', 'HOL'], { cwd, timeout: 60000 });
-    lines.push('✓ HOL heap present (isabelle build -n -l HOL exited 0).');
-  } catch { lines.push('✗ HOL heap: unavailable — run isabelle build -b HOL with this installation.'); }
+    // build -n exits non-zero when the session would need building.
+    const args = sessionArgs(session).filter(arg => arg !== '-l');
+    await execute(executable, ['build', '-n', '-b', ...args], { cwd, timeout: 60000 });
+    lines.push(`✓ ${session.logic} heap present.`);
+  } catch {
+    lines.push(`✗ ${session.logic} heap: unavailable — run isabelle build -b ${sessionArgs(session).filter(arg => arg !== '-l').join(' ')}`);
+  }
   // Claude Code and MCP are optional: report them without marking a working setup as broken.
   const claude = await onPath('claude');
   lines.push(claude ? `✓ Claude on PATH: ${claude}` : '– Claude Code (optional): not on PATH. Install it to use the Isabelle MCP server.');

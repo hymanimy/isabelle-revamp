@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+if (require.main === module) require('./vscodeStub.cjs');
 const { Goals } = require('../out/goals');
 
 // Inject protocol replies in the wrong order, which is hard to force on a fast
@@ -51,12 +52,26 @@ exports.checkCursorRaces = async function () {
     assert.equal(state.text, 'CURRENT\n\nTry this: by simp');
     assert(state.html.includes('Try this'));
 
-    emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [{}] }] });
+    const at = (line, character = 0) => ({ range: [line, character, line, character + 5] });
+    emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [at(5)] }] });
     assert.equal(state.phase, 'checking');
     assert.equal(state.text, '');
     emit('PIDE/decoration', { uri, entries: [{ type: 'text_overview_error', content: [] }] });
     assert.equal(state.phase, 'checking'); // Omitted running entry is not cleared.
     emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [] }] });
+    assert.equal(state.phase, 'ready');
+    // Work and errors after the caret do not hide its goal: Isabelle may never check text out of view.
+    emit('PIDE/decoration', { uri, entries: [{ type: 'background_unprocessed1', content: [at(40)] }] });
+    assert.equal(state.phase, 'ready');
+    emit('PIDE/decoration', { uri, entries: [{ type: 'text_overview_error', content: [at(30)] }] });
+    goals.setDiagnostics(uri, [{ severity: 0, message: 'Failed elsewhere', range: { start: { line: 30, character: 0 }, end: { line: 30, character: 5 } } }]);
+    assert.equal(state.phase, 'ready');
+    assert.deepEqual(state.errors, []);
+    goals.setDiagnostics(uri, [{ severity: 0, message: 'Failed here', range: { start: { line: 6, character: 2 }, end: { line: 6, character: 9 } } }]);
+    assert.equal(state.phase, 'error');
+    assert.deepEqual(state.errors, ['Failed here']);
+    goals.setDiagnostics(uri, []);
+    emit('PIDE/decoration', { uri, entries: [{ type: 'text_overview_error', content: [] }, { type: 'background_unprocessed1', content: [] }] });
     assert.equal(state.phase, 'ready');
 
     // The server sends unchanged caret output only once, so it must survive moves.
@@ -82,7 +97,7 @@ exports.checkCursorRaces = async function () {
     const now = Date.now;
     try {
       Date.now = () => now() + 11000;
-      emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [{}] }] });
+      emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [at(2)] }] });
       assert.equal(state.phase, 'checking');
       emit('PIDE/decoration', { uri, entries: [{ type: 'background_running1', content: [] }] });
       assert.equal(state.phase, 'unavailable');
@@ -91,8 +106,9 @@ exports.checkCursorRaces = async function () {
     }
     goals.follow(undefined);
     assert.equal(state.phase, 'idle');
-    console.log('PASS: stale replies, early replies, caret messages, version changes, and decoration deltas');
+    console.log('PASS: stale replies, early replies, caret messages, version changes, decoration deltas, and caret-scoped work and errors');
   } finally {
     goals.dispose();
   }
 };
+if (require.main === module) exports.checkCursorRaces().catch(error => { console.error(error); process.exitCode = 1; });
