@@ -106,11 +106,6 @@ export class BridgeTools {
       const eol = document.eol === EndOfLine.LF ? '\n' : '\r\n';
       const text = encodeSymbols(params.text as string).replace(/\r\n|\r|\n/g, eol);
       const visible = () => window.visibleTextEditors.find(editor => editor.document === document);
-      const shown = visible();
-      if (shown) await this.agentEdits.preview(shown, new Range(start, end));
-      if (document.isClosed || document.version !== version) {
-        throw new Error('The buffer changed during the edit preview. Call open and recompute the edit range.');
-      }
       // A workspace edit joins the document's undo history without needing an editor.
       const edit = new WorkspaceEdit();
       edit.replace(document.uri, new Range(start, end), text);

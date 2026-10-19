@@ -2,11 +2,5 @@ extension/node_modules/
 extension/out/
 .dev-host/
 __pycache__/
-mcp/.venv/
 dist/
-# Build-time copies of mcp/; git cannot re-include a file under an excluded
-# directory, so this must exclude the contents rather than the directory.
-extension/mcp/*
-!extension/mcp/README.md
 extension/LICENSE
-mcp/.setup-lock/

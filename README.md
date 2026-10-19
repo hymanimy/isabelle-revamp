@@ -38,25 +38,22 @@ Run **Isabelle Revamp: Setup check** from the command palette to see what's wire
 | --- | --- | --- |
 | Everything | [Isabelle2025-2](https://isabelle.in.tum.de/) with the HOL heap | macOS bundle ships HOL prebuilt; on Linux run `isabelle build -b HOL` once (10–20 min) |
 | Everything | VS Code 1.104+ | stock build; no VSCodium needed |
-| MCP server | Python 3.11+ | its own deps install into a private venv on first run |
 | Development | Node 22+, npm | to build the extension and run the checks |
 
 Tested on macOS (Apple Silicon) and Linux. Windows is untested.
 
 ## MCP server (optional)
 
-Register the bundled server with Claude Code (the exact command is printed by **Setup check**):
-
-```sh
-claude mcp add --transport stdio --scope local isabelle -- python3 '<extension path>/mcp/launch.py'
-```
-
-See [mcp/README.md](mcp/README.md) for the tools and their coordinates.
+Run **Isabelle: Register MCP Server with Claude Code** once. Then start `claude` in your theory
+folder, for example in VS Code's terminal, and ask it to prove something: it reads goals, edits
+the theory, and checks the result in the same Isabelle session you see. There is nothing else
+to install; the server runs on VS Code's own Node.js. See [docs/MCP.md](docs/MCP.md) for the
+tools.
 
 ## How it works
 
 ```
- MCP client ──stdio──▶ mcp/server.py
+ MCP client ──stdio──▶ out/mcpServer.js
                            │  local socket, token-authenticated
                            ▼
                VS Code extension (TypeScript)
@@ -84,10 +81,10 @@ npm run package --prefix extension         # builds dist/isabelle-revamp-0.1.0.v
 The integration tests open a VS Code window and need a display. They find VS Code and Isabelle
 at their usual install locations; set `VSCODE_EXECUTABLE` or `ISABELLE_EXECUTABLE` otherwise.
 Run selected suites with `npm run test:integration --prefix extension -- goals,proof`, and check
-an installed VSIX with `-- installed`. The `mcp` suite creates `mcp/.venv` on first run.
+an installed VSIX with `-- installed`.
 
-Layout: `extension/` (VS Code extension, with its tests in `extension/test/`), `mcp/` (MCP
-server), `examples/` (example theories), `scripts/` (packaging check, LSP probe), `docs/`.
+Layout: `extension/` (VS Code extension and its MCP server, with tests in `extension/test/`),
+`examples/` (example theories), `scripts/` (packaging check, LSP probe), `docs/`.
 
 ## Docs
 

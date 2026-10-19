@@ -1,5 +1,4 @@
-import { resolve } from 'node:path';
-import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { commands, ConfigurationTarget, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
@@ -15,7 +14,7 @@ import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
-import { findIsabelle, setupReport } from './setup';
+import { findIsabelle, mcpLaunch, onPath, registerWithClaude, setupReport } from './setup';
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
 
@@ -33,8 +32,7 @@ export async function activate(context: ExtensionContext) {
   const visibleTheory = () => theoryEditor && !theoryEditor.document.isClosed && window.tabGroups.all.some(group =>
     group.tabs.some(tab => tab.input instanceof TabInputText && tab.input.uri.toString() === theoryEditor!.document.uri.toString()))
     ? theoryEditor : undefined;
-  const serverRoot = existsSync(resolve(context.extensionPath, 'src/extension.ts'))
-    ? resolve(context.extensionPath, '..') : context.extensionPath;
+  const launch = mcpLaunch(context.extensionPath);
   context.subscriptions.push(output, view,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
     commands.registerCommand('isabelleRevamp.showGoals', () =>
@@ -44,10 +42,31 @@ export async function activate(context: ExtensionContext) {
   const locate = () => findIsabelle(workspace.getConfiguration('isabelleRevamp').get<string>('executable', 'isabelle'));
   context.subscriptions.push(commands.registerCommand('isabelleRevamp.setupCheck', async () => {
     output.show(true);
-    const report = await setupReport(await locate(), workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, serverRoot, currentSettings());
+    const report = await setupReport(await locate(), workspace.workspaceFolders?.[0]?.uri.fsPath ?? context.extensionPath, launch, currentSettings());
     report.forEach(line => output.appendLine(line));
     return report;
   }));
+  // The registration names this install's paths. Re-register after an update moves them,
+  // but only if the user registered through this command before.
+  const register = async (quiet: boolean) => {
+    const claude = await onPath('claude');
+    if (!claude) {
+      if (!quiet) void window.showErrorMessage('Claude Code is not on PATH. Install it, then run this command again.');
+      return;
+    }
+    try {
+      await registerWithClaude(claude, launch, workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir());
+      await context.globalState.update('mcpRegistration', JSON.stringify(launch));
+      output.info(`Registered the isabelle MCP server with Claude Code: ${launch.command} ${launch.args.join(' ')}`);
+      if (!quiet) void window.showInformationMessage('Registered the isabelle MCP server with Claude Code for all your projects. Restart running Claude Code sessions to use it.');
+    } catch (error) {
+      output.error(`MCP registration failed: ${String(error)}`);
+      if (!quiet) void window.showErrorMessage('Could not register the MCP server with Claude Code. See Output → Isabelle.');
+    }
+  };
+  context.subscriptions.push(commands.registerCommand('isabelleRevamp.registerMcp', () => register(false)));
+  const registered = context.globalState.get<string>('mcpRegistration');
+  if (registered && registered !== JSON.stringify(launch)) void register(true);
   const firstTheory = async () => {
     if (context.workspaceState.get('goalsOpened') || !workspace.textDocuments.some(doc => doc.languageId === 'isabelle')) return;
     await context.workspaceState.update('goalsOpened', true);
@@ -155,7 +174,9 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, agentEdits));
+  bridge = new Bridge(new BridgeTools(goals, agentEdits), () => (workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath));
+  const published = bridge;
+  context.subscriptions.push(workspace.onDidChangeWorkspaceFolders(() => { void published.publish(); }));
   try {
     await bridge.start();
     output.info(`MCP bridge ready; discovery file: ${bridge.portFile}`);

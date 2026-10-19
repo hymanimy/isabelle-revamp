@@ -11,8 +11,6 @@ interface Flash {
 
 // These decorations never enter the document, undo history, or PIDE stream.
 export class AgentEdits implements Disposable {
-  private strike = window.createTextEditorDecorationType({ textDecoration: 'line-through',
-    rangeBehavior: DecorationRangeBehavior.ClosedClosed });
   private marker = window.createTextEditorDecorationType({
     after: { color: new ThemeColor('editorInfo.foreground'), margin: '0 0 0 1em' },
     rangeBehavior: DecorationRangeBehavior.ClosedClosed });
@@ -20,7 +18,6 @@ export class AgentEdits implements Disposable {
     backgroundColor: `color-mix(in srgb, var(--vscode-editorInfo-foreground, #3794ff) ${30 - i * 1.5}%, transparent)`,
     rangeBehavior: DecorationRangeBehavior.ClosedClosed }));
   private flashes: Flash[] = [];
-  private previewing?: { editor: TextEditor; range: Range };
   private painted = new Map<TextEditor, Set<TextEditorDecorationType>>();
   private timer?: ReturnType<typeof setInterval>;
   private disposed = false;
@@ -36,7 +33,6 @@ export class AgentEdits implements Disposable {
       workspace.onDidChangeConfiguration(event => {
         if (!event.affectsConfiguration('isabelleRevamp.showAgentEdits')) return;
         this.flashes = this.flashes.filter(f => this.enabled(f.editor));
-        if (this.previewing && !this.enabled(this.previewing.editor)) this.clearPreview();
         this.render();
       }),
     ];
@@ -44,20 +40,6 @@ export class AgentEdits implements Disposable {
 
   private enabled(editor: TextEditor): boolean {
     return !this.disposed && workspace.getConfiguration('isabelleRevamp', editor.document.uri).get('showAgentEdits', true);
-  }
-
-  async preview(editor: TextEditor, range: Range): Promise<void> {
-    if (!this.enabled(editor) || range.isEmpty) return;
-    this.clearPreview();
-    this.previewing = { editor, range };
-    editor.setDecorations(this.strike, [range]);
-    try { await new Promise(resolve => setTimeout(resolve, 200)); }
-    finally { this.clearPreview(); }
-  }
-
-  private clearPreview(): void {
-    this.previewing?.editor.setDecorations(this.strike, []);
-    this.previewing = undefined;
   }
 
   applied(editor: TextEditor, range: Range, agent: string): void {
@@ -70,7 +52,6 @@ export class AgentEdits implements Disposable {
 
   private changed(event: TextDocumentChangeEvent): void {
     if (!event.contentChanges.length) return;
-    if (this.previewing?.editor.document === event.document) this.clearPreview();
     // Changes use offsets in the old buffer. Descending order keeps offsets
     // valid, including multi-cursor edits. Never attribute human typing to an agent.
     const changes = [...event.contentChanges].sort((a, b) => b.rangeOffset - a.rangeOffset);
@@ -128,18 +109,15 @@ export class AgentEdits implements Disposable {
   // Inspect the same ranges/lifetimes sent to VS Code in the live host check.
   snapshot() {
     const coordinates = (range: Range) => [range.start.line, range.start.character, range.end.line, range.end.character];
-    return { preview: this.previewing ? { file: this.previewing.editor.document.uri.fsPath,
-      range: coordinates(this.previewing.range) } : undefined,
-    flashes: this.flashes.map(f => ({ file: f.editor.document.uri.fsPath, range: coordinates(this.range(f)), agent: f.agent,
+    return { flashes: this.flashes.map(f => ({ file: f.editor.document.uri.fsPath, range: coordinates(this.range(f)), agent: f.agent,
       opacity: Math.max(0, 30 - Math.floor((Date.now() - f.at) / 100) * 1.5), marker: `✎ ${f.agent}` })) };
   }
 
   dispose(): void {
     this.disposed = true;
     clearInterval(this.timer);
-    this.clearPreview();
     this.flashes = []; this.render();
     for (const listener of this.listeners) listener.dispose();
-    for (const decoration of [this.strike, this.marker, ...this.fades]) decoration.dispose();
+    for (const decoration of [this.marker, ...this.fades]) decoration.dispose();
   }
 }

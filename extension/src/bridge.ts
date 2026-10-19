@@ -1,20 +1,19 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { createServer, Server, Socket } from 'node:net';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
 import { AgentSession, BridgeTools } from './bridgeTools';
+import { publishWindow, withdrawWindow } from './discovery';
 
-// Newline-delimited JSON on loopback. Two agents; editor operations serialize.
+// Newline-delimited JSON on loopback, one connection per MCP client. Editor
+// operations from all clients run one at a time.
 export class Bridge {
   private server?: Server;
   private agents = new Set<Socket>();
   private operations = Promise.resolve();
   private readonly token = randomBytes(32).toString('hex');
-  private metadata = '';
-  readonly portFile = process.env.ISABELLE_REVAMP_PORT_FILE ?? join(homedir(), '.isabelle-revamp', 'port');
+  private port = 0;
+  portFile?: string;
 
-  constructor(private tools: BridgeTools) {}
+  constructor(private tools: BridgeTools, private folders: () => string[]) {}
 
   async start(): Promise<void> {
     const server = this.server = createServer(socket => this.connect(socket));
@@ -24,19 +23,18 @@ export class Bridge {
     });
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Missing bridge TCP address.');
-    this.metadata = JSON.stringify({ port: address.port, token: this.token }) + '\n';
-    await mkdir(dirname(this.portFile), { recursive: true, mode: 0o700 });
-    const temporary = this.portFile + '.' + process.pid;
-    await writeFile(temporary, this.metadata, { mode: 0o600, flag: 'wx' });
-    await rename(temporary, this.portFile);
+    this.port = address.port;
+    await this.publish();
+  }
+
+  // MCP servers pick the window whose workspace contains the agent's directory.
+  async publish(): Promise<void> {
+    if (!this.port) return;
+    this.portFile = await publishWindow({ port: this.port, token: this.token, pid: process.pid, folders: this.folders() }, this.portFile);
   }
 
   private connect(socket: Socket): void {
     socket.on('error', () => socket.destroy());
-    if (this.agents.size >= 2) {
-      socket.end(JSON.stringify({ error: 'Two agents are already connected to this extension instance.' }) + '\n');
-      return;
-    }
     this.agents.add(socket);
     socket.on('close', () => this.agents.delete(socket));
     socket.setEncoding('utf8');
@@ -70,12 +68,9 @@ export class Bridge {
               || !request.params || typeof request.params !== 'object' || Array.isArray(request.params)) {
               throw new Error('Expected {id: integer, method: string, params: object}.');
             }
-            if (!agent) {
-              const raw = typeof request.client_name === 'string' ? request.client_name : 'MCP agent';
-              const name = /claude/i.test(raw) ? 'Claude' : /codex/i.test(raw) ? 'Codex'
-                : raw.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 40) || 'MCP agent';
-              agent = { name, versions: new Map() };
-            }
+            // The MCP client's self-reported name labels its edits; it is not authentication.
+            agent ??= { name: typeof request.client_name === 'string'
+              && request.client_name.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 40) || 'MCP agent', versions: new Map() };
             const session = agent;
             const operation = this.operations.then(() => {
               if (socket.destroyed) throw new Error('Client disconnected before the operation started.');
@@ -94,7 +89,6 @@ export class Bridge {
   async close(): Promise<void> {
     for (const agent of this.agents) agent.destroy();
     if (this.server?.listening) await new Promise<void>(resolve => this.server!.close(() => resolve()));
-    // Another window may now own discovery. Never remove its port file.
-    try { if (this.metadata && await readFile(this.portFile, 'utf8') === this.metadata) await unlink(this.portFile); } catch { /* already removed */ }
+    if (this.portFile) await withdrawWindow(this.portFile, this.token);
   }
 }

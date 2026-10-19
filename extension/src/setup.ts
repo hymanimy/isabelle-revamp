@@ -10,9 +10,26 @@ const execute = promisify(execFile);
 async function executableFile(file: string): Promise<boolean> {
   try { await access(file, constants.X_OK); return (await stat(file)).isFile(); } catch { return false; }
 }
-export function registrationCommand(serverRoot: string): string {
-  const launcher = join(serverRoot, 'mcp/launch.py').replace(/'/g, "'\\''");
-  return `claude mcp add --transport stdio --scope local isabelle -- python3 '${launcher}'`;
+// How agents start the MCP server: VS Code's own Node.js runs the bundled script,
+// so neither Node nor Python needs to be installed.
+export interface McpLaunch { command: string; args: string[]; env: Record<string, string> }
+export const mcpLaunch = (extensionPath: string, runtime = process.execPath): McpLaunch =>
+  ({ command: runtime, args: [join(extensionPath, 'out', 'mcpServer.js')], env: { ELECTRON_RUN_AS_NODE: '1' } });
+
+const registration = (launch: McpLaunch) => ['mcp', 'add', '--scope', 'user', 'isabelle',
+  ...Object.entries(launch.env).flatMap(([key, value]) => ['-e', `${key}=${value}`]), '--', launch.command, ...launch.args];
+
+export function registrationCommand(launch: McpLaunch): string {
+  return ['claude', ...registration(launch)].map(arg => /^[\w./=:@-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, "'\\''")}'`).join(' ');
+}
+
+// Register for all of the user's projects, replacing any earlier registration
+// (including a project-local one, which would take precedence).
+export async function registerWithClaude(claude: string, launch: McpLaunch, cwd: string): Promise<void> {
+  for (const scope of ['local', 'user']) {
+    await execute(claude, ['mcp', 'remove', '--scope', scope, 'isabelle'], { cwd, timeout: 15000 }).catch(() => {});
+  }
+  await execute(claude, registration(launch), { cwd, timeout: 30000 });
 }
 export async function onPath(name: string, path = process.env.PATH ?? ''): Promise<string | undefined> {
   for (const directory of path.split(delimiter).filter(Boolean)) {
@@ -39,7 +56,7 @@ export async function findIsabelle(configured: string, home = homedir(), path = 
   }
 }
 
-export async function setupReport(executable: string | undefined, cwd: string, serverRoot: string,
+export async function setupReport(executable: string | undefined, cwd: string, launch: McpLaunch,
   session: Pick<ServerSettings, 'logic' | 'sessionDirs'> = { logic: 'HOL', sessionDirs: [] }): Promise<string[]> {
   const lines: string[] = [];
   if (!executable) lines.push('✗ Isabelle: not found — use Locate… or set isabelleRevamp.executable.');
@@ -61,11 +78,14 @@ export async function setupReport(executable: string | undefined, cwd: string, s
   // Claude Code and MCP are optional: report them without marking a working setup as broken.
   const claude = await onPath('claude');
   lines.push(claude ? `✓ Claude on PATH: ${claude}` : '– Claude Code (optional): not on PATH. Install it to use the Isabelle MCP server.');
-  try {
-    if (!claude) throw new Error('missing');
-    const result = await execute(claude, ['mcp', 'get', 'isabelle'], { cwd, timeout: 15000 });
-    if (!/^isabelle:/m.test(result.stdout)) throw new Error('unregistered');
-    lines.push('✓ MCP registered: isabelle (this extension’s bundled server).');
-  } catch { lines.push(`– MCP (optional): not registered. To use it with Claude Code, run: ${registrationCommand(serverRoot)}`); }
+  const register = 'run Isabelle: Register MCP Server with Claude Code';
+  let registered: string | undefined;
+  if (claude) {
+    registered = await execute(claude, ['mcp', 'get', 'isabelle'], { cwd, timeout: 15000 })
+      .then(result => result.stdout, () => undefined);
+  }
+  if (registered?.includes(launch.args[0])) lines.push('✓ MCP registered: isabelle (this install’s bundled server).');
+  else if (registered) lines.push(`– MCP (optional): isabelle is registered for another install or the old Python server; ${register}.`);
+  else lines.push(`– MCP (optional): not registered. To use it with Claude Code, ${register}, or: ${registrationCommand(launch)}`);
   return lines;
 }

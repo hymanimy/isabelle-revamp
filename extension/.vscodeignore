@@ -9,6 +9,4 @@
 !media/**
 !language-configuration.json
 !out/symbolCodes.json
-!mcp/server.py
-!mcp/requirements.txt
-!mcp/launch.py
+!out/mcpServer.js

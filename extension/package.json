@@ -18,7 +18,8 @@
     "onView:isabelleRevamp.goals",
     "onCommand:isabelleRevamp.showGoals",
     "onCommand:isabelleRevamp.setupCheck",
-    "onView:isabelleRevamp.theories"
+    "onView:isabelleRevamp.theories",
+    "onCommand:isabelleRevamp.registerMcp"
   ],
   "scripts": {
     "compile": "tsc -p .",
@@ -63,6 +64,10 @@
       {
         "command": "isabelleRevamp.setupCheck",
         "title": "Isabelle Revamp: Setup check"
+      },
+      {
+        "command": "isabelleRevamp.registerMcp",
+        "title": "Isabelle: Register MCP Server with Claude Code"
       }
     ],
     "languages": [
@@ -103,7 +108,7 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Highlight MCP edits in editors that show the file, without scrolling or moving your caret: preview replaced text for 200 ms, highlight new text for 2 seconds, and show the agent name for 3 seconds."
+          "description": "Highlight MCP edits in editors that show the file, without scrolling or moving your caret: new text is highlighted for 2 seconds, with the agent's name for 3 seconds."
         },
         "isabelleRevamp.prettySymbols": {
           "type": "boolean",
@@ -206,7 +211,9 @@
     ]
   },
   "dependencies": {
-    "vscode-languageclient": "10.1.2"
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "vscode-languageclient": "10.1.2",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

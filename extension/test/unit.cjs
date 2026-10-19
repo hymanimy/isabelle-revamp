@@ -56,8 +56,22 @@ function checkLastProofLine() {
   console.log('PASS: whole-theory checks confirm with the last proof command, not qed or end');
 }
 
+function checkWindowChoice() {
+  const { chooseWindow } = require('../out/discovery');
+  const window = (port, ...folders) => ({ port, token: 't', pid: 1, folders });
+  const project = window(1, '/home/u/project'), nested = window(2, '/home/u/project/sub'), other = window(3, '/home/u/other');
+  assert.equal(chooseWindow([project, other], '/home/u/project/thys'), project);
+  assert.equal(chooseWindow([project, nested], '/home/u/project/sub/A'), nested, 'The closest workspace folder wins');
+  assert.equal(chooseWindow([other], '/tmp'), other, 'A single window serves any directory');
+  assert.match(chooseWindow([project, other], '/tmp'), /Several VS Code windows/);
+  assert.match(chooseWindow([], '/tmp'), /No VS Code window/);
+  assert.match(chooseWindow([project, other], '/home/u/projector'), /Several/, 'Folder prefixes are not containment');
+  console.log('PASS: MCP servers pick the VS Code window whose workspace contains the agent');
+}
+
 (async () => {
   checkTheoryHeader();
+  checkWindowChoice();
   checkLastProofLine();
   require('./goalHtml.cjs').checkGoalHtml();
   checkScriptRanges();

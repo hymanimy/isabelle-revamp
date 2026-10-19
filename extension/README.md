@@ -14,7 +14,7 @@ mathematical symbol display. The original ASCII theory stays on disk by default.
 4. If Isabelle is not found, choose **Locate…** and select its `bin/isabelle`.
    **Isabelle Revamp: Setup check** prints checks and fixes in Output → Isabelle.
 
-No Node, npm, Python or repository checkout is needed for proof checking.
+No Node, npm, Python or repository checkout is needed.
 The extension finds Isabelle using its executable setting, PATH, then common
 macOS/home installation locations. To build a missing HOL heap, run
 `isabelle build -b HOL` once.
@@ -22,11 +22,10 @@ macOS/home installation locations. To build a missing HOL heap, run
 ## MCP server (optional)
 
 The extension bundles an MCP server that gives an agent such as Claude Code the
-same goals, errors and edits you see. With Python 3.11+ installed, run the
-registration command printed by **Setup check** in your theory folder. It points
-to this extension's bundled `mcp/launch.py`, not a source checkout. On first use
-the launcher installs pinned dependencies into a private `mcp/.venv` (network
-access is needed once); it changes no global Python packages.
+same goals, errors and edits you see, in the same Isabelle session. Run
+**Isabelle: Register MCP Server with Claude Code** once, then start `claude` in
+your theory folder. The server runs on VS Code's own Node.js and never moves
+your cursor or scrolls your editor.
 
 The extension uses the unmodified Isabelle language server. It never runs
 Sledgehammer automatically. Source:

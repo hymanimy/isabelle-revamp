@@ -22,18 +22,16 @@ function vscodeExecutable() {
   return found;
 }
 
-// The mcp suite drives the real MCP server, which needs its pinned Python packages.
-function mcpEnvironment() {
-  const python = path.join(root, 'mcp/.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
-  if (fs.existsSync(python)) return;
-  console.log('Creating mcp/.venv for the MCP suite…');
-  execFileSync('python3', ['-m', 'venv', path.join(root, 'mcp/.venv')], { stdio: 'inherit' });
-  execFileSync(python, ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', path.join(root, 'mcp/requirements.txt')], { stdio: 'inherit' });
+function placeholder() {
+  const directory = path.join(host, 'installed-placeholder');
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({
+    name: 'installed-check', publisher: 'test', version: '0.0.0', engines: { vscode: '*' } }));
+  return directory;
 }
 
 const suites = process.argv[2] ?? '';
 const installed = suites === 'installed';
-if (!installed && (!suites || suites.split(',').includes('mcp'))) mcpEnvironment();
 fs.mkdirSync(host, { recursive: true });
 const profile = path.join(host, installed ? 'installed-user' : 'test-user');
 fs.mkdirSync(path.join(profile, 'User'), { recursive: true });
@@ -52,7 +50,9 @@ if (installed) {
 }
 const args = ['--user-data-dir', profile, '--extensions-dir', extensions, '--skip-welcome', '--skip-release-notes',
   '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
-  ...(installed ? [] : ['--disable-extensions', `--extensionDevelopmentPath=${extension}`]),
+  // VS Code runs --extensionTestsPath only alongside a development extension; for the
+  // installed check that is an empty placeholder, so the VSIX is what gets tested.
+  ...(installed ? [`--extensionDevelopmentPath=${placeholder()}`] : ['--disable-extensions', `--extensionDevelopmentPath=${extension}`]),
   `--extensionTestsPath=${path.join(__dirname, 'integration.cjs')}`, root];
 const env = { ...process.env, ISABELLE_REVAMP_PORT_FILE: path.join(host, 'test-port'),
   ...(suites ? { ISABELLE_REVAMP_SUITES: suites } : {}) };

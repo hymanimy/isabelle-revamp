@@ -74,48 +74,38 @@ exports.run = async function () {
     const top = editor.visibleRanges[0].start.line;
     const old = find('sorry'), version = document.version, started = Date.now();
     const replacement = 'proof -\n    show True by simp\n  qed';
-    const first = claude.call('edit', params(old, replacement));
-    await until('strike preview', () => state().preview);
-    assert.equal(document.getText(old), 'sorry'); assert.equal(document.version, version);
-    assert.deepEqual(state().preview.range, [old.start.line, old.start.character, old.end.line, old.end.character]);
-    // A user can move the caret during the preview. Do not restore its old position.
-    editor.selections = [new vscode.Selection(1, 8, 1, 8), new vscode.Selection(below, below)];
-    await first;
-    assert(Date.now() - started >= 195);
+    await claude.call('edit', params(old, replacement));
+    assert(Date.now() - started < 1000, 'Edits apply without a display delay');
     assert.equal(document.version, version + 1, 'Exactly one document replacement');
     assert.equal(document.getText().split('sorry').length - 1, 1);
-    assert.equal(state().preview, undefined); assert.equal(state().flashes[0].marker, '✎ Claude');
+    assert.equal(state().flashes[0].marker, '✎ Claude Code');
     assert(state().flashes[0].opacity >= 24);
-    assert.deepEqual(editor.selections.map(s => [s.active.line, s.active.character]), [[1, 8], [below.line + 2, below.character]]);
+    // The user's carets move with the text; they are never put on the agent's step.
+    assert.deepEqual(editor.selections.map(s => [s.active.line, s.active.character]), [[1, 7], [below.line + 2, below.character]]);
     await pause(100);
     assert.equal(editor.visibleRanges[0].start.line, top, 'An agent edit must not scroll the user\'s view');
-    receipt('200 ms strike preview keeps sorry, one replacement, no scrolling, multi-caret tracking and Claude marker');
+    receipt('one immediate replacement, no scrolling, multi-caret tracking and the client\'s own name');
 
     // Insert above the first flash: its text/range and marker must follow.
     await codex.call('open', { file });
     const insertion = new vscode.Range(1, 0, 1, 0);
     await codex.call('edit', params(insertion, '(* Codex insertion *)\n'));
     assert.equal(state().flashes.length, 2);
-    assert.equal(state().flashes.find(f => f.agent === 'Claude').range[0], old.start.line + 1);
+    assert.equal(state().flashes.find(f => f.agent === 'Claude Code').range[0], old.start.line + 1);
     assert.equal(state().flashes.find(f => f.agent === 'Codex').marker, '✎ Codex');
     await pause(600);
-    const opacity = state().flashes.find(f => f.agent === 'Claude').opacity;
+    const opacity = state().flashes.find(f => f.agent === 'Claude Code').opacity;
     assert(opacity > 0 && opacity < 24);
-    await until('background ends before marker', () => state().flashes.some(f => f.agent === 'Claude' && f.opacity === 0));
+    await until('background ends before marker', () => state().flashes.some(f => f.agent === 'Claude Code' && f.opacity === 0));
     receipt('independent agent flashes rebase across earlier insertions; background fades by two seconds');
     await until('three-second marker cleanup', () => state().flashes.length === 0);
 
-    // Human typing during the display delay must abort the stale agent edit.
+    // A human edit after the agent's read makes its edit stale.
     await claude.call('open', { file });
-    const secondRange = find('sorry');
-    const rejected = claude.call('edit', params(secondRange, 'by simp')).then(() => null, error => error);
-    await until('second preview', () => state().preview);
     await editor.edit(edit => edit.insert(new vscode.Position(1, 0), '(* human typing *)\n'));
-    const error = await rejected;
-    assert.match(error?.message, /changed during the edit preview/);
+    await assert.rejects(claude.call('edit', params(find('sorry'), 'by simp')), /buffer changed since this client last read it/);
     assert(document.getText().includes('(* human typing *)')); assert(document.getText().includes('sorry'));
-    assert.equal(state().preview, undefined); assert.equal(state().flashes.length, 0);
-    receipt('human edit during preview is preserved and rejects stale MCP edit');
+    receipt('a human edit after the agent read the file rejects the stale MCP edit');
 
     await claude.call('open', { file });
     const target = find('sorry');
@@ -125,7 +115,7 @@ exports.run = async function () {
     const active = vscode.window.activeTextEditor;
     await claude.call('edit', params(target, 'by simp'));
     assert.equal(vscode.window.activeTextEditor, active);
-    assert.equal(state().flashes[0].marker, '✎ Claude');
+    assert.equal(state().flashes[0].marker, '✎ Claude Code');
     let checked;
     try { await until('kernel accepts both proofs', async () => (checked = await claude.call('status', {})).fully_checked, 20000); }
     catch (error) { throw new Error(error.message + ': ' + JSON.stringify({ checked, errors: await claude.call('errors', { file }) })); }
@@ -140,13 +130,11 @@ exports.run = async function () {
     editor.revealRange(new vscode.Range(0, 0, 0, 0), vscode.TextEditorRevealType.AtTop); await pause(100);
     const visibleStart = editor.visibleRanges[0].start.line;
     const proof = find('by simp'), beforeEdit = document.getText();
-    const disabledAt = Date.now();
     await claude.call('edit', params(proof, 'by (simp)'));
-    assert.equal(state().preview, undefined); assert.equal(state().flashes.length, 0);
+    assert.equal(state().flashes.length, 0);
     assert.equal(editor.selection.active.line, 5);
     await pause(100); assert.equal(editor.visibleRanges[0].start.line, visibleStart);
     receipt('showAgentEdits=false disables decorations and forced reveal while edits still work');
-    receipts.push({check: 'disabled edit duration (no preview delay)', milliseconds: Date.now() - disabledAt - 100});
     await vscode.commands.executeCommand('undo');
     assert.equal(document.getText(), beforeEdit, 'A single undo restores the entire replacement');
     await document.save();

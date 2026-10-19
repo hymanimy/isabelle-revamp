@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
-const { findIsabelle, registrationCommand, setupReport } = require('../out/setup');
+const { findIsabelle, mcpLaunch, registerWithClaude, registrationCommand, setupReport } = require('../out/setup');
 const root = path.resolve(__dirname, '../..');
 
 async function run() {
@@ -25,15 +25,26 @@ async function run() {
   const previousPath = process.env.PATH;
   try {
     process.env.PATH = bin;
-    let report = await setupReport(undefined, root, root);
+    const launch = mcpLaunch('/ext', '/vscode/code');
+    let report = await setupReport(undefined, root, launch);
     assert.equal(report.length, 4);
     assert.deepEqual(report.map(line => line[0]), ['✗', '✗', '–', '–'], report.join('\n'));
-    executable(path.join(bin, 'claude'), '#!/bin/sh\necho isabelle:\n');
-    report = await setupReport(command, root, root);
+    // A fake claude that logs its arguments and reports what was registered last.
+    const log = path.join(fixture, 'claude.log');
+    executable(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${log}'\n[ "$2" = get ] && /bin/cat '${fixture}/registered' 2>/dev/null\nexit 0\n`);
+    fs.writeFileSync(path.join(fixture, 'registered'), 'isabelle:\n  Command: python3 /old/mcp/launch.py\n');
+    report = await setupReport(command, root, launch);
+    assert.match(report[3], /^– MCP \(optional\): isabelle is registered for another install/, report.join('\n'));
+    await registerWithClaude(path.join(bin, 'claude'), launch, root);
+    assert.deepEqual(fs.readFileSync(log, 'utf8').trim().split('\n').slice(-3), [
+      'mcp get isabelle', 'mcp remove --scope local isabelle', 'mcp remove --scope user isabelle',
+    ].slice(1).concat('mcp add --scope user isabelle -e ELECTRON_RUN_AS_NODE=1 -- /vscode/code /ext/out/mcpServer.js'));
+    fs.writeFileSync(path.join(fixture, 'registered'), 'isabelle:\n  Command: /vscode/code\n  Args: /ext/out/mcpServer.js\n');
+    report = await setupReport(command, root, launch);
     assert(report.every(line => line.startsWith('✓')), report.join('\n'));
   } finally { process.env.PATH = previousPath; }
-  const installed = '/Applications/Extensions/Isabelle Revamp';
-  assert(registrationCommand(installed).includes("'/Applications/Extensions/Isabelle Revamp/mcp/launch.py'"));
+  assert.equal(registrationCommand(mcpLaunch('/Applications/Isabelle Revamp', '/vscode/code')),
+    "claude mcp add --scope user isabelle -e ELECTRON_RUN_AS_NODE=1 -- /vscode/code '/Applications/Isabelle Revamp/out/mcpServer.js'");
 
   // Missing Isabelle must stop before the language client or bridge is created.
   const notices = [], commands = new Map(), called = [], state = new Map(), providers = [];
@@ -53,13 +64,14 @@ async function run() {
   Module._load = function(name, parent, isMain) {
     if (name === 'vscode') return vscode;
     if (name === 'vscode-languageclient/node') return { LanguageClient: class { constructor() { throw new Error('Client started without Isabelle'); } } };
-    if (name === './setup' && parent.filename.endsWith('/out/extension.js')) return { findIsabelle: async () => undefined, setupReport };
+    if (name === './setup' && parent.filename.endsWith('/out/extension.js')) return { ...require('../out/setup'), findIsabelle: async () => undefined };
     return load.apply(this, arguments);
   };
   try {
     const extension = require('../out/extension');
     const api = await extension.activate({ extensionPath: path.join(root, 'extension'), subscriptions: [],
-      workspaceState: { get: key => state.get(key), update: async (key, value) => state.set(key, value) } });
+      workspaceState: { get: key => state.get(key), update: async (key, value) => state.set(key, value) },
+      globalState: { get: () => undefined, update: async () => {} } });
     assert(api.setupRequired); assert.equal(notices.length, 1);
     assert.deepEqual(notices[0], ['Isabelle not found', 'Locate…', 'Download']);
     assert(called.includes('isabelleRevamp.showGoals'));
@@ -67,7 +79,7 @@ async function run() {
     assert.deepEqual(providers, ['isabelleRevamp.goals']);
     await extension.deactivate();
   } finally { Module._load = load; }
-  console.log('PASS: discovery priority, setup fixes, absolute bundled MCP command, one missing-Isabelle notification and first-theory Goals');
+  console.log('PASS: discovery priority, setup fixes, MCP registration replacing older installs, one missing-Isabelle notification and first-theory Goals');
 }
 exports.run = run;
 if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1; });
