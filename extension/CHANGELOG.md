@@ -1,5 +1,7 @@
 # Changelog
 
+## Unreleased
+
 ## 0.2.3 (2026-10-20)
 
 - Fixed highlighting breaking for the rest of a theory after an attribute
