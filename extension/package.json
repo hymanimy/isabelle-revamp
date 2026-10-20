@@ -1,7 +1,7 @@
 {
   "name": "isabelle-revamp",
   "displayName": "Isabelle Revamp",
-  "description": "Isabelle/HOL in stock VS Code using the installed Isabelle language server.",
+  "description": "Unofficial Isabelle/HOL support for VS Code: live goals, Unicode symbols and an MCP server for AI agents, using your installed Isabelle.",
   "version": "0.2.0",
   "publisher": "hymanimy",
   "private": true,
@@ -11,6 +11,16 @@
   },
   "categories": [
     "Programming Languages"
+  ],
+  "keywords": [
+    "isabelle",
+    "isabelle/hol",
+    "hol",
+    "isar",
+    "theorem prover",
+    "proof assistant",
+    "formal verification",
+    "mcp"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
@@ -336,6 +346,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/hymanimy/isabelle-revamp.git"
+  },
+  "homepage": "https://github.com/hymanimy/isabelle-revamp#readme",
+  "bugs": {
+    "url": "https://github.com/hymanimy/isabelle-revamp/issues"
   },
   "vsce": {
     "dependencies": false,

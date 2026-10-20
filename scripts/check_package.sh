@@ -16,7 +16,7 @@ with ZipFile(file) as archive:
     names = archive.namelist()
     assert not any('/node_modules/' in name or '/src/' in name or '/test/' in name or '/.dev-host/' in name for name in names)
     assert set(name for name in names if name.endswith('.js')) == {'extension/out/extension.js', 'extension/out/mcpServer.js'}
-    for name in ['media/icon.png', 'out/symbolCodes.json', 'out/DEPENDENCY_LICENSES.txt']:
+    for name in ['media/icon.png', 'out/symbolCodes.json', 'out/DEPENDENCY_LICENSES.txt', 'changelog.md']:
         assert 'extension/' + name in names, name
     manifest = json.loads(archive.read('extension/package.json'))
     assert manifest['engines']['vscode'] == '^' + package['devDependencies']['@types/vscode']

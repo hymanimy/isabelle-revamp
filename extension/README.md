@@ -3,11 +3,16 @@
 Live Isabelle/HOL proofs in stock VS Code, with **Isabelle Goals** and
 mathematical symbol display. The original ASCII theory stays on disk by default.
 
+This is an unofficial extension, not made by the Isabelle team. It is a client
+of the language server that ships with Isabelle (`isabelle vscode_server`).
+
 ## Install and open a proof
 
 1. Install Isabelle2025-2 with its HOL heap and VS Code 1.104 or newer.
-2. In Extensions, choose **… → Install from VSIX…** and select
-   `isabelle-revamp-0.2.0.vsix`.
+2. In the Extensions view, search for **Isabelle Revamp** and install it.
+   Alternatively, download the `.vsix` from
+   [GitHub releases](https://github.com/hymanimy/isabelle-revamp/releases) and
+   choose **… → Install from VSIX…**.
 3. Open a folder containing your `.thy` files, then open a theory. Goals opens
    automatically. **Isabelle: Show Theories** lists each open theory and the
    theories it imports, with the prover's progress on each. When `try0`,
