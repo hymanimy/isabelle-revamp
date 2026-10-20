@@ -2,6 +2,16 @@
 
 ## Decisions taken unattended
 
+- Continuation audit (2026-10-20): cwd and git root are
+  `/Users/leo/Mathematical-proof-revamp`; branch `eval` is already checked out
+  at `8b3de98` (M0). Preserved the modified notes/probe, untracked corpus work
+  and `eval_overnight.log`; continued the existing branch without resetting it.
+  Rechecked `isabelle version` = `Isabelle2025-2` and `isabelle build -b HOL`
+  = exit 0, `0:00:02 elapsed time`. Audited all twelve saved M0 observations:
+  exits `[0,1,1,0,1,1,1,0,0,0,0,0]`, median 6.999 s. M0 remains passed.
+  All three provider environment variables are still absent. The pre-existing
+  config is retained; real API calls are unavailable, not simulated measurements.
+
 - Startup (2026-10-20): repository `/Users/leo/Mathematical-proof-revamp`,
   HEAD `abb9d23746692ef498d1549e97fb90b64f21b4ed`. Branch `eval` already existed
   and was checked out at that HEAD. Reused it without resetting history.
@@ -15,6 +25,22 @@
   requested process pool; no agents, worktrees, or detached jobs are used.
 - Python is 3.13.15. No `httpx`, `anthropic`, `openai`, or `pytest` is installed
   in the initial Python environment. Dependencies, if needed, will be local.
+- M1: `eval/corpus/fresh_statements.thy` is absent. Do not invent a file and
+  attribute it to Leo. Promote existing example steps into independent lemmas,
+  preserving referenced facts as named assumptions and expanding local `let`
+  abbreviations in the statement and solution step. Include a supplied file
+  automatically if one is added later. These are example-derived tasks, not
+  evidence of training-set novelty; publication must not claim otherwise.
+- M1: the current `examples/Sqrt2.thy` is a primes demo, has two admissions,
+  imports `HOL-Computational_Algebra.Primes`, and has no `_solution` sibling.
+  Only its already complete declarations are candidates; statements needing
+  unavailable imports or local facts are rejected by validation. Do not silently
+  synthesize missing held-out solutions. Swarm, Cascade and Sqrt4 solutions are
+  read without changing them.
+- M1: a lexer is deliberately conservative, not a full Isar parser. Unsupported
+  declarations are discarded; the target is validated examples, not exhaustive
+  extraction. Original proofs are necessarily read by corpus construction for
+  validation; downstream real-provider code must never receive them.
 
 ## M0: environment
 
@@ -275,7 +301,7 @@ Trivial-check median (five sequential runs): **6.999 s**.
 - **Fix / action.** Parse both streams, preserve line numbers, and represent an
   unavailable column as null. The real transcripts are committed in
   `eval/tests/fixtures/{syntax_error,unknown_fact,method_failed}.json`.
-- **What happened.** Five checks take 6.999, 7.061, 6.968, 6.967, 7.094 seconds
+- **What happened.** Five checks take 6.999, 7.058, 6.968, 6.967, 7.094 seconds
   (rounded); median 6.999 seconds. Hardware reports six CPUs and 8 GiB RAM.
 - **Experience.** Process startup dominates this trivial proof.
 - **Fix / action.** Keep the fallback configuration at one worker on this small
@@ -285,3 +311,65 @@ Trivial-check median (five sequential runs): **6.999 s**.
   `[0,1,1,0]` for the four Swarm configurations, three failing error fixtures,
   five successful timing runs, and the median recorded above. No Isabelle files
   or protected source directories were changed.
+
+## M1: declaration errors in batch checks
+
+- **What happened.** A mixed batch containing a good declaration and an undefined type prints the declaration error only in `***` summary lines, without an `Error (...)` header. The first corpus pass was stopped before producing a corpus because its header-only error locator needlessly bisected batches.
+- **Experience.** Error formatting depends on where checking fails; parsing just one observed shape wastes checks and could miss errors.
+- **Fix / action.** Locate affected files in both header and summary lines, then recheck survivors. Only a fully successful, error-free command validates a batch. The statement pass enables quick-and-dirty mode; the original-proof pass explicitly disables it. Commands and exit statuses are retained under `eval/results/corpus/`.
+
+```text
+$ isabelle process_theories -D eval/results/corpus/diagnostic -O -o quick_and_dirty=true E_good E_bad
+Running Draft ...
+
+Output (line 4 of "~/Mathematical-proof-revamp/eval/results/corpus/diagnostic/E_good.thy"):
+theorem probe: True
+Draft FAILED (see also "isabelle build_log -H Error Draft")
+*** Undefined type name: "missing_type" (line 4 of "~/Mathematical-proof-revamp/eval/results/corpus/diagnostic/E_bad.thy")
+*** At command "lemma" (line 4 of "~/Mathematical-proof-revamp/eval/results/corpus/diagnostic/E_bad.thy")
+Unfinished session(s): Draft
+exit: 1
+```
+
+## M1: corpus selection and imported context
+
+- **What happened.** Some distribution theories require local definitions or notation that `Main` explicitly hides (for example lattice top notation). A failed batch can report only its first declaration error.
+- **Experience.** Walking every Library theory does not mean its standalone statements are usable with the allowed imports. Sequentially removing one bad statement from a huge batch wastes startup time.
+- **Fix / action.** Stopped the second exploratory pass before corpus publication. The selection walks HOL root and Library sources, shuffles each source with seed 20251020, then round-robins public mathematical source theories first; remaining sources are fallback. Source contributions are capped at floor(0.15 * target). Each rejected Main candidate is retried with Complex_Main. Both validation phases still require an error-free exit-zero command; rejections are expected filtering, not proof success.
+- **Limitation.** Imported libraries already contain many target facts and simplification rules. This measures reconstruction in that imported environment, not proving library results without their originals in the context. The held-out proof text is withheld from models, but imported facts and training contamination are separate issues.
+
+## M1: timeout cleanup crosses process groups
+
+- **What happened.** An original-proof batch reached its 180 s diagnostic timeout (exit -9; `PROBE TIMEOUT`). Killing only the launcher group left an ML process alive in group 13120; `ps` showed its parent had become PID 1. Isabelle had launched ML via `bash_process` into separate groups.
+- **Experience.** A command timeout does not necessarily stop CPU/memory consumption.
+- **Fix / action.** Removed that owned orphan, stopped the owned validation tree, and resumed from 76 cached successes after adding descendant-group cleanup. A local process test with a child in a separate session passed. Corpus batches now have a 60 s timeout and the entire uncertain batch is discarded instead of repeatedly bisecting timeouts. All discarded members count as unvalidated, never successful. Completed corpus rows are checkpointed each round. This may bias selection toward faster validations and must be disclosed. No milestone acceptance check has yet passed for M1; interrupted exploratory passes are not successful checks.
+
+## M1: bounded validation groups
+
+- **What happened.** Continuation reached 96 validated library lemmas, then
+  several 19-theory original-proof batches hit 60 s. Main/Complex_Main retries
+  repeated the same expensive failures.
+- **Experience.** One divergent proof prevents retaining otherwise usable
+  candidates in that group.
+- **Fix / action.** Interrupted the owned corpus process with SIGINT (its
+  descendant cleanup ran), preserving checkpoints and receipts. Original-proof
+  validation now uses groups of at most five, with a 30 s command timeout.
+  Statement batches also use 30 s. Timed-out groups are still rejected in full;
+  only exit-zero, error-free checks count. Earlier validation receipts remain
+  available. This is a selection-time bound, distinct from evaluation timeouts.
+- **Decision taken unattended.** Installed only the allowed direct dependencies
+  `pytest` and `httpx` (plus their required transitive packages) in `eval/.venv`;
+  no global packages or configuration were changed.
+
+## M1 acceptance
+
+`python3 -m eval.corpus.build_corpus` exited 0: 250 lib and 40 fresh, all
+with matching successful statement/proof validation hashes. Lib spans 20 source
+theories; maximum contribution 15/250 (6%). Imports: lib Main 238, Complex_Main
+12; fresh Main 1, Complex_Main 39. Original-proof line buckets (1 / 2–3 / 4–8 /
+9+): lib 198 / 11 / 19 / 22; fresh 28 / 0 / 9 / 3. Fresh sources: Swarm 6,
+Cascade 31, Sqrt4 2, Sqrt2 1. The other Sqrt2 declarations need local facts and
+were rejected. Lexer checks passed for attributes, local-context exclusion and
+nested proof boundaries. Every retained JSONL row was checked against its
+content-hashed validation receipt. Cached runs retain the earlier validation
+timeouts documented above.

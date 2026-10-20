@@ -10,18 +10,43 @@ import subprocess
 import time
 
 
+def kill_tree(pid: int) -> None:
+    """Kill owned descendants too: Isabelle creates separate ML process groups."""
+    table = subprocess.check_output(["ps", "-axo", "pid=,ppid=,pgid="], text=True)
+    entries = [tuple(map(int, line.split())) for line in table.splitlines()]
+    descendants = {pid}
+    while True:
+        children = {child for child, parent, _ in entries if parent in descendants}
+        if children <= descendants:
+            break
+        descendants |= children
+    groups = {group for child, _, group in entries if child in descendants}
+    groups.discard(os.getpgrp())
+    for group in groups:
+        try:
+            os.killpg(group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def run(args: list[str], timeout: float = 120) -> dict:
     start = time.monotonic()
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, start_new_session=True)
+    timed_out = False
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        os.killpg(proc.pid, signal.SIGKILL)
+        timed_out = True
+        kill_tree(proc.pid)
         out, err = proc.communicate()
         err += "\nPROBE TIMEOUT\n"
+    except BaseException:
+        kill_tree(proc.pid)
+        proc.wait()
+        raise
     return {"command": args, "exit_code": proc.returncode, "stdout": out,
-            "stderr": err, "wall_s": time.monotonic() - start}
+            "stderr": err, "wall_s": time.monotonic() - start, "timed_out": timed_out}
 
 
 def main() -> None:
