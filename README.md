@@ -119,4 +119,6 @@ Layout: `extension/` (VS Code extension and its MCP server, with tests in `exten
 Isabelle and its VS Code language server are by the Isabelle team (BSD; see
 [THIRD_PARTY_NOTICES](extension/THIRD_PARTY_NOTICES.md)). The MCP tool design follows AWS's
 [I/Q](https://github.com/awslabs/AutoCorrode/blob/main/iq/README.md) for Isabelle/jEdit.
-Team: Alex Hyman, Leo Aarons-Ditson. MIT licence.
+The original hackathon work (the `leo` branch) is by Leo Aarons-Ditson and Alex Hyman. The
+subsequent work on `main`, which turned it into a proper VS Code extension, is by Alex Hyman.
+MIT licence.
