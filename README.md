@@ -42,7 +42,9 @@ also has the `.vsix`, for **Extensions → ⋯ → Install from VSIX…**.
 | Everything | VS Code 1.104+ | stock build; no VSCodium needed |
 | Development | Node 22+, npm | to build the extension and run the checks |
 
-Tested on macOS (Apple Silicon) and Linux. Windows is untested.
+Tested on macOS (Apple Silicon) and Linux. Windows is untested. With another Isabelle release the
+extension still starts, but warns once that some features may not work; support for Isabelle2026
+will follow its release.
 
 ## MCP server (optional)
 

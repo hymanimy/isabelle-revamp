@@ -8,7 +8,9 @@ of the language server that ships with Isabelle (`isabelle vscode_server`).
 
 ## Install and open a proof
 
-1. Install Isabelle2025-2 with its HOL heap and VS Code 1.104 or newer.
+1. Install Isabelle2025-2 with its HOL heap and VS Code 1.104 or newer. Other
+   Isabelle releases start with a warning that some features may not work;
+   support for Isabelle2026 will follow its release.
 2. In the Extensions view, search for **Isabelle Revamp** and install it.
    Alternatively, download the `.vsix` from
    [GitHub releases](https://github.com/hymanimy/isabelle-revamp/releases) and

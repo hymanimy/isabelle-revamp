@@ -38,6 +38,7 @@ fs.mkdirSync(path.join(profile, 'User'), { recursive: true });
 fs.writeFileSync(path.join(profile, 'User/settings.json'), JSON.stringify({
   'security.workspace.trust.enabled': false, 'update.mode': 'none', 'extensions.autoUpdate': false,
   'workbench.tips.enabled': false, 'chat.disableAIFeatures': true,
+  ...(process.env.ISABELLE_EXECUTABLE ? { 'isabelleRevamp.executable': process.env.ISABELLE_EXECUTABLE } : {}),
 }));
 const extensions = path.join(host, installed ? 'installed-extensions' : 'extensions');
 const code = vscodeExecutable();

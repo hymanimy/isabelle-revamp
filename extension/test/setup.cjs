@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
-const { findIsabelle, mcpLaunch, registerWithClaude, registrationCommand, setupReport } = require('../out/setup');
+const { findIsabelle, mcpLaunch, registerWithClaude, registrationCommand, setupReport, versionWarning } = require('../out/setup');
 const root = path.resolve(__dirname, '../..');
 
 async function run() {
@@ -42,7 +42,14 @@ async function run() {
     fs.writeFileSync(path.join(fixture, 'registered'), 'isabelle:\n  Command: /vscode/code\n  Args: /ext/out/mcpServer.js\n');
     report = await setupReport(command, root, launch);
     assert(report.every(line => line.startsWith('✓')), report.join('\n'));
+    // Another release still runs, with a warning that some features may not work.
+    const newer = executable(path.join(fixture, 'newer/bin/isabelle'), '#!/bin/sh\nif [ "$1" = version ]; then echo Isabelle2026; fi\nexit 0\n');
+    report = await setupReport(newer, root, launch);
+    assert.match(report[0], /^⚠ Isabelle: Isabelle Revamp is built for Isabelle2025-2, but this Isabelle is Isabelle2026: some features may not work/, report.join('\n'));
+    assert(report.slice(1).every(line => line.startsWith('✓')), report.join('\n'));
   } finally { process.env.PATH = previousPath; }
+  assert.equal(versionWarning('Isabelle2025-2'), undefined);
+  assert.match(versionWarning('Isabelle2025'), /built for Isabelle2025-2, but this Isabelle is Isabelle2025: .* Isabelle2026 will follow its release\.$/);
   assert.equal(registrationCommand(mcpLaunch('/Applications/Isabelle Revamp', '/vscode/code')),
     "claude mcp add --scope user isabelle -e ELECTRON_RUN_AS_NODE=1 -- /vscode/code '/Applications/Isabelle Revamp/out/mcpServer.js'");
 

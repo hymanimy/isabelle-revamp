@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Warns once if Isabelle is not Isabelle2025-2, the release this extension is
+  built for: some features may not work. **Isabelle Revamp: Setup check** shows
+  the same. Support for Isabelle2026 will follow its release.
+
 ## 0.2.1 (2026-10-20)
 
 - Marketplace listing: says the extension is unofficial, adds this changelog

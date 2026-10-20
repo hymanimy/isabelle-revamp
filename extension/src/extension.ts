@@ -15,7 +15,7 @@ import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
 import { GoalLinks } from './goalLinks';
-import { findIsabelle, mcpLaunch, onPath, registerWithClaude, setupReport } from './setup';
+import { findIsabelle, isabelleVersion, mcpLaunch, onPath, registerWithClaude, setupReport, versionWarning } from './setup';
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
 import { applySuggestion, withSuggestionLinks } from './tryButtons';
@@ -93,6 +93,16 @@ export async function activate(context: ExtensionContext) {
     });
     return { getGoalState: () => view.snapshot(), setupRequired: true };
   }
+  // Warn once per Isabelle release other than the supported one; startup does not wait.
+  void isabelleVersion(executable, workspace.workspaceFolders?.[0]?.uri.fsPath ?? homedir()).then(async version => {
+    const warning = versionWarning(version);
+    output.info(`Isabelle version: ${version}`);
+    if (!warning) return;
+    output.warn(warning);
+    if (context.globalState.get('versionWarned') === version) return;
+    await context.globalState.update('versionWarned', version);
+    void window.showWarningMessage(warning);
+  }, error => output.warn(`Could not read the Isabelle version: ${String(error)}`));
   let libraryRoots: string[] = [];
   try {
     libraryRoots = await findLibraryRoots(executable);

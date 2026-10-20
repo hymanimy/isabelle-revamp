@@ -10,6 +10,16 @@ const execute = promisify(execFile);
 async function executableFile(file: string): Promise<boolean> {
   try { await access(file, constants.X_OK); return (await stat(file)).isFile(); } catch { return false; }
 }
+// The Isabelle release this extension is built and tested against. Others start
+// anyway: the language server protocol changes between releases, so some features may not work.
+export const supportedIsabelle = 'Isabelle2025-2';
+export async function isabelleVersion(executable: string, cwd: string): Promise<string> {
+  return (await execute(executable, ['version'], { cwd, timeout: 15000 })).stdout.trim();
+}
+export const versionWarning = (version: string) => version === supportedIsabelle ? undefined
+  : `Isabelle Revamp is built for ${supportedIsabelle}, but this Isabelle is ${version}: some features may not work. `
+    + 'Support for Isabelle2026 will follow its release.';
+
 // How agents start the MCP server: VS Code's own Node.js runs the bundled script,
 // so neither Node nor Python needs to be installed.
 export interface McpLaunch { command: string; args: string[]; env: Record<string, string> }
@@ -62,8 +72,8 @@ export async function setupReport(executable: string | undefined, cwd: string, l
   if (!executable) lines.push('✗ Isabelle: not found — use Locate… or set isabelleRevamp.executable.');
   else {
     try {
-      const result = await execute(executable, ['version'], { cwd, timeout: 15000 });
-      lines.push(`✓ Isabelle: ${result.stdout.trim()} (${executable})`);
+      const version = await isabelleVersion(executable, cwd), warning = versionWarning(version);
+      lines.push(warning ? `⚠ Isabelle: ${warning} (${executable})` : `✓ Isabelle: ${version} (${executable})`);
     } catch { lines.push(`✗ Isabelle: cannot run ${executable} — set isabelleRevamp.executable to a working installation.`); }
   }
   try {
