@@ -1,0 +1,42 @@
+# Pushing a version tag such as v0.2.3 builds the extension, runs the unit tests and
+# packaging check, and publishes a GitHub release with the VSIX and its changelog entry.
+# The integration tests need Isabelle and a display, so run them locally before tagging.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci --prefix extension
+      - name: Tag matches the extension version
+        run: |
+          version=$(node -p "require('./extension/package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match extension/package.json version $version"
+            exit 1
+          fi
+      - name: Build, test and package
+        run: bash scripts/check_package.sh
+      - name: Release notes from the changelog
+        run: |
+          awk -v heading="## ${GITHUB_REF_NAME#v} " 'index($0, heading) == 1 { found = 1; next }
+            found && /^## / { exit } found' extension/CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "::error::No CHANGELOG.md entry for ${GITHUB_REF_NAME#v}"; exit 1; fi
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "dist/isabelle-revamp-${GITHUB_REF_NAME#v}.vsix"
+          --title "Isabelle Revamp ${GITHUB_REF_NAME#v}" --notes-file notes.md --verify-tag

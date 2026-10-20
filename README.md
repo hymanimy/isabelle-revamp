@@ -88,6 +88,13 @@ at their usual install locations; set `VSCODE_EXECUTABLE` or `ISABELLE_EXECUTABL
 Run selected suites with `npm run test:integration --prefix extension -- goals,proof`, and check
 an installed VSIX with `-- installed`.
 
+To release, set the new version in `extension/package.json` (`npm version X.Y.Z
+--no-git-tag-version --prefix extension`), add its `extension/CHANGELOG.md` entry, run the
+integration tests, commit, then push a matching tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+The [Release workflow](.github/workflows/release.yml) builds the VSIX, runs the unit tests and
+packaging check, and publishes a GitHub release with the VSIX and the changelog entry. Upload
+the same VSIX to the Marketplace from its publisher page (**⋮ → Update**).
+
 Layout: `extension/` (VS Code extension and its MCP server, with tests in `extension/test/`),
 `examples/` (example theories), `scripts/` (packaging check, LSP probe), `docs/`.
 
