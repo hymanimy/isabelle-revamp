@@ -16,7 +16,7 @@ def test_forbidden(word):
 
 
 @pytest.mark.parametrize("proof", [
-    "by simp", "by (simp add: append_assoc)",
+    "by simp", "by try0", "by (simp add: append_assoc)",
     'proof -\n have weekend: "True" by simp\n show ?thesis using weekend .\nqed',
 ])
 def test_allowed(proof):
@@ -30,8 +30,14 @@ def test_scanner_boundaries():
     assert scan("by (tactic ‹Skip_Proof.cheat_tac @{context} 1›)")
     assert scan("*) lemma fake: \"True\" by simp", "(*")
     assert scan("by simp", 'lemma "target": "True" by simp', "target")
+    assert scan("by simp", 'lemma "Namespace.target": "True" by simp', "target")
+    assert scan("by simp", 'lemma ‹target›: "True" by simp', "target")
+    assert scan("by simp", 'lemma (in group) target: "True" by simp', "target")
     assert scan('by simp (*')
     assert not scan('by simp (* outer (* nested *) comment *)')
+    assert scan("by simp\nend")
+    assert not scan('by simp (* end of the proof *)')
+    assert not scan('proof -\n have h: "end = end" by simp\n show ?thesis by simp\nqed')
 
 
 def test_assembly():

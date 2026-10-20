@@ -1,0 +1,10 @@
+{
+  "run_id": "tactics",
+  "corpus": ["eval/corpus/lib.jsonl", "eval/corpus/fresh.jsonl"],
+  "conditions": [{"model": "tactics", "provider": "tactics", "max_attempts": 8}],
+  "cost_usd_per_m": {},
+  "workers": 2,
+  "kernel_timeout_s": 30,
+  "max_usd": 0,
+  "max_hours": 8
+}

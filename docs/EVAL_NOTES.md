@@ -2,6 +2,26 @@
 
 ## Decisions taken unattended
 
+- M4 corpus reproducibility audit: the default corpus command now validates and
+  retains an existing complete corpus snapshot, including baseline annotations.
+  `--rebuild` explicitly resamples and clears cached negative judgments from
+  earlier batch timeouts. Adding a previously absent hand-written fresh source
+  still triggers extraction. The committed JSONL is the identity of this
+  benchmark: resampling is a dataset change and requires a new results run.
+  Sorted/seeded candidate order is deterministic; timeout-based eligibility can
+  still vary across machines. Earlier exploratory cache outcomes are not a
+  guarantee of identical clean-room resampling.
+
+- M4 provenance: results record the HEAD at execution time (`fb0d140...` for
+  the baseline); the required milestone commit follows the run. Thus that HEAD
+  alone is not a claim that all new M4 files were committed before execution.
+  The baseline's local `source_hashes.json` records evaluator source hashes;
+  the milestone commit preserves the implementation after acceptance.
+- M4 reporting: all five table calculations share the same reporting module.
+  Successful-row medians sum all attempts for each lemma first. Attempt-failure
+  counters include retries preceding eventual successes. Missing GPU allocation
+  measurements are NA, never estimated from API latency or a zero token price.
+
 - M3 trace naming: the requested path lacks a condition component. To prevent
   model/attempt-budget collisions, `attempt_<n>.json` uses a run-wide ordinal
   within each lemma: condition offsets are cumulative maximum attempt counts.
@@ -409,9 +429,12 @@ exit: 1
   `Error (...)` and `***` locations; missing columns remain null. Kill owned
   descendant process groups on timeout, including Isabelle's separate ML group.
 - **Decision taken unattended.** The strict scanner also rejects direct ML
-  tactic/command hooks and sledgehammer/nitpick. Forbidden tokens inside comments
+  tactic/command hooks and sledgehammer/nitpick, including the broader `try`
+  command that may invoke them; `try0` remains allowed. Forbidden tokens inside comments
   and strings are rejected deliberately, including `sorry`; substrings inside
-  identifiers such as `append` are allowed. This trades false positives for a
+  identifiers such as `append` are allowed. The specified exception is `end`:
+  it is rejected as an unquoted command token, not in quoted terms or comments.
+  This trades false positives for a
   smaller executable surface. It is not a general-purpose Isar security sandbox.
 
 ## M1 acceptance
@@ -443,3 +466,45 @@ task allowlist check and stopped-call diagnostics, all 68 non-Isabelle tests
 passed. HTTP provider tests use MockTransport; no real-provider request has
 been made or claimed. Baseline will use two workers, following the successful
 concurrent kernel checks; full config retains its conservative one worker.
+
+## M4: repeated launches and bounded parallelism
+
+- **What happened.** The first ten completed tactic rows used 52 checks and
+  474.3 aggregate kernel seconds with two workers, compared with M0's 6.999 s
+  sequential trivial-check median. Some lemmas exhaust all eight methods.
+- **Experience.** Both startup overhead and failed attempts matter to wall time;
+  a fast successful example is not a representative run-cost estimate.
+- **Fix / action.** Retain the prescribed separate checks and 30 s timeouts,
+  checkpoint every attempt and completed row, and keep the measured two-worker
+  limit. At this point `memory_pressure -Q` reported 46% memory free on 8 GiB.
+  No persistent server, sledgehammer baseline or other optional M8 work is used.
+- **Accounting fix.** Mocked malformed API answers with returned usage/model IDs
+  retain those values even when classified provider_error. A focused test
+  confirms the usage is still charged and the exact returned ID is recorded.
+
+## M4: named assumptions and the literal battery
+
+- **What happened.** All eight literal methods failed on
+  `fresh/Cascade/denominator_nonzero`. Its original validated proof is
+  `using denominator by simp`; the statement names the positive-denominator
+  assumption explicitly.
+- **Experience.** A short, elementary reference proof does not guarantee that
+  the specified bare-method battery succeeds. Fact forwarding and statement
+  syntax matter as well as mathematics.
+- **Fix / action.** Keep the prerequested battery unchanged. Disclose that no
+  `using assms` preface is inserted and that original-proof length is only a
+  rough proxy. No post-hoc baseline tuning is mixed into these results.
+
+
+## M4 acceptance
+
+The complete baseline exited 0: 290 rows and 1391 separate kernel checks.
+Library: 125/250 (50.0%, Wilson 95% CI 43.8–56.2%); example-derived fresh:
+15/40 (37.5%, CI 24.2–53.0%). All 290 per-attempt receipts and corpus annotations
+were audited; all other corpus fields match the M1 commit. Re-running the same
+baseline produced zero new rows and left every kernel receipt timestamp unchanged.
+`python -m eval.harness.report results/tactics` regenerates summary.md exactly.
+The full current test suite passed: 79 tests in 59.13 s. Protected directories
+have no tracked or untracked changes. Baseline USD token spend is zero; local
+CPU costs are not priced. There were 13 timed-out library attempts, retained
+in the failure table.

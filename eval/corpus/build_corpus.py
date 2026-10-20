@@ -291,6 +291,8 @@ def statistics(rows: list[dict]) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", type=int, default=250)
+    parser.add_argument("--rebuild", action="store_true",
+                        help="Resample instead of validating the committed corpus snapshot")
     args = parser.parse_args()
     version = subprocess.check_output(["isabelle", "version"], text=True).strip()
     home = Path(subprocess.check_output(["isabelle", "getenv", "-b", "ISABELLE_HOME"], text=True).strip())
@@ -299,6 +301,28 @@ def main() -> None:
     root.mkdir(parents=True, exist_ok=True)
     cache_path = root.parent / "validation_cache.json"
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    snapshots = [Path(f"eval/corpus/{name}.jsonl") for name in ("lib", "fresh")]
+    if not args.rebuild and all(path.exists() for path in snapshots):
+        saved = [[json.loads(line) for line in path.read_text().splitlines()] for path in snapshots]
+        supplied = Path("eval/corpus/fresh_statements.thy")
+        new_source = supplied.exists() and not any(
+            r["source_file"] == str(supplied) for r in saved[1])
+        if len(saved[0]) == args.target and 25 <= len(saved[1]) <= 40 and not new_source:
+            for name, rows in zip(("lib", "fresh"), saved):
+                assert len({r["id"] for r in rows}) == len(rows)
+                assert len(validate(rows, version, cache, root)) == len(rows), (
+                    f"Committed {name} snapshot failed validation; do not silently replace it")
+                print(name, json.dumps(statistics(rows), sort_keys=True), flush=True)
+            assert max(Counter(r["source_file"] for r in saved[0]).values()) / len(saved[0]) <= .15
+            (root.parent / "statistics.json").write_text(json.dumps({
+                "isabelle_version": version, "lib": statistics(saved[0]),
+                "fresh": statistics(saved[1])}, indent=2)+"\n")
+            shutil.rmtree(root)
+            print("M1 validation passed (retained committed corpus snapshot)", flush=True)
+            return
+    if args.rebuild:
+        # Old group timeouts are not permanent negative judgments on candidates.
+        cache = {key: accepted for key, accepted in cache.items() if accepted}
     groups: dict[str, list[dict]] = defaultdict(list)
     for path in sorted(hol.glob("*.thy")) + sorted((hol / "Library").glob("*.thy")):
         for candidate in extract(path, str(path.relative_to(hol))):

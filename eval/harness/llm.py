@@ -63,9 +63,13 @@ class OpenAICompatible:
             # No redirects, tool calls, streaming, automatic retries or prompt caching.
             with httpx.Client(timeout=self.timeout_s, transport=self.transport) as client:
                 response = client.post(url, headers=headers, json=payload)
-            raw = response.text
+            try:
+                raw = response.json()
+            except ValueError:
+                raw = response.text
             response.raise_for_status()
-            raw = response.json()
+            if not isinstance(raw, dict):
+                raise ValueError("Expected a JSON object")
             text, pt, ct, actual = self.decode(raw)
             if not isinstance(text, str) or not actual or min(pt, ct) < 0:
                 raise ValueError("Missing text, exact model id, or valid usage")
@@ -74,8 +78,14 @@ class OpenAICompatible:
             # Never serialize exception text that might contain request headers/keys.
             status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
             known_free = isinstance(exc, KeyError) and raw == "" or status in {400, 401, 403, 404, 422, 429}
-            return Completion("", 0, 0, None, time.monotonic()-start, raw, payload,
-                              f"{type(exc).__name__}; HTTP status={status}", known_free)
+            usage = raw.get("usage", {}) if isinstance(raw, dict) else {}
+            pt = usage.get("prompt_tokens", usage.get("input_tokens"))
+            ct = usage.get("completion_tokens", usage.get("output_tokens"))
+            known_usage = isinstance(pt, int) and isinstance(ct, int) and min(pt, ct) >= 0
+            actual = raw.get("model") if isinstance(raw, dict) else None
+            return Completion("", pt if known_usage else 0, ct if known_usage else 0,
+                              actual, time.monotonic()-start, raw, payload,
+                              f"{type(exc).__name__}; HTTP status={status}", known_free or known_usage)
 
 
 class Anthropic(OpenAICompatible):

@@ -41,7 +41,9 @@ class Budget:
 
     def settle(self, identity: str, actual: float) -> None:
         with self.connect() as db:
-            db.execute("UPDATE calls SET usd=?, settled=1 WHERE id=?", (actual, identity))
+            updated = db.execute("UPDATE calls SET usd=?, settled=1 WHERE id=?", (actual, identity))
+            if updated.rowcount != 1:
+                raise BudgetStop("missing reservation; refusing to lose historical spend")
 
     def total(self) -> float:
         with self.connect() as db:

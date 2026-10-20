@@ -115,6 +115,8 @@ def run(config: dict, root: Path = Path("eval/results"), keep_work: bool = False
             (directory / "interrupted_tail.json").write_bytes(tail)
             path.write_bytes(data[:len(data)-len(tail)])
         rows = read_rows(path)
+        if rows and not (directory / "budget.sqlite").exists():
+            raise ValueError("Spend ledger missing for existing rows; refusing a fresh budget")
         completed = {key(r) for r in rows}
         jobs, offset = [], 0
         for condition in config["conditions"]:

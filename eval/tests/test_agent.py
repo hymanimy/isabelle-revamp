@@ -7,13 +7,27 @@ import time
 import httpx
 import pytest
 
-from eval.harness.agent import extract_blocks, feedback, run_task
+from eval.harness.agent import extract_blocks, feedback, method_counts, run_task
 from eval.harness.budget import Budget, BudgetStop
 from eval.harness.llm import Anthropic, Fake, OpenAICompatible
 from eval.harness.runner import read_rows, run
 from eval.harness.schema import Task
 
 META = {"git_sha": "a"*40, "isabelle_version": "Isabelle2025-2"}
+
+
+def strings(value):
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for child in value.values() for s in strings(child)]
+    if isinstance(value, list):
+        return [s for child in value for s in strings(child)]
+    return []
+
+
+def normalized_trace(path):
+    return [" ".join(s.split()) for s in strings(json.loads(path.read_text()))]
 
 
 def fixture_corpus(tmp_path):
@@ -45,6 +59,9 @@ def test_blocks_and_feedback():
             extract_blocks(text)
     assert len(feedback("long\n"*1000)) <= 3000
     assert len(feedback("long\n"*1000).splitlines()) == 40
+    assert method_counts("by simp (* by rule *)")["other"] == 0
+    assert method_counts('have h: "by rule" by simp')["other"] == 0
+    assert method_counts("by (rule refl)")["other"] == 1
 
 
 def test_public_task_boundary(tmp_path):
@@ -67,8 +84,17 @@ def test_sorry_never_calls_kernel(tmp_path, monkeypatch):
     for row in rows:
         private = " ".join(row["held_out_proof"].split())
         for trace in (tmp_path / "traces").rglob("*.json"):
-            assert private not in " ".join(trace.read_text().split())
+            assert all(private not in s for s in normalized_trace(trace))
             assert "private_canary" not in trace.read_text()
+
+
+def test_leak_detector_positive_control(tmp_path):
+    path, rows = fixture_corpus(tmp_path)
+    original = rows[-1]["held_out_proof"]
+    completion = Fake.from_corpus("held_out", [str(path)], rows[-1]["id"]).complete([], "fake")
+    trace = tmp_path / "positive.json"
+    trace.write_text(json.dumps(asdict(completion)))
+    assert any(" ".join(original.split()) in s for s in normalized_trace(trace))
 
 
 def test_provider_requests_and_full_response(monkeypatch):
@@ -106,6 +132,18 @@ def test_provider_error_is_one_call(monkeypatch):
     assert result.raw_response == "complete error body" and not result.usage_known
 
 
+@pytest.mark.parametrize("status", [200, 500])
+def test_malformed_answer_preserves_returned_model_and_billable_usage(monkeypatch, status):
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "not-real")
+    def answer(request):
+        return httpx.Response(status, json={"model": "returned-snapshot",
+            "usage": {"prompt_tokens": 12, "completion_tokens": 7}, "choices": []})
+    result = OpenAICompatible(transport=httpx.MockTransport(answer)).complete([], "alias")
+    assert result.error and result.model_id == "returned-snapshot"
+    assert result.usage_known and (result.prompt_tokens, result.completion_tokens) == (12, 7)
+
+
 def test_budget_reservation_and_restart(tmp_path):
     budget = Budget(tmp_path / "budget.sqlite", 1, 1)
     budget.reserve("a", .8)
@@ -118,6 +156,8 @@ def test_budget_reservation_and_restart(tmp_path):
         budget.reserve("b", 0)
     with pytest.raises(BudgetStop):
         Budget(tmp_path / "zero.sqlite", 1, 0).reserve("c", 0)
+    with pytest.raises(BudgetStop):
+        budget.settle("missing", .4)
 
 
 def test_retry_and_condition_trace_separation(tmp_path):
@@ -159,5 +199,5 @@ def test_end_to_end_and_resume(tmp_path):
         if policy != "held_out":
             for original in source:
                 needle = " ".join(original["held_out_proof"].split())
-                assert all(needle not in " ".join(p.read_text().split()) for p in traces)
+                assert all(needle not in s for p in traces for s in normalized_trace(p))
                 assert all("private_canary" not in p.read_text() for p in traces)

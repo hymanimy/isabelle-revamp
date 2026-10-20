@@ -84,14 +84,16 @@ def method_counts(text: str) -> dict[str, int]:
     from eval.corpus.build_corpus import lex
     names = "simp auto blast metis fastforce force arith linarith induction try0".split()
     try:
-        counts = Counter(t.value for t in lex(text))
+        tokens = [t.value for t in lex(text)
+                  if not t.value.startswith(('"', "‹", r"\<open>"))]
     except ValueError:
-        counts = Counter()
+        tokens = []
+    counts = Counter(tokens)
     result = {name: counts[name] for name in names}
     result["induction"] += counts["induct"]
     # Other counts explicit by invocations with an unlisted first method.
     result["other"] = sum(m not in names + ["induct"] for m in
-                          re.findall(r"\bby\s+\(?\s*([A-Za-z_][\w']*)", text))
+                          re.findall(r"\bby\s+\(?\s*([A-Za-z_][\w']*)", " ".join(tokens)))
     return result
 
 
