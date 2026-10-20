@@ -275,25 +275,42 @@ export class Goals implements Disposable {
   // its output has settled. Never moves the user's cursor.
   async stateAt(document: TextDocument, line: number, character: number, timeout = 30000): Promise<GoalState> {
     return this.hold(document, line, character, async probe => {
-      const deadline = Date.now() + timeout;
-      let checkedAt: number | undefined;
-      while (Date.now() < deadline) {
-        if (document.isClosed || document.version !== probe.version) {
-          throw new Error('The document changed during the query. Retry goals_at.');
-        }
-        const result = (stateHtml?: string) => ({ ...this.present(document, line, stateHtml, probe.since),
-          theory: basename(document.uri.fsPath, '.thy'), checkStatus: this.documentStatus(document).state });
-        const quiet = Date.now() - this.outputAt >= this.outputSettle;
-        const checked = !this.busyBefore(probe.uri, line, character);
-        if (checked && quiet && probe.state !== undefined && this.annotatedVersions.get(probe.uri) === probe.version) {
-          return result(probe.state);
-        }
-        checkedAt = checked ? checkedAt ?? Date.now() : undefined;
-        if (checked && quiet && probe.state === undefined && Date.now() - checkedAt! >= stateGrace) return result();
-        await pause(25);
-      }
-      throw new Error('Isabelle is still checking; query processing_status and retry goals_at.');
+      const stateHtml = await this.settle(document, line, character, probe, timeout, 'goals_at');
+      return { ...this.present(document, line, stateHtml, probe.since),
+        theory: basename(document.uri.fsPath, '.thy'), checkStatus: this.documentStatus(document).state };
     });
+  }
+
+  // Ask the language server about a position, such as for hover text, once Isabelle
+  // has checked up to it as for stateAt: its answers come from the checked markup.
+  async queryAt<T>(document: TextDocument, line: number, character: number, tool: string,
+    query: () => Thenable<T>, timeout = 30000): Promise<T> {
+    return this.hold(document, line, character, async probe => {
+      await this.settle(document, line, character, probe, timeout, tool);
+      return await query();
+    });
+  }
+
+  // Wait until everything up to a held position is checked and output has settled;
+  // return the proof state there, if the command has one.
+  private async settle(document: TextDocument, line: number, character: number, probe: Probe,
+    timeout: number, tool: string): Promise<string | undefined> {
+    const deadline = Date.now() + timeout;
+    let checkedAt: number | undefined;
+    while (Date.now() < deadline) {
+      if (document.isClosed || document.version !== probe.version) {
+        throw new Error(`The document changed during the query. Retry ${tool}.`);
+      }
+      const quiet = Date.now() - this.outputAt >= this.outputSettle;
+      const checked = !this.busyBefore(probe.uri, line, character);
+      if (checked && quiet && probe.state !== undefined && this.annotatedVersions.get(probe.uri) === probe.version) {
+        return probe.state;
+      }
+      checkedAt = checked ? checkedAt ?? Date.now() : undefined;
+      if (checked && quiet && probe.state === undefined && Date.now() - checkedAt! >= stateGrace) return undefined;
+      await pause(25);
+    }
+    throw new Error(`Isabelle is still checking; query processing_status and retry ${tool}.`);
   }
 
   // Check all of a theory, not just near the user's cursor, for up to `budget` ms.

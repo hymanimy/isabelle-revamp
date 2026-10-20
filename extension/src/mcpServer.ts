@@ -96,7 +96,7 @@ class BridgeClient {
 const bridge = new BridgeClient(process.cwd());
 const server = new McpServer({ name: 'Isabelle Revamp', version }, {
   instructions: 'Work in the open VS Code workspace. Positions are zero-based lines and UTF-16 columns; ends are exclusive. '
-    + 'Start with open to read the current buffer. edit changes and saves that buffer. goals_at returns the proof state and messages at a position. '
+    + 'Start with open to read the current buffer. edit changes and saves that buffer. goals_at returns the proof state and messages at a position; hover and definition tell what a name there is and where it is defined. '
     + 'None of these move the user\'s cursor. Empty errors do not prove completion: check status and sorry_positions. '
     + 'Read open immediately before every edit; stale edits are rejected. Never retry an uncertain edit without reading the buffer again.',
 });
@@ -120,7 +120,11 @@ tool('edit', 'Replace an exclusive-end range using zero-based lines/UTF-16 colum
   { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false });
 tool('goals_at', 'Return the proof state and messages (e.g. try0 suggestions) at a proof command, once Isabelle has checked up to it; waits up to 30s. Includes phase and version. Does not move the user\'s cursor.',
   { file, line: position, col: position }, read);
-tool('errors', 'Check the whole theory (up to 15s per call), then return error messages and source ranges. complete=false means checking is still pending; call again, as progress is kept.',
+tool('hover', 'Return what Isabelle shows on hover at a position, once it has checked up to there: e.g. "free variable :: nat", or a constant\'s full name and type. A misspelt constant shows as a free variable. Waits up to 30s; does not move the user\'s cursor.',
+  { file, line: position, col: position }, read);
+tool('definition', 'Return where the name at a position is defined, once Isabelle has checked up to there: file, range and source lines, for library constants and lemmas as well as local ones. Waits up to 30s; does not move the user\'s cursor.',
+  { file, line: position, col: position }, read);
+tool('errors','Check the whole theory (up to 15s per call), then return error messages and source ranges. complete=false means checking is still pending; call again, as progress is kept.',
   { file }, read);
 tool('status', 'Check the theories open in the user\'s tabs and those this client has read or edited (up to 15s each per call), and report completion: versions, errors, admissions and saved state. Checking or sorry is never fully_checked; call again while checking.',
   {}, read);

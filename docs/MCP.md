@@ -1,7 +1,7 @@
 # Isabelle MCP
 
 An MCP server that lets an agent such as Claude Code work in the same Isabelle
-session as you: read theories, see goals, edit, and check. It exposes seven
+session as you: read theories, see goals, edit, and check. It exposes nine
 tools and never launches a second prover; it forwards each call to the VS Code
 window running the extension.
 
@@ -69,6 +69,8 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 | `open(file)` | Returns the file's current `text`, `version`, and `saved` flag as VS Code holds it, including unsaved user edits. Does not open a tab or move the user's cursor. |
 | `edit(file, start_line, start_col, end_line, end_col, text)` | Replaces the range through VS Code, saves the buffer, and returns its new version/status. Uses the editor's undo history. A stale client version is rejected; read with `open` immediately before editing. |
 | `goals_at(file, line, col)` | Waits up to 30 seconds until Isabelle has checked up to a proof command and its output has settled. Returns Unicode `text` (the proof state plus messages such as try0 suggestions), `phase`, diagnostics of that command, the file/version/position, `theory` and `checkStatus`. Does not move the user's cursor. |
+| `hover(file, line, col)` | Waits like `goals_at`, then returns what Isabelle shows on hover there as Unicode `text`, such as `constant "NthRoot.sqrt"` with its type, or `fixed "n" :: nat`, and the hovered `range`. A misspelt constant shows as `free variable`. |
+| `definition(file, line, col)` | Waits like `goals_at`, then returns `definitions`: each with its `file`, `range` and Unicode `source` (from the definition's line to the next blank line, at most 20 lines). Covers library constants and facts as well as local names and facts. Library files are read from disk, not opened. |
 | `errors(file)` | Returns error messages/ranges, `has_errors`, and `complete`. `complete=false` means an empty or partial list is inconclusive. |
 | `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag, for the theories open in the user's tabs plus those this client has read or edited. |
 | `sorry_positions(file)` | Returns server-marked `[start_line,start_col,end_line,end_col]` ranges and a `complete` flag. Comments and strings containing the word are ignored. |
@@ -131,10 +133,10 @@ mechanism.
 npm run test:integration --prefix extension -- mcp,agentEdits
 ```
 
-This starts the bundled server the way Claude Code does and drives all seven
+This starts the bundled server the way Claude Code does and drives all nine
 tools through the MCP SDK's client against VS Code and Isabelle: it replaces a
 `sorry` with a complete proof in a disposable copy of the sqrt-2 fixture, and
-checks goals, messages, completion, errors, processing, authentication and file
+checks goals, messages, hover, definitions, completion, errors, processing, authentication and file
 boundaries. Receipts are in `.dev-host/m5-results.json`.
 Profiles and discovery files stay under `.dev-host/` during tests.
 
@@ -198,6 +200,8 @@ Agents can already run `try0`, `sledgehammer`, `find_theorems`, `term` and `thm`
 by writing the command with `edit`, reading the result with `goals_at`, and
 editing again. Dedicated tools were considered on 2026-10-20 and parked: they
 would add convenience, not capability. Revisit if agents struggle with that loop.
+(`hover` and `definition` were built the same day: they come straight from the
+language server and catch misspelt constants, which become free variables.)
 
 What dedicated tools would add over the edit loop:
 
@@ -213,8 +217,6 @@ Per tool, against Isabelle2025-2's VS Code server:
 
 | Tool | Effort | Notes |
 |---|---|---|
-| hover / type | a few hours | `vscode.executeHoverProvider` at a position checked via `goals.hold`. |
-| definition | a few hours | `vscode.executeDefinitionProvider`. Targets are mostly library files, so the agent needs read-only access outside the workspace. |
 | sledgehammer | about a day | Native `PIDE/sledgehammer_request` (streamed output, cancel), so no file edit. Runs at Isabelle's single cursor, so the user's Goals panel waits while it runs. The same plumbing would give the editor a Sledgehammer panel. Build this one first. |
 | try0 | not worth it | No server request; a tool could only wrap the edit loop. |
 | find_theorems | 1–3 days, uncertain | No server support. Either patch the Scala server (a fork to maintain) or check a hidden scratch theory importing the current one (theory-level facts only; needs an experiment). The edit loop already works and sees local facts. |
@@ -229,7 +231,6 @@ open question. PIDE MCP's README likewise says it needs distribution changes.
 
 Before building any of these, consider an existing Isabelle MCP server alongside
 ours for queries. Qiyuan Xu's [Isabelle-MCP](https://github.com/xqyww123/Isabelle-MCP)
-(Python, `isabelle-mcp` 0.6.0) already offers `find_theorems`, hover,
-go-to-definition and an ML debugger. It starts its own Isabelle process, so it
+(Python, `isabelle-mcp` 0.6.0) already offers `find_theorems` and an ML debugger. It starts its own Isabelle process, so it
 does not see the editor's unsaved edits, and the user does not see its work.
 Running both on the same theory at once is untested.

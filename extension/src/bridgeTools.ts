@@ -1,8 +1,10 @@
-import { realpath, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import { DiagnosticSeverity, EndOfLine, languages, Position, Range, TabInputText, TextDocument, Uri, window, workspace, WorkspaceEdit } from 'vscode';
+import { commands, DiagnosticSeverity, EndOfLine, Hover, languages, Location, LocationLink, Position, Range, TabInputText,
+  TextDocument, Uri, window, workspace, WorkspaceEdit } from 'vscode';
 import { Goals } from './goals';
-import { encodeSymbols } from './symbols';
+import { encodeSymbols, unicodeSymbols } from './symbols';
+import { hoverText } from './goalLinks';
 import { AgentEdits } from './agentEdits';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
@@ -43,6 +45,19 @@ export class BridgeTools {
     return new Position(line, col);
   }
 
+  // Where a definition is, and its source: the lines from its start to the next blank line.
+  private async definition(target: Location | LocationLink) {
+    const uri = 'targetUri' in target ? target.targetUri : target.uri;
+    const range = 'targetUri' in target ? target.targetSelectionRange ?? target.targetRange : target.range;
+    // Read files that aren't open from disk: opening a library theory would hand it to Isabelle as an editor buffer.
+    const open = workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
+    const lines = (open?.getText() ?? await readFile(uri.fsPath, 'utf8').catch(() => '')).split(/\r?\n/);
+    const blank = lines.findIndex((text, line) => line > range.start.line && !text.trim());
+    const end = Math.min(blank < 0 ? lines.length : blank, range.start.line + 20);
+    return { file: uri.fsPath, range: [range.start.line, range.start.character, range.end.line, range.end.character],
+      source: unicodeSymbols(lines.slice(range.start.line, end).join('\n')) };
+  }
+
   // Theories open in the user's tabs, plus those this agent has read or edited.
   private async documents(agent: AgentSession): Promise<TextDocument[]> {
     const uris = new Set(window.tabGroups.all.flatMap(group => group.tabs.flatMap(tab =>
@@ -66,7 +81,7 @@ export class BridgeTools {
         ? { fully_checked: files.length > 0 && files.every(file => 'fully_checked' in file && file.fully_checked), files }
         : { processing: files.some(file => file.processing), files };
     }
-    if (!['open', 'edit', 'goals_at', 'errors', 'sorry_positions'].includes(method)) {
+    if (!['open', 'edit', 'goals_at', 'hover', 'definition', 'errors', 'sorry_positions'].includes(method)) {
       throw new Error('Unknown method: ' + method);
     }
     const document = await this.document(params.file);
@@ -121,7 +136,20 @@ export class BridgeTools {
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };
     }
     const position = this.position(document, params.line, params.col);
+    const at = { ...identity(), line: position.line, col: position.character };
+    if (method === 'hover') {
+      const hovers = await this.goals.queryAt(document, position.line, position.character, method,
+        () => commands.executeCommand<Hover[]>('vscode.executeHoverProvider', document.uri, position)) ?? [];
+      const range = hovers.find(hover => hover.range)?.range;
+      return { ...at, text: hoverText(hovers).replace(/\n\s*\n/g, '\n'),
+        range: range ? [range.start.line, range.start.character, range.end.line, range.end.character] : null };
+    }
+    if (method === 'definition') {
+      const targets = await this.goals.queryAt(document, position.line, position.character, method,
+        () => commands.executeCommand<(Location | LocationLink)[]>('vscode.executeDefinitionProvider', document.uri, position)) ?? [];
+      return { ...at, definitions: await Promise.all(targets.map(target => this.definition(target))) };
+    }
     const { html: _html, ...state } = await this.goals.stateAt(document, position.line, position.character);
-    return { ...identity(), line: position.line, col: position.character, ...state };
+    return { ...at, ...state };
   }
 }

@@ -7,7 +7,7 @@ const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const root = path.resolve(__dirname, '../..');
-const TOOLS = ['edit', 'errors', 'goals_at', 'open', 'processing_status', 'sorry_positions', 'status'];
+const TOOLS = ['definition', 'edit', 'errors', 'goals_at', 'hover', 'open', 'processing_status', 'sorry_positions', 'status'];
 
 // An MCP client the way Claude Code starts one: the bundled server on VS Code's Node.js.
 async function agent(name) {
@@ -63,7 +63,7 @@ exports.run = async function () {
   const claude = await agent('claude-code');
   try {
     assert.deepEqual((await claude.listTools()).tools.map(tool => tool.name).sort(), TOOLS);
-    receipt('exactly seven MCP tools');
+    receipt('exactly nine MCP tools');
     const until = async (label, predicate) => {
       let value;
       for (let i = 0; i < 200; i++) {
@@ -111,6 +111,23 @@ exports.run = async function () {
     assert(goal.text.includes('Successful attempt to solve goal'), goal.text);
     receipt('goals_at includes the command messages', goal);
 
+    // The first occurrence of `word` on the line containing `context`.
+    const at = (context, word) => {
+      const line = original.split('\n').findIndex(text => text.includes(context));
+      return { file, line, col: original.split('\n')[line].indexOf(word, original.split('\n')[line].indexOf(context)) };
+    };
+    let hover = await call(claude, 'hover', at('theorem sqrt2', 'sqrt ('));
+    assert.match(hover.text, /constant "NthRoot\.sqrt"\n:: real ⇒ real/);
+    hover = await call(claude, 'hover', at('where denominator', 'n \\<noteq>'));
+    assert.match(hover.text, /fixed "n"\n:: nat/); assert.deepEqual(hover.range, [10, 24, 10, 25]);
+    receipt('hover names constants and variables with their types', hover);
+    let definition = await call(claude, 'definition', at('theorem sqrt2', '\\<rat>'));
+    assert(definition.definitions[0].file.endsWith('/src/HOL/Rat.thy'), JSON.stringify(definition));
+    assert(definition.definitions[0].source.startsWith('definition Rats :: "\'a set" (‹ℚ›)'), JSON.stringify(definition));
+    definition = await call(claude, 'definition', at('using denominator fraction', 'denominator'));
+    assert.equal(definition.definitions[0].file, file); assert.deepEqual(definition.definitions[0].range, [10, 10, 10, 21]);
+    receipt('definition finds library and local definitions with their source', definition);
+
     await replace(original.replace('    by simp\nqed', '    by (rule TrueI)\nqed'));
     await until('wrong tactic is not fully checked', item => item.state === 'error');
     let errors;
@@ -122,6 +139,12 @@ exports.run = async function () {
     assert(errors.complete && errors.has_errors && errors.errors.some(error => error.message.includes('Failed to apply')),
       JSON.stringify(errors));
     receipt('MCP returns inline errors with ranges', errors);
+
+    // A misspelt constant silently becomes a free variable; hover shows it.
+    await replace(original.replace('"sqrt (2 :: real) \\<notin>', '"sqrrt (2 :: real) \\<notin>'));
+    hover = await call(claude, 'hover', at('theorem sqrt2', 'sqrt ('));
+    assert.match(hover.text, /free variable/, hover.text);
+    receipt('hover shows a misspelt constant as a free variable', hover);
 
     // processing_status checks for at most 5 s and status for 15 s, so a 25 s command is still running.
     await replace(original.replace('proof\n', 'proof\n  ML_prf \\<open>OS.Process.sleep (Time.fromReal 25.0)\\<close>\n'));
