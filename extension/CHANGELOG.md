@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 (2026-10-20)
 
 - Warns once if Isabelle is not Isabelle2025-2, the release this extension is
   built for: some features may not work. **Isabelle Revamp: Setup check** shows
