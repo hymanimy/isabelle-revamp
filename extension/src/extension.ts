@@ -14,7 +14,7 @@ import { StatusDecorations } from './statusDecorations';
 import { SymbolInput, asciiCompletion, asciiCompletions } from './symbolInput';
 import { visibleScripts } from './scriptDecorations';
 import { convertQuotes } from './cartouches';
-import { GoalLinks } from './goalLinks';
+import { distinctHover, GoalLinks } from './goalLinks';
 import { findIsabelle, isabelleVersion, mcpLaunch, onPath, registerWithClaude, setupReport, versionWarning } from './setup';
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
@@ -141,7 +141,7 @@ export async function activate(context: ExtensionContext) {
     outputChannel: output,
     middleware: {
       provideHover: async (document, position, token, next) =>
-        withSuggestionLinks(await next(document, position, token), document.uri.toString(), position),
+        withSuggestionLinks(distinctHover(await next(document, position, token)), document.uri.toString(), position),
       provideCompletionItem: async (document,position,context,token,next) =>
         asciiCompletions(await next(document,position,context,token)),
       resolveCompletionItem: async (item,token,next) => {

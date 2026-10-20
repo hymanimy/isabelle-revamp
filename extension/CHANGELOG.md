@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hover shows each line once. Isabelle reported the variable of a bounded
+  quantifier, as in `∀i < n. P`, twice, so every line of its hover appeared twice.
+
 ## 0.2.3 (2026-10-20)
 
 - Fixed highlighting breaking for the rest of a theory after an attribute

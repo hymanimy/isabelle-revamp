@@ -146,6 +146,15 @@ exports.run = async function () {
     assert.match(hover.text, /free variable/, hover.text);
     receipt('hover shows a misspelt constant as a free variable', hover);
 
+    // A bounded quantifier reports its variable twice: ∀i < n. P is ∀i. i < n ⟶ P.
+    const bounded = 'lemma bounded: "\\<forall>i < (n::nat). i < n" by simp\n';
+    await replace(original.slice(0, original.lastIndexOf('\nend')) + '\n\n' + bounded + original.slice(original.lastIndexOf('\nend')));
+    const boundedLine = (await call(claude, 'open', { file })).text.split('\n').indexOf(bounded.trimEnd());
+    hover = await call(claude, 'hover', { file, line: boundedLine, col: bounded.indexOf('i <') });
+    assert.match(hover.text, /bound "i"/, hover.text);
+    assert.equal(hover.text.split('\n').length, new Set(hover.text.split('\n')).size, 'Repeated hover lines: ' + hover.text);
+    receipt('hover lists a bounded variable once', hover);
+
     // processing_status checks for at most 5 s and status for 15 s, so a 25 s command is still running.
     await replace(original.replace('proof\n', 'proof\n  ML_prf \\<open>OS.Process.sleep (Time.fromReal 25.0)\\<close>\n'));
     await pause(700);
