@@ -2,7 +2,7 @@
   "name": "isabelle-revamp",
   "displayName": "Isabelle Revamp",
   "description": "Unofficial Isabelle/HOL support for VS Code: live goals, Unicode symbols and an MCP server for AI agents, using your installed Isabelle.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "hymanimy",
   "private": true,
   "license": "MIT",

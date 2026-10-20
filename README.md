@@ -80,7 +80,7 @@ npm ci --prefix extension
 # open this folder in VS Code, Run → Start Debugging (F5)
 npm test --prefix extension                # unit tests: no VS Code window, no Isabelle
 npm run test:integration --prefix extension  # drives a real VS Code window against Isabelle
-npm run package --prefix extension         # builds dist/isabelle-revamp-0.2.2.vsix
+npm run package --prefix extension         # builds dist/isabelle-revamp-0.2.3.vsix
 ```
 
 The integration tests open a VS Code window and need a display. They find VS Code and Isabelle

@@ -58,6 +58,13 @@ exports.checkHighlighting = async function (app) {
     role('  using prime_above_bound try0', 'try0', 'storage.type.isabelle');
     role('  using denominator fraction by simp', 'fraction', 'variable.other.fact.isabelle');
     role('  using denominator fraction by simp', 'by', 'keyword.control.isabelle');
+    // A ] inside a term, or a nested attribute, must not end an attribute early: that left a
+    // string open and swapped code and strings for the rest of the theory.
+    let stack = textmate.INITIAL;
+    for (const line of ['  using foo[OF _ a b, of "[0..<n]" "(\\<lambda>p. f p)"]',
+      '    bar[OF baz[of x]] by (rule qux[of "[a]" \\<open>]\\<close>])']) stack = tokenize(line, stack).ruleStack;
+    const after = tokenize('  finally show ?thesis .', stack).tokens.find(token => token.endIndex > 2);
+    assert(after.scopes.includes('keyword.control.isabelle'), 'Attribute left a string open: ' + after.scopes.join(' '));
     role('  using denominator fraction by simp', 'simp', 'support.function.method.isabelle');
     role('text ‹A proof by contradiction›', 'A proof by contradiction', 'comment.block.documentation.isabelle');
     assert(!has(tokenize('text ‹A proof by contradiction›'), 'support.function.method.isabelle'));

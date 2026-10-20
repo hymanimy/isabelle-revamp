@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 (2026-10-20)
+
+- Fixed highlighting breaking for the rest of a theory after an attribute
+  containing a `]` inside a term, such as `[of "[0..<n]"]`: code was coloured
+  as strings and strings as code. Nested attributes such as `[OF foo[of x]]`
+  are also highlighted correctly.
+
 ## 0.2.2 (2026-10-20)
 
 - Warns once if Isabelle is not Isabelle2025-2, the release this extension is
