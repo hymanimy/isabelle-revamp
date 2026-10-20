@@ -2,6 +2,16 @@
 
 ## Decisions taken unattended
 
+- M5 shrinking retains one model until the prescribed lib-to-150 step has been
+  tried; otherwise dropping every model would make that last shrinking step
+  unreachable. If even that final condition does not fit, schedule no real run
+  and report the reason. The fixed `max_usd` and `max_hours` are never increased.
+- M5 smoke costs and unresolved reservations count against the full USD ceiling
+  via `prior_run_costs` / `prior_usd_cost`; M6 gets only the remainder. M6's wall
+  clock starts when M6 is actually launched. An unavailable partial report does
+  not create its spend ledger or immutable run manifest, so supplying credentials
+  and models later can still use `run_id=full`.
+
 - M4 corpus reproducibility audit: the default corpus command now validates and
   retains an existing complete corpus snapshot, including baseline annotations.
   `--rebuild` explicitly resamples and clears cached negative judgments from
@@ -508,3 +518,54 @@ The full current test suite passed: 79 tests in 59.13 s. Protected directories
 have no tracked or untracked changes. Baseline USD token spend is zero; local
 CPU costs are not priced. There were 13 timed-out library attempts, retained
 in the failure table.
+
+## M5: smoke checks and budget gate
+
+- **What happened.** Smoke acceptance failed three consecutive checks; no real-model smoke was established.
+- **Experience.** Missing models/credentials are unavailable measurements, not failed proofs or zero-cost model evidence.
+- **Fix / action.** Stop the real-model phase and produce the required partial report from existing data.
+
+Projection uses all allowed attempts, smoke mean token/latency measurements, 3000 additional feedback tokens per retry plus preceding completions, and a 25% wall-time margin. Kernel hours use the M0 median × attempts / workers. An empty schedule projects zero scheduled work; it is not a model estimate.
+
+```json
+{
+  "smoke_complete": false,
+  "proceed_to_full": false,
+  "errors": [
+    "check 1: ValueError: No configured models for the real-provider smoke run",
+    "check 2: ValueError: No configured models for the real-provider smoke run",
+    "check 3: ValueError: No configured models for the real-provider smoke run"
+  ],
+  "dropped": [],
+  "before_shrinking": {
+    "conditions": [],
+    "lemmas": 290,
+    "prior_usd_cost": 0,
+    "projected_llm_usd": 0.0,
+    "projected_total_usd": 0.0,
+    "kernel_hours": 0.0,
+    "projected_hours": 0.0
+  },
+  "projection": {
+    "conditions": [],
+    "lemmas": 290,
+    "prior_usd_cost": 0,
+    "projected_llm_usd": 0.0,
+    "projected_total_usd": 0.0,
+    "kernel_hours": 0.0,
+    "projected_hours": 0.0
+  },
+  "max_usd": 25,
+  "max_hours": 8,
+  "kernel_median_s": 6.998562707998644,
+  "samples": {}
+}
+```
+
+M5 verification: all 80 non-Isabelle tests passed, including the shrinking
+order, last-model subsampling, smoke-cost deduction and three-restart bound.
+smoke.json contains exactly five lib and five fresh ids. Three preflight
+receipts record missing configured models. OPENAI_BASE_URL, OPENAI_API_KEY and
+ANTHROPIC_API_KEY were rechecked and remain absent. No provider request or
+smoke result row was fabricated. The fixed limits remain USD 25 / eight hours.
+M5 real smoke is unavailable; M6 will contain a partial baseline report only.

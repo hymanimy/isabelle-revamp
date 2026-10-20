@@ -1,10 +1,15 @@
 {
   "run_id": "full",
-  "corpus": ["eval/corpus/lib.jsonl", "eval/corpus/fresh.jsonl"],
+  "corpus": [
+    "eval/corpus/lib.jsonl",
+    "eval/corpus/fresh.jsonl"
+  ],
   "conditions": [],
   "cost_usd_per_m": {},
   "workers": 1,
   "kernel_timeout_s": 120,
   "max_usd": 25,
-  "max_hours": 8
+  "max_hours": 8,
+  "prior_run_costs": {},
+  "prior_usd_cost": 0
 }

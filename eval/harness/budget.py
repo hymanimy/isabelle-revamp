@@ -10,6 +10,11 @@ class BudgetStop(Exception):
     pass
 
 
+def available_usd(config: dict) -> float:
+    """Smoke spending shares the fixed full-run ceiling."""
+    return max(0., config["max_usd"] - config.get("prior_usd_cost", 0.))
+
+
 class Budget:
     def __init__(self, path: Path, max_usd: float, max_hours: float):
         self.path, self.max_usd, self.max_hours = path, max_usd, max_hours

@@ -14,7 +14,7 @@ import tempfile
 import time
 
 from .assemble import assemble, target_name
-from .budget import Budget, BudgetStop
+from .budget import Budget, BudgetStop, available_usd
 from .classify import classify
 from .kernel import check, proved
 from .llm import Anthropic, Completion, Fake, OpenAICompatible, Provider
@@ -135,7 +135,7 @@ def deadline_expired(signum: int, frame: object) -> None:
 def run_task(task: Task, condition: dict, config: dict, metadata: dict,
              offset: int, root: Path, keep_work: bool = False) -> dict | None:
     run_id = config["run_id"]
-    budget = Budget(root / run_id / "budget.sqlite", config["max_usd"], config.get("max_hours", 8))
+    budget = Budget(root / run_id / "budget.sqlite", available_usd(config), config.get("max_hours", 8))
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"imports {' '.join(task.imports)}\n\n{task.statement}"}]
     records = []

@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, defaultdict
+from dataclasses import asdict
 import json
 import math
 from pathlib import Path
+import sqlite3
 import statistics
+import subprocess
 
 from .classify import FAILURES
-from .runner import read_rows
+from .runner import load_tasks, read_rows
 
 
 def wilson(successes: int, total: int) -> tuple[float, float] | None:
@@ -47,9 +50,29 @@ def proportion(rows: list[dict]) -> str:
     return f"{s}/{n} ({100*s/n:.1f}%)" if n else "NA (0 completed)"
 
 
+def prepare_partial(directory: Path, config: dict, reason: str) -> None:
+    """Report an unavailable run without reserving its run_id or starting its clock."""
+    if (directory / "manifest.json").exists():
+        return
+    from .agent import atomic_json
+    directory.mkdir(parents=True, exist_ok=True)
+    tasks = load_tasks(config)
+    atomic_json(directory / "report_context.json", {
+        "config": config, "tasks": [asdict(t) for t in tasks],
+        "isabelle_version": subprocess.check_output(["isabelle", "version"], text=True).strip(),
+        "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()})
+    (directory / "results.jsonl").touch(exist_ok=True)
+    atomic_json(directory / "status.json", {
+        "status": reason, "written": 0, "completed": len(read_rows(directory / "results.jsonl")),
+        "planned": len(tasks)*len(config["conditions"]),
+        "usd_reserved_or_spent": config.get("prior_usd_cost", 0)})
+
+
 def generate(directory: Path) -> str:
     own = read_rows(directory / "results.jsonl")
     manifest_path = directory / "manifest.json"
+    if not manifest_path.exists():
+        manifest_path = directory / "report_context.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     config = manifest.get("config", {})
     tasks = manifest.get("tasks", [])
@@ -89,9 +112,15 @@ def generate(directory: Path) -> str:
     status_path = directory / "status.json"
     if status_path.exists():
         status = json.loads(status_path.read_text())
-        out.append(f"Run status: `{status['status']}`. Completed rows: {status['completed']}/"
+        spent = status["usd_reserved_or_spent"]
+        ledger = directory / "budget.sqlite"
+        if ledger.exists():
+            with sqlite3.connect(ledger) as db:
+                spent = config.get("prior_usd_cost", 0) + db.execute(
+                    "SELECT COALESCE(SUM(usd),0) FROM calls").fetchone()[0]
+        out.append(f"Last recorded run status: `{status['status']}`. Completed rows: {len(own)}/"
                    f"{status['planned']}. Reserved/spent LLM budget: "
-                   f"${status['usd_reserved_or_spent']:.6f} (includes unfinished-call reservations).\n")
+                   f"${spent:.6f} (includes prior smoke spending and unfinished-call reservations).\n")
     out.append("Strata are never pooled. Percentages use completed rows; coverage is shown separately. "
                "Wilson intervals are descriptive, unadjusted 95% intervals; related example steps "
                "are not independent random samples. Incomplete runs may omit slower or harder tasks; "
@@ -198,9 +227,12 @@ def generate(directory: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory")
+    parser.add_argument("--config", help="Describe a partial run without launching it")
     args = parser.parse_args()
     directory = report_directory(args.directory)
     directory.mkdir(parents=True, exist_ok=True)
+    if args.config:
+        prepare_partial(directory, json.loads(Path(args.config).read_text()), "real_models_unavailable")
     output = generate(directory)
     (directory / "summary.md").write_text(output)
     print(output, end="")

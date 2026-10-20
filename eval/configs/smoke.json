@@ -1,0 +1,26 @@
+{
+  "run_id": "smoke",
+  "corpus": [
+    "eval/corpus/lib.jsonl",
+    "eval/corpus/fresh.jsonl"
+  ],
+  "conditions": [],
+  "cost_usd_per_m": {},
+  "workers": 1,
+  "kernel_timeout_s": 120,
+  "max_usd": 25,
+  "max_hours": 8,
+  "prior_usd_cost": 0,
+  "lemma_ids": [
+    "lib/Finite_Set/inj_on_iff_eq_card",
+    "lib/Wellfounded/wf_union_compatible",
+    "lib/Binomial/card_disjoint_shuffles",
+    "lib/Set/range_constant",
+    "lib/Option/not_Some_eq",
+    "fresh/Cascade/reorder",
+    "fresh/Swarm/result",
+    "fresh/Cascade/scaled_equality",
+    "fresh/Cascade/common_positive",
+    "fresh/Cascade/numerator_divides"
+  ]
+}

@@ -14,7 +14,7 @@ import re
 import subprocess
 
 from .agent import atomic_json, run_task
-from .budget import Budget, BudgetStop
+from .budget import Budget, BudgetStop, available_usd
 from .schema import Result, Task, key
 
 
@@ -61,6 +61,9 @@ def validate_config(config: dict) -> None:
             raise ValueError(f"Invalid {name}")
     if config["workers"] < 1 or config["kernel_timeout_s"] <= 0:
         raise ValueError("Workers and kernel timeout must be positive")
+    prior = config.get("prior_usd_cost", 0)
+    if not math.isfinite(prior) or not 0 <= prior <= config["max_usd"]:
+        raise ValueError("Prior smoke spending exceeds the fixed ceiling")
     seen = set()
     for condition in config["conditions"]:
         identity = (condition["model"], condition["max_attempts"])
@@ -125,7 +128,11 @@ def run(config: dict, root: Path = Path("eval/results"), keep_work: bool = False
                 if identity not in completed:
                     jobs.append((task, condition, config, metadata, offset, root, keep_work))
             offset += condition["max_attempts"]
-        budget = Budget(directory / "budget.sqlite", config["max_usd"], config.get("max_hours", 8))
+        budget = Budget(directory / "budget.sqlite", available_usd(config), config.get("max_hours", 8))
+        atomic_json(directory / "status.json", {
+            "status": "running", "written": 0, "completed": len(rows),
+            "planned": len(tasks)*len(config["conditions"]),
+            "usd_reserved_or_spent": config.get("prior_usd_cost", 0) + budget.total(), **metadata})
         pending, iterator, written, stopped = {}, iter(jobs), 0, False
         with ProcessPoolExecutor(max_workers=config["workers"]) as pool, path.open("a") as out:
             def submit_one() -> bool:
@@ -161,7 +168,8 @@ def run(config: dict, root: Path = Path("eval/results"), keep_work: bool = False
         status = {"status": "no_conditions" if not config["conditions"] else
                   "budget_or_interrupted_call" if stopped else "complete",
                   "written": written, "completed": len(rows) + written,
-                  "planned": len(tasks)*len(config["conditions"]), "usd_reserved_or_spent": budget.total(),
+                  "planned": len(tasks)*len(config["conditions"]),
+                  "usd_reserved_or_spent": config.get("prior_usd_cost", 0) + budget.total(),
                   **metadata}
         atomic_json(directory / "status.json", status)
         return status
