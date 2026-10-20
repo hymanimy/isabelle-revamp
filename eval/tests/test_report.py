@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-from eval.harness.report import bucket, generate, report_directory, wilson
+from eval.harness.report import bucket, generate, prepare_partial, report_directory, wilson
+from eval.harness.runner import run
 from eval.harness.schema import Result
 
 
@@ -45,3 +46,20 @@ def test_report_attempt_denominator_paired_comparison_and_reproducibility(tmp_pa
     assert "$0.500000" in text  # All spending, including failed lemma, per one success.
     assert text.index("| tactics |") < text.index("| model |")
     assert text == generate(full)
+
+
+def test_partial_report_does_not_reserve_future_run_id(tmp_path, monkeypatch):
+    def metadata(command, **kwargs):
+        return "Isabelle2025-2" if command[0] == "isabelle" else "a"*40
+    monkeypatch.setattr("subprocess.check_output", metadata)
+    config = {"run_id": "full", "corpus": ["eval/corpus/fresh.jsonl"],
+              "lemma_ids": ["fresh/Swarm/base"], "conditions": [], "workers": 1,
+              "kernel_timeout_s": 30, "max_usd": 0, "max_hours": 1}
+    directory = tmp_path / "full"
+    prepare_partial(directory, config, "real_models_unavailable")
+    assert not (directory / "manifest.json").exists()
+    assert not (directory / "budget.sqlite").exists()
+    assert "No completed real-model observations" in generate(directory)
+    config["conditions"] = [{"model": "fake", "provider": "fake", "policy": "garbage", "max_attempts": 1}]
+    assert run(config, tmp_path)["completed"] == 1
+    assert (directory / "manifest.json").exists()

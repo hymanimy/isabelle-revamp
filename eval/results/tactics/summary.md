@@ -8,7 +8,7 @@ Loop limits: at most 40 feedback lines and 3000 feedback characters per retry; 8
 
 **No completed real-model observations. This is a baseline-only/partial report, not a measurement of LLM proof performance.**
 
-Run status: `complete`. Completed rows: 290/290. Reserved/spent LLM budget: $0.000000 (includes unfinished-call reservations).
+Last recorded run status: `complete`. Completed rows: 290/290. Reserved/spent LLM budget: $0.000000 (includes prior smoke spending and unfinished-call reservations).
 
 Strata are never pooled. Percentages use completed rows; coverage is shown separately. Wilson intervals are descriptive, unadjusted 95% intervals; related example steps are not independent random samples. Incomplete runs may omit slower or harder tasks; their completed-row rates are not full-corpus estimates. Fake-provider rows excluded: 0.
 

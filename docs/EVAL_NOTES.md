@@ -569,3 +569,28 @@ receipts record missing configured models. OPENAI_BASE_URL, OPENAI_API_KEY and
 ANTHROPIC_API_KEY were rechecked and remain absent. No provider request or
 smoke result row was fabricated. The fixed limits remain USD 25 / eight hours.
 M5 real smoke is unavailable; M6 will contain a partial baseline report only.
+
+## M6: required partial report
+
+- **What happened.** M5 exhausted its three acceptance checks without any
+  configured real model. No M6 model run was launched.
+- **Experience.** There are baseline measurements, but no evidence about real
+  LLM proof performance or model value over tactics.
+- **Fix / action.** Produced eval/results/full/summary.md from the 290 completed
+  tactic rows and an explicit unavailable-run context. Its empty results.jsonl
+  contains no invented observations. The exact requested report command
+  regenerates summary.md byte-for-byte. The full run_id remains available: no
+  full manifest or wall-clock/spend ledger was created. Existing baseline
+  summary formatting was regenerated with the same reporting code.
+
+Tables derive from results JSONL files; protocol/coverage metadata comes from
+run manifests or the partial-report context. Budget reservations additionally
+come from the spend ledger when present. These local data/receipt files are
+gitignored by the requested policy; the committed summaries alone are not a
+raw-data release.
+
+M6 reporting acceptance: both summaries regenerate exactly. The full suite
+passed 85 tests in 63.74 s, including proof-only real-kernel tests, budget
+gates, report arithmetic and a test that an unavailable report does not
+prevent a later run from using the same run_id. Real-model measurements
+remain unavailable; only reporting is complete for M6.
