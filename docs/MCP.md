@@ -5,6 +5,13 @@ session as you: read theories, see goals, edit, and check. It exposes seven
 tools and never launches a second prover; it forwards each call to the VS Code
 window running the extension.
 
+In short: [I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) for VS Code.
+Other Isabelle MCP servers start a second, headless Isabelle session and are
+built for agents working alone, such as autoformalisation. Like I/Q in jEdit,
+this one lets the agent work in your open editor's session. It has fewer tools
+so far, because VS Code reaches Isabelle only through its language server; see
+[Why our own server](#why-our-own-server).
+
 The server is `extension/src/mcpServer.ts`, bundled into `out/mcpServer.js`. It
 runs on the Node.js built into VS Code (`ELECTRON_RUN_AS_NODE=1`), so neither
 Node nor Python needs to be installed.
@@ -139,3 +146,90 @@ For an isolated instance, set `ISABELLE_REVAMP_PORT_FILE` to the same path for
 VS Code and the MCP server; both then use only that file. Treat the bridge as
 local access under your OS account, not as a sandbox for untrusted proof text or
 ML commands.
+
+## Why our own server
+
+Other Isabelle MCP servers exist, and they suit a different job. Kevin
+Kappelmann's [PIDE MCP](https://github.com/kappelmann/isabelle-pide-mcp)
+(Isabelle2025-2 on its `2025-2` branch) and Qiyuan Xu's
+[Isabelle-MCP](https://github.com/xqyww123/Isabelle-MCP) each start their own
+headless Isabelle session. Used beside an editor, that makes two sessions: the
+agent's and the user's, each loading HOL and checking the same theories, with the
+agent seeing only what is saved to disk and the user seeing the agent's work only
+as files changing underneath them. Both are built for agents working on their
+own, such as autoformalisation: PIDE MCP's tools target workflows like
+auto-formalization, and Isabelle-MCP says it is not designed for human–AI
+collaboration. PIDE MCP's README notes that sharing one session with an editor
+would need changes to the Isabelle distribution.
+
+This server is for a person and an agent working together, in one session. The
+closest match is [I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq), a
+plugin that runs inside the user's Isabelle/jEdit and exposes the open session to
+an agent as an MCP server: the agent reads and writes jEdit's buffers, and the
+user sees its work. This project brings Isabelle to a new editor, so it is I/Q
+for VS Code. It avoids the distribution change because the extension is already
+the editor's client. The core tools line up: I/Q's `get_diagnostics`,
+`get_processing_status` and `get_sorry_positions` match `errors`,
+`processing_status` and `sorry_positions` here. One session gives:
+
+- **One prover.** No second Isabelle process loading HOL and checking the same
+  theories again.
+- **Unsaved edits.** The agent reads the buffer as VS Code holds it.
+- **Visible work.** Agent edits appear live in the editor, highlighted and
+  undoable.
+- **Nothing to install.** The server ships inside the extension and runs on VS
+  Code's Node, with the editor's session options.
+
+The others have far more tools so far. PIDE MCP adds state inspection, entity
+lookups, ML files, a plugin system and agent skills. I/Q, as a jEdit plugin, runs
+inside Isabelle's own JVM and can use its internals directly: its `explore` tries
+proof steps "without interfering with the user", and its REPL forks and steps
+proofs and runs sledgehammer and find_theorems. A VS Code extension reaches
+Isabelle only through the requests its language server offers, so here each of
+those needs either the edit loop or a change to Isabelle's VS Code server. This
+server starts with the essentials and grows as real use shows which tools are
+worth that work (see [Parked: dedicated query tools](#parked-dedicated-query-tools)).
+For an agent working alone, without an editor open, use PIDE MCP; it can run
+beside this server.
+
+## Parked: dedicated query tools
+
+Agents can already run `try0`, `sledgehammer`, `find_theorems`, `term` and `thm`
+by writing the command with `edit`, reading the result with `goals_at`, and
+editing again. Dedicated tools were considered on 2026-10-20 and parked: they
+would add convenience, not capability. Revisit if agents struggle with that loop.
+
+What dedicated tools would add over the edit loop:
+
+- The user's file is never touched: no temporary edits, saves or undo entries,
+  and no stray `sledgehammer` left if the agent stops partway.
+- No re-checking of everything after the inserted command, which the edit loop
+  causes twice.
+- No stale-version rejections when the user is typing in the same file.
+- Structured results and one call that waits for completion. Sledgehammer can
+  outlast `goals_at`'s 30 s wait; how `goals_at` behaves mid-run is untested.
+
+Per tool, against Isabelle2025-2's VS Code server:
+
+| Tool | Effort | Notes |
+|---|---|---|
+| hover / type | a few hours | `vscode.executeHoverProvider` at a position checked via `goals.hold`. |
+| definition | a few hours | `vscode.executeDefinitionProvider`. Targets are mostly library files, so the agent needs read-only access outside the workspace. |
+| sledgehammer | about a day | Native `PIDE/sledgehammer_request` (streamed output, cancel), so no file edit. Runs at Isabelle's single cursor, so the user's Goals panel waits while it runs. The same plumbing would give the editor a Sledgehammer panel. Build this one first. |
+| try0 | not worth it | No server request; a tool could only wrap the edit loop. |
+| find_theorems | 1–3 days, uncertain | No server support. Either patch the Scala server (a fork to maintain) or check a hidden scratch theory importing the current one (theory-level facts only; needs an experiment). The edit loop already works and sees local facts. |
+
+A cheap step short of tools: describe the edit → `goals_at` → edit loop for
+these commands in the server's `instructions` in `extension/src/mcpServer.ts`.
+
+Trying a command without touching the document is possible from inside
+Isabelle's process: I/Q's `explore` does it as a jEdit plugin. Here it would need
+a matching request in Isabelle's VS Code server, a known design rather than an
+open question. PIDE MCP's README likewise says it needs distribution changes.
+
+Before building any of these, consider an existing Isabelle MCP server alongside
+ours for queries. Qiyuan Xu's [Isabelle-MCP](https://github.com/xqyww123/Isabelle-MCP)
+(Python, `isabelle-mcp` 0.6.0) already offers `find_theorems`, hover,
+go-to-definition and an ML debugger. It starts its own Isabelle process, so it
+does not see the editor's unsaved edits, and the user does not see its work.
+Running both on the same theory at once is untested.
