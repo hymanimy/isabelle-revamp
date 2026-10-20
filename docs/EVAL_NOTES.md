@@ -2,6 +2,39 @@
 
 ## Decisions taken unattended
 
+- M3 trace naming: the requested path lacks a condition component. To prevent
+  model/attempt-budget collisions, `attempt_<n>.json` uses a run-wide ordinal
+  within each lemma: condition offsets are cumulative maximum attempt counts.
+  Each trace also records the condition and its local attempt number. Theory
+  names use that ordinal in the specified SHA1 formula.
+- M3 leak tests: a literal match of an original `by simp` in a generated answer
+  cannot distinguish leakage from independent reconstruction. Tests therefore
+  append unique harmless comment canaries to originals, check all normalized
+  held-out strings and canaries across every non-held-out-fake trace, and test
+  the public task allowlist. Real-provider inputs contain imports and statement
+  only, plus preceding model responses and checker feedback. Corpus construction
+  must read originals to validate them; only Fake's held-out policy and the
+  reporting/corpus stages may access that field.
+- M3 successful rows have `failure_class=null`; failures use the requested enum.
+  Extra `attempt_failures`, `orig_proof_lines`, `model_ids_returned`, `provider`
+  and `cost_is_upper_bound` fields preserve attempt-rate denominators, difficulty,
+  API alias changes and incomplete usage. Fake results are test data, never
+  real-model measurements.
+- M3 uses SQLite (Python standard library) for atomic spend reservations across
+  workers. Reserve before each request; settle against returned usage; retain an
+  upper bound for interrupted/unknown-usage calls. A restart reuses the original
+  wall-clock deadline and trace responses. Calls with no recorded response are
+  not automatically retried. Providers must honour configured token limits and
+  configured prices must be accurate; this cannot enforce a provider's billing.
+- M3 provider requests follow the official
+  [OpenAI Chat Completions reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
+  and [Anthropic Messages reference](https://platform.claude.com/docs/en/api/messages/create).
+  Temperature is zero by default; a condition may explicitly set
+  `supports_temperature=false` for an API that rejects it. There is no silent
+  fallback or hidden request retry. OpenAI-compatible endpoints may explicitly
+  select `token_parameter="max_tokens"` instead of `max_completion_tokens`.
+  All credentials remain in environment variables; headers are never logged.
+
 - Continuation audit (2026-10-20): cwd and git root are
   `/Users/leo/Mathematical-proof-revamp`; branch `eval` is already checked out
   at `8b3de98` (M0). Preserved the modified notes/probe, untracked corpus work
@@ -400,3 +433,13 @@ timeouts documented above.
 `eval/.venv/bin/python -m pytest eval/tests -m isabelle`: 3 passed (13.75 s),
 including real Swarm solution acceptance, admitted Swarm rejection and timeout.
 Both checks passed again after adding lexical-boundary controls.
+
+## M3 acceptance
+
+Full suite: 71 passed in 64.15 s, including two-worker real-kernel e2e
+checks on five fresh fixtures (held_out 5/5; sorry 5/5 rejected without kernel;
+simp mixed outcomes; repeat runs write zero rows/calls). After adding a public
+task allowlist check and stopped-call diagnostics, all 68 non-Isabelle tests
+passed. HTTP provider tests use MockTransport; no real-provider request has
+been made or claimed. Baseline will use two workers, following the successful
+concurrent kernel checks; full config retains its conservative one worker.
