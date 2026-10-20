@@ -2,6 +2,16 @@
 
 ## Decisions taken unattended
 
+- M7 reproduction audit: remove the smoke run's own entry from its copied
+  `prior_run_costs` as well as from `prior_usd_cost`. This keeps the smoke
+  configuration fingerprint unchanged after its cost is recorded in full.json;
+  other prior spending still counts. A regression test verifies the resume
+  configuration is identical before and after that bookkeeping.
+- M7 write-up generation copies the summary and exact runtime system prompt.
+  Interpretation remains `TODO(Leo)`. The current fresh stratum's novelty is
+  explicitly unverified; no missing hand-written material or real-model results
+  are invented to satisfy the intended publication framing.
+
 - M5 shrinking retains one model until the prescribed lib-to-150 step has been
   tried; otherwise dropping every model would make that last shrinking step
   unreachable. If even that final condition does not fit, schedule no real run
@@ -594,3 +604,23 @@ passed 85 tests in 63.74 s, including proof-only real-kernel tests, budget
 gates, report arithmetic and a test that an unavailable report does not
 prevent a later run from using the same run_id. Real-model measurements
 remain unavailable; only reporting is complete for M6.
+
+## M7: write-up skeleton and reproduction
+
+- **What happened.** Created docs/EVAL_RESULTS.md with the exact proof loop,
+  prompt, contamination caveats, limitations, available tables and five
+  reproduction commands. Real-model measurements remain unavailable.
+- **Experience.** A published table needs both a reproducible calculation and
+  explicit coverage. The example-derived `fresh` label is not evidence that
+  those statements were absent from model training.
+- **Fix / action.** The write-up embeds summary.md verbatim and leaves
+  interpretation as `TODO(Leo)`. `python -m eval.harness.writeup` regenerates
+  the skeleton; authored prose should be kept separately or restored afterward.
+
+M7 acceptance: generated measurements match summary.md byte-for-byte; the
+runtime system prompt is present exactly; there are five shell command lines
+and four TODO prose placeholders. Both result summaries regenerate exactly.
+All 82 non-Isabelle tests pass, including the new smoke-resume regression;
+the four unchanged real-Isabelle tests passed in the M6 full-suite check.
+`git diff --check` passes. Protected directories are unchanged. The existing
+untracked eval_overnight.log is preserved and excluded from milestone commits.

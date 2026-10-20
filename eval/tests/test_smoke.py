@@ -27,6 +27,14 @@ def test_smoke_is_ten_deterministic_lemmas_and_every_model():
     assert len(full["conditions"]) == 4  # No mutation of the fixed input.
 
 
+def test_smoke_bookkeeping_does_not_change_its_resume_fingerprint():
+    full = full_config()
+    before = make_smoke(full)
+    full["prior_run_costs"] = {"smoke": .4}
+    full["prior_usd_cost"] = .4
+    assert make_smoke(full) == before
+
+
 def test_shrink_order_and_fixed_budget():
     full = full_config()
     selected, estimate, dropped = shrink(full, COUNTS, SAMPLES, 7)

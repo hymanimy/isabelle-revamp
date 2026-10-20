@@ -18,6 +18,9 @@ from .runner import load_tasks, read_rows, run
 def make_smoke(full: dict) -> dict:
     config = copy.deepcopy(full)
     config["run_id"] = full.get("smoke_run_id", "smoke")
+    config["prior_run_costs"] = {
+        name: value for name, value in full.get("prior_run_costs", {}).items()
+        if name != config["run_id"]}
     seen = set()
     conditions = []
     for condition in full["conditions"]:
@@ -25,9 +28,7 @@ def make_smoke(full: dict) -> dict:
             seen.add(condition["model"])
             conditions.append({**condition, "max_attempts": 1})
     config["conditions"] = conditions
-    config["prior_usd_cost"] = sum(
-        value for name, value in full.get("prior_run_costs", {}).items()
-        if name != config["run_id"])
+    config["prior_usd_cost"] = sum(config["prior_run_costs"].values())
     rng = random.Random(20251020)
     tasks = load_tasks(full)
     ids = []

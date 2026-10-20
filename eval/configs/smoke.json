@@ -10,6 +10,7 @@
   "kernel_timeout_s": 120,
   "max_usd": 25,
   "max_hours": 8,
+  "prior_run_costs": {},
   "prior_usd_cost": 0,
   "lemma_ids": [
     "lib/Finite_Set/inj_on_iff_eq_card",
