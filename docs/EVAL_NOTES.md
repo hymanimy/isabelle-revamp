@@ -361,6 +361,26 @@ exit: 1
   `pytest` and `httpx` (plus their required transitive packages) in `eval/.venv`;
   no global packages or configuration were changed.
 
+## M2: proof acceptance and statement boundaries
+
+- **What happened.** Exit zero alone does not establish proof. An auxiliary
+  fragment with an open comment could also hide the target from parsing while
+  leaving the statement's bytes present in the file.
+- **Experience.** Text-presence checks need a boundary check as well as a kernel
+  verdict.
+- **Fix / action.** Scan proof and auxiliary fragments separately, reject
+  unbalanced comments/strings/cartouches, then require exit zero, no parsed
+  errors, no timeout, a clean scan and the canonical statement verbatim.
+  Reject quoted auxiliary names that shadow the target. Always invoke
+  `process_theories -o quick_and_dirty=false`. Parse both error streams and both
+  `Error (...)` and `***` locations; missing columns remain null. Kill owned
+  descendant process groups on timeout, including Isabelle's separate ML group.
+- **Decision taken unattended.** The strict scanner also rejects direct ML
+  tactic/command hooks and sledgehammer/nitpick. Forbidden tokens inside comments
+  and strings are rejected deliberately, including `sorry`; substrings inside
+  identifiers such as `append` are allowed. This trades false positives for a
+  smaller executable surface. It is not a general-purpose Isar security sandbox.
+
 ## M1 acceptance
 
 `python3 -m eval.corpus.build_corpus` exited 0: 250 lib and 40 fresh, all
@@ -373,3 +393,10 @@ were rejected. Lexer checks passed for attributes, local-context exclusion and
 nested proof boundaries. Every retained JSONL row was checked against its
 content-hashed validation receipt. Cached runs retain the earlier validation
 timeouts documented above.
+
+## M2 acceptance
+
+`eval/.venv/bin/python -m pytest eval/tests -m "not isabelle"`: 61 passed.
+`eval/.venv/bin/python -m pytest eval/tests -m isabelle`: 3 passed (13.75 s),
+including real Swarm solution acceptance, admitted Swarm rejection and timeout.
+Both checks passed again after adding lexical-boundary controls.
