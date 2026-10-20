@@ -7,7 +7,7 @@ mathematical symbol display. The original ASCII theory stays on disk by default.
 
 1. Install Isabelle2025-2 with its HOL heap and VS Code 1.104 or newer.
 2. In Extensions, choose **… → Install from VSIX…** and select
-   `isabelle-revamp-0.1.0.vsix`.
+   `isabelle-revamp-0.2.0.vsix`.
 3. Open a folder containing your `.thy` files, then open a theory. Goals opens
    automatically. **Isabelle: Show Theories** lists each open theory and the
    theories it imports, with the prover's progress on each. When `try0`,

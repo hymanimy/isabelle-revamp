@@ -2,7 +2,7 @@
   "name": "isabelle-revamp",
   "displayName": "Isabelle Revamp",
   "description": "Isabelle/HOL in stock VS Code using the installed Isabelle language server.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "hymanimy",
   "private": true,
   "license": "MIT",
