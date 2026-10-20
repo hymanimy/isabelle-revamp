@@ -21,16 +21,18 @@ including its demo, is preserved on the `leo` branch.
 
 ## Install
 
-Download `isabelle-revamp-0.2.0.vsix` from the
-[latest release](https://github.com/hymanimy/isabelle-revamp/releases/latest), then either
+In VS Code's Extensions view, search for **Isabelle Revamp**, or install it from the
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=hymanimy.isabelle-revamp).
+From a terminal:
 
 ```sh
-code --install-extension isabelle-revamp-0.2.0.vsix
+code --install-extension hymanimy.isabelle-revamp
 ```
 
-or in VS Code: **Extensions → ⋯ → Install from VSIX…**. Open any `.thy` file. If Isabelle
-isn't found you get one notification with **Locate…** (pick `bin/isabelle`) or **Download**.
-Run **Isabelle Revamp: Setup check** from the command palette to see what's wired up.
+Open any `.thy` file. If Isabelle isn't found you get one notification with **Locate…**
+(pick `bin/isabelle`) or **Download**. Run **Isabelle Revamp: Setup check** from the command
+palette to see what's wired up. Each [release](https://github.com/hymanimy/isabelle-revamp/releases)
+also has the `.vsix`, for **Extensions → ⋯ → Install from VSIX…**.
 
 ## Dependencies
 
@@ -76,7 +78,7 @@ npm ci --prefix extension
 # open this folder in VS Code, Run → Start Debugging (F5)
 npm test --prefix extension                # unit tests: no VS Code window, no Isabelle
 npm run test:integration --prefix extension  # drives a real VS Code window against Isabelle
-npm run package --prefix extension         # builds dist/isabelle-revamp-0.2.0.vsix
+npm run package --prefix extension         # builds dist/isabelle-revamp-0.2.1.vsix
 ```
 
 The integration tests open a VS Code window and need a display. They find VS Code and Isabelle

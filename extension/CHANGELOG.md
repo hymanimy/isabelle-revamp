@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2026-10-20)
+
+- Marketplace listing: says the extension is unofficial, adds this changelog
+  and search keywords. No change to the extension itself.
+
 ## 0.2.0 (2026-10-20)
 
 - **Checking like Isabelle/jEdit.** Isabelle checks the text near the cursor
