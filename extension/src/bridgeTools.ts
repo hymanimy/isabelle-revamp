@@ -6,12 +6,52 @@ import { Goals } from './goals';
 import { encodeSymbols, unicodeSymbols } from './symbols';
 import { hoverText } from './goalLinks';
 import { AgentEdits } from './agentEdits';
+import { Sledgehammer, SledgehammerRun } from './sledgehammer';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
 
 
 export class BridgeTools {
-  constructor(private goals: Goals, private agentEdits: AgentEdits) {}
+  // Finished runs whose result an agent has already received.
+  private delivered = new WeakSet<SledgehammerRun>();
+
+  constructor(private goals: Goals, private agentEdits: AgentEdits, private hammer: Sledgehammer) {}
+
+  // Start sledgehammer at a position, or keep waiting on this agent's run there, for up
+  // to wait_seconds. Only starting needs the editor queue.
+  async sledgehammer(params: Record<string, unknown>, agent: AgentSession,
+    exclusive: <T>(work: () => Promise<T>) => Promise<T>): Promise<unknown> {
+    if (params.cancel === true) {
+      const run = this.hammer.run;
+      if (!run || !this.hammer.active) return { cancelled: false, note: 'No sledgehammer is running.' };
+      if (run.owner !== agent.name) throw new Error(`The running sledgehammer belongs to ${run.owner}; only its owner can cancel it.`);
+      await this.hammer.cancel();
+      await this.hammer.finished(run, 10000);
+      return this.hammerResult(run, agent);
+    }
+    const wait = typeof params.wait_seconds === 'number' && params.wait_seconds >= 0 ? Math.min(params.wait_seconds, 300) : 50;
+    const run = await exclusive(async () => {
+      const document = await this.document(params.file);
+      const position = this.position(document, params.line, params.col);
+      const current = this.hammer.run;
+      if (current && current.owner === agent.name && current.uri === document.uri.toString() && current.line === position.line
+        && (this.hammer.active || !this.delivered.has(current))) return current;
+      return this.hammer.start(document, position.line, position.character, agent.name);
+    });
+    await this.hammer.finished(run, wait * 1000);
+    return this.hammerResult(run, agent);
+  }
+
+  private hammerResult(run: SledgehammerRun, agent: AgentSession) {
+    const finished = run.status === 'finished';
+    if (finished) this.delivered.add(run);
+    const replaced = run.cancelled && this.hammer.run !== run && this.hammer.run?.owner !== agent.name;
+    return { file: Uri.parse(run.uri).fsPath, line: run.line, col: run.character, status: run.status,
+      cancelled: run.cancelled, proofs: run.proofs, messages: run.messages.slice(-40).map(message => message.text),
+      note: replaced ? `${this.hammer.run?.owner ?? 'Someone'} started another sledgehammer, which replaced this run.`
+        : finished ? (run.proofs.length ? 'Use a proof with edit; check it with goals_at or errors.' : 'No proof found.')
+        : 'Still running: call sledgehammer again at the same position to keep waiting, or with cancel: true to stop it.' };
+  }
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');

@@ -7,7 +7,7 @@ const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const root = path.resolve(__dirname, '../..');
-const TOOLS = ['definition', 'edit', 'errors', 'goals_at', 'hover', 'open', 'processing_status', 'sorry_positions', 'status'];
+const TOOLS = ['definition', 'edit', 'errors', 'goals_at', 'hover', 'open', 'processing_status', 'sledgehammer', 'sorry_positions', 'status'];
 
 // An MCP client the way Claude Code starts one: the bundled server on VS Code's Node.js.
 async function agent(name) {
@@ -63,7 +63,7 @@ exports.run = async function () {
   const claude = await agent('claude-code');
   try {
     assert.deepEqual((await claude.listTools()).tools.map(tool => tool.name).sort(), TOOLS);
-    receipt('exactly nine MCP tools');
+    receipt('exactly ten MCP tools');
     const until = async (label, predicate) => {
       let value;
       for (let i = 0; i < 200; i++) {
@@ -154,6 +154,38 @@ exports.run = async function () {
     assert.match(hover.text, /bound "i"/, hover.text);
     assert.equal(hover.text.split('\n').length, new Set(hover.text.split('\n')).size, 'Repeated hover lines: ' + hover.text);
     receipt('hover lists a bounded variable once', hover);
+
+    // Sledgehammer runs as Isabelle's query: the theory is not edited.
+    const hammerFile = path.join(directory, 'Hammer.thy');
+    const hammerSource = 'theory Hammer imports Main begin\nlemma comm: "(a::int) * b + c = c + b * a"\n  sorry\n'
+      + 'lemma fermat3: "(x::nat) ^ 3 + y ^ 3 \\<noteq> z ^ 3 \\<or> x * y * z = 0"\n  sorry\nend\n';
+    fs.writeFileSync(hammerFile, hammerSource);
+    let hammer = await call(claude, 'sledgehammer', { file: hammerFile, line: 1, col: 2, wait_seconds: 55 });
+    assert.equal(hammer.status, 'finished', JSON.stringify(hammer));
+    assert(hammer.proofs.length && hammer.proofs.every(proof => proof.startsWith('by ')), JSON.stringify(hammer));
+    assert.equal(fs.readFileSync(hammerFile, 'utf8'), hammerSource);
+    receipt('sledgehammer returns proofs without editing the theory', hammer);
+    // A hard goal: the call returns while running; other clients go on but cannot start or cancel one.
+    hammer = await call(claude, 'sledgehammer', { file: hammerFile, line: 3, col: 2, wait_seconds: 1 });
+    assert.notEqual(hammer.status, 'finished', JSON.stringify(hammer));
+    const waiting = call(claude, 'sledgehammer', { file: hammerFile, line: 3, col: 2, wait_seconds: 50 });
+    const other = await agent('other-agent');
+    try {
+      const asked = Date.now();
+      assert.equal((await call(other, 'open', { file: hammerFile })).text, hammerSource);
+      assert(Date.now() - asked < 5000, 'A waiting sledgehammer held up another client');
+      await assert.rejects(call(other, 'sledgehammer', { file: hammerFile, line: 1, col: 2 }), /already running for claude-code/);
+      await assert.rejects(call(other, 'sledgehammer', { file: hammerFile, line: 3, col: 2, cancel: true }), /belongs to claude-code/);
+    } finally { await other.close(); }
+    // The user cancels from the editor; the waiting call returns at once.
+    await api.sledgehammer.cancel();
+    hammer = await waiting;
+    assert(hammer.status === 'finished' && hammer.cancelled, JSON.stringify(hammer));
+    // The agent cancels its own run.
+    assert.notEqual((await call(claude, 'sledgehammer', { file: hammerFile, line: 3, col: 2, wait_seconds: 1 })).status, 'finished');
+    hammer = await call(claude, 'sledgehammer', { file: hammerFile, line: 3, col: 2, cancel: true });
+    assert(hammer.status === 'finished' && hammer.cancelled, JSON.stringify(hammer));
+    receipt('a long sledgehammer does not block other calls, refuses other clients and cancels', hammer);
 
     // processing_status checks for at most 5 s and status for 15 s, so a 25 s command is still running.
     await replace(original.replace('proof\n', 'proof\n  ML_prf \\<open>OS.Process.sleep (Time.fromReal 25.0)\\<close>\n'));

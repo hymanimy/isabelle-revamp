@@ -209,7 +209,7 @@ export async function activate(context: ExtensionContext) {
     );
     throw error;
   }
-  bridge = new Bridge(new BridgeTools(goals, agentEdits), () => (workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath));
+  bridge = new Bridge(new BridgeTools(goals, agentEdits, sledgehammer), () => (workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath));
   const published = bridge;
   context.subscriptions.push(workspace.onDidChangeWorkspaceFolders(() => { void published.publish(); }));
   try {

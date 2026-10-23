@@ -78,7 +78,9 @@ class BridgeClient {
       if (Buffer.byteLength(body) > limit) throw new Error('Request exceeds the 2 MiB limit.');
       let reply;
       try {
-        reply = JSON.parse(await this.line(35000, body));
+        // Sledgehammer waits as long as asked, plus time to start behind other agents' calls.
+        const wait = method === 'sledgehammer' ? (typeof params.wait_seconds === 'number' ? params.wait_seconds : 50) * 1000 + 30000 : 0;
+        reply = JSON.parse(await this.line(Math.max(35000, wait), body));
         if (reply.id !== id) throw new Error('response ID mismatch');
       } catch (error) {
         this.drop();
@@ -102,8 +104,8 @@ const server = new McpServer({ name: 'Isabelle Revamp', version }, {
     + 'Never guess a fact name: check it exists with thm NAME, search with find_theorems (a pattern such as "_ * _ = _ * _", or name: part), and check constants and types with term or typ. '
     + 'Run these by inserting the command with edit, reading its output with goals_at, then removing it. '
     + 'To close a goal, first write using with the relevant facts followed by try0, and replace try0 with the method it suggests. '
-    + 'Only if try0 fails and the goal looks within reach of automation, run sledgehammer the same way, with at most two sledgehammer commands in the theories at once. '
-    + 'Sledgehammer can outlast goals_at\'s wait: call goals_at again until a proof or a failure appears.',
+    + 'Only if try0 fails and the goal looks within reach of automation, call the sledgehammer tool at the statement; it does not edit the theory. '
+    + 'Then put a proof it found in place with edit.',
 });
 
 const read = { readOnlyHint: true, openWorldHint: false };
@@ -135,6 +137,8 @@ tool('status', 'Check the theories open in the user\'s tabs and those this clien
   {}, read);
 tool('sorry_positions', 'Check the whole theory (up to 15s per call), then list sorry commands as [start_line,start_col,end_line,end_col] ranges. Ignores comments/strings; complete=false means the list is provisional.',
   { file }, read);
+tool('sledgehammer', 'Run Isabelle\'s sledgehammer on the proof command at a position (e.g. a have or lemma statement; on a sorry, use the statement before it) and wait up to wait_seconds (default 50) for it to finish. The theory is not edited. Returns proofs found so far, such as "by (metis foo bar)", and messages. Isabelle runs one sledgehammer at a time, shared with the user: a call fails while another is running. If still running, call again at the same position to keep waiting; cancel: true stops your run.',
+  { file, line: position, col: position, wait_seconds: z.number().min(0).max(300).optional(), cancel: z.boolean().optional() }, read);
 tool('processing_status', 'Advance checking of the same theories as status (up to 5s each), then report processing/known flags and pending ranges.',
   {}, read);
 

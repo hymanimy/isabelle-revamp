@@ -72,12 +72,18 @@ export class Bridge {
             agent ??= { name: typeof request.client_name === 'string'
               && request.client_name.replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 40) || 'MCP agent', versions: new Map() };
             const session = agent;
-            const operation = this.operations.then(() => {
-              if (socket.destroyed) throw new Error('Client disconnected before the operation started.');
-              return this.tools.call(request.method, request.params, session);
-            });
-            this.operations = operation.then(() => {}, () => {});
-            send({ id, result: await operation });
+            const exclusive = <T>(work: () => Promise<T>): Promise<T> => {
+              const operation = this.operations.then(() => {
+                if (socket.destroyed) throw new Error('Client disconnected before the operation started.');
+                return work();
+              });
+              this.operations = operation.then(() => {}, () => {});
+              return operation;
+            };
+            // Sledgehammer waits for its result outside the queue, so other calls go on meanwhile.
+            send({ id, result: await (request.method === 'sledgehammer'
+              ? this.tools.sledgehammer(request.params, session, exclusive)
+              : exclusive(() => this.tools.call(request.method, request.params, session))) });
           } catch (error) {
             send({ id, error: error instanceof Error ? error.message : String(error) });
           }
