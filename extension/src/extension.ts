@@ -19,6 +19,7 @@ import { findIsabelle, isabelleVersion, mcpLaunch, onPath, registerWithClaude, s
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
 import { Outline } from './outline';
+import { LemmaStatus } from './lemmaStatus';
 import { Sledgehammer } from './sledgehammer';
 import { SledgehammerUi } from './sledgehammerUi';
 import { applySuggestion, withSuggestionLinks } from './tryButtons';
@@ -171,7 +172,8 @@ export async function activate(context: ExtensionContext) {
   goals = new Goals(client, view, settings.outputDelay);
   const semanticColors = new SemanticColors(goals);
   const statusDecorations = new StatusDecorations(goals);
-  context.subscriptions.push(semanticColors, statusDecorations);
+  const lemmaStatus = new LemmaStatus(goals, context.extensionPath);
+  context.subscriptions.push(semanticColors, statusDecorations, lemmaStatus);
   const sledgehammer = new Sledgehammer(client, goals);
   const sledgehammerUi = new SledgehammerUi(sledgehammer, view, () => window.activeTextEditor ?? visibleTheory());
   context.subscriptions.push(sledgehammer, sledgehammerUi);
@@ -235,6 +237,7 @@ export async function activate(context: ExtensionContext) {
     hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),
     getScriptDecorations: () => window.activeTextEditor ? visibleScripts(window.activeTextEditor) : [],
     getAbbreviations: () => symbolInput.snapshot(),
+    getLemmaStatus: () => window.activeTextEditor ? lemmaStatus.snapshot(window.activeTextEditor) : [],
     getStatusDecorations: () => window.activeTextEditor ? statusDecorations.snapshot(window.activeTextEditor) : {},
     getSemanticColors: () => window.activeTextEditor ? semanticColors.snapshot(window.activeTextEditor.document) : [],
     getPrettySymbols: () => window.activeTextEditor ? prettySymbols.snapshot(window.activeTextEditor) : [] };

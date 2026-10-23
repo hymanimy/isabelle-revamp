@@ -42,6 +42,7 @@ async function run() {
   await checkCartouches(root,api);
   await checkGoalLinks(root,api);
   await checkOutline(root);
+  await checkLemmaStatus(root,api);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
@@ -55,6 +56,46 @@ async function checkOutline(root) {
   const [theorem] = symbols;
   assert.deepEqual([theorem.range.start.line,theorem.range.end.line,theorem.selectionRange.start.character],[6,50,8]);
   console.log('PASS: outline lists the theorem without the theory, and its range covers the proof');
+}
+
+// Gutter marks: a tick when checked, a ring for sorry, a cross for an error.
+async function checkLemmaStatus(root,api) {
+  const file = path.join(root,'.dev-host/m10-fixture/Status.thy');
+  fs.writeFileSync(file,'theory Status imports Main begin\n\nlemma fine: "x = x"\n  by simp\n\n'
+    + 'definition double :: "nat \\<Rightarrow> nat" where "double n = 2 * n"\n\n'
+    + 'lemma later: "double 2 = 4"\n  sorry\n\nlemma wrong: "(1::nat) = 2"\n  by simp\n\nend\n');
+  const doc = await vscode.workspace.openTextDocument(file);
+  const editor = await vscode.window.showTextDocument(doc);
+  const until = async (expected, label) => {
+    let marks;
+    for (let i = 0; i < 300; i++) {
+      marks = api.getLemmaStatus();
+      if (JSON.stringify(marks) === JSON.stringify(expected)) return;
+      await pause(100);
+    }
+    assert.fail(label + ': ' + JSON.stringify(marks));
+  };
+  await until([[2,'checked'],[5,'checked'],[7,'unfinished'],[10,'error']],'marks for checked, sorry and error');
+  const wrong = doc.lineAt(10).text.indexOf('= 2') + 2;
+  await editor.edit(edit => edit.replace(new vscode.Range(10,wrong,10,wrong+1),'1'));
+  // A tick only once the fix is checked: never while the old error still stands.
+  const seen = [];
+  const watch = setInterval(() => seen.push(JSON.stringify(api.getLemmaStatus().find(([line]) => line === 10))), 20);
+  await until([[2,'checked'],[5,'checked'],[7,'unfinished'],[10,'checked']],'a fixed lemma is checked');
+  clearInterval(watch);
+  // After the fix, the mark may stay a cross, then go, then tick: never cross again after a tick.
+  const states = seen.map(item => item && JSON.parse(item)[1]);
+  assert(!states.slice(states.indexOf('checked')).includes('error'), states.join());
+  // Breaking a checked lemma: once its tick goes, it must not come back before the cross.
+  const broken = [];
+  const watchBreak = setInterval(() => broken.push(api.getLemmaStatus().find(([line]) => line === 2)?.[1] ?? 'none'), 20);
+  await editor.edit(edit => edit.replace(new vscode.Range(3,5,3,9),'(rule TrueI)'));
+  await until([[2,'error'],[5,'checked'],[7,'unfinished'],[10,'checked']],'a broken lemma shows a cross');
+  clearInterval(watchBreak);
+  const left = broken.findIndex(state => state !== 'checked');
+  assert(left < 0 || !broken.slice(left, broken.indexOf('error')).includes('checked'), broken.join());
+  await doc.save();
+  console.log('PASS: gutter marks show checked, sorry and failed lemmas, and follow a fix');
 }
 
 async function checkColors(root,api) {

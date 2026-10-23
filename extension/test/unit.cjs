@@ -158,9 +158,26 @@ function checkSledgehammerOutput() {
   console.log('PASS: sledgehammer output becomes messages with symbols and entities decoded');
 }
 
+function checkLemmaStatus() {
+  const { lemmaState, markedItems } = require('../out/lemmaStatus');
+  const { outline } = require('../out/outline');
+  const lemma = [2, 0, 5, 9];
+  const none = { errors: [], busy: [], admissions: [] };
+  assert.equal(lemmaState(lemma, none), 'checked');
+  assert.equal(lemmaState(lemma, { ...none, admissions: [[4, 2, 4, 7]] }), 'unfinished');
+  assert.equal(lemmaState(lemma, { ...none, admissions: [[4, 2, 4, 7]], errors: [[3, 4, 3, 9]] }), 'error', 'An error wins');
+  assert.equal(lemmaState(lemma, { ...none, admissions: [[4, 2, 4, 7]], busy: [[5, 2, 5, 9]] }), undefined, 'Unchecked text: no mark yet');
+  assert.equal(lemmaState(lemma, { ...none, errors: [[6, 0, 6, 3]], busy: [[0, 0, 2, 0]], admissions: [[5, 9, 6, 0]] }), 'checked',
+    'Ranges that only touch its ends are outside');
+  const items = markedItems(outline('theory T imports Main begin\nsection ‹S›\nlemma a: "x" sorry\ncontext begin\ndefinition f where "f = 0"\nend\nend\n'));
+  assert.deepEqual(items.map(item => item.name), ['a', 'f'], 'Lemmas and definitions at any depth; not sections or blocks');
+  console.log('PASS: lemma status prefers errors, waits for unchecked text, then tells sorry from checked');
+}
+
 (async () => {
   checkTheoryHeader();
   checkOutline();
+  checkLemmaStatus();
   checkSuggestions();
   checkSledgehammerOutput();
   checkWindowChoice();

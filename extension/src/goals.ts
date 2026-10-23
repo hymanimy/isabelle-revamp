@@ -16,7 +16,7 @@ const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const stateGrace = 400;
 
 // PIDE/decoration messages are deltas: omitted entries retain their old value.
-const busyTypes = new Set([
+export const busyTypes = new Set([
   'background_unprocessed1', 'background_running1', 'background_canceled',
   'text_overview_unprocessed', 'text_overview_running',
 ]);
@@ -78,6 +78,8 @@ export class Goals implements Disposable {
   private confirmedVersions = new Map<string, number>();
   private annotatedVersions = new Map<string, number>();
   private changedAt = new Map<string, number>();
+  // When a full decoration snapshot, listing every type, last arrived for a file.
+  private snapshotAt = new Map<string, number>();
   private busySnapshots = new Map<string, string>();
   private verifyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private subscriptions: Disposable[] = [];
@@ -128,6 +130,7 @@ export class Goals implements Disposable {
           if (version !== undefined && version === this.versions.get(message.uri)) {
             this.annotatedVersions.set(message.uri, version);
           }
+          this.snapshotAt.set(message.uri, Date.now());
           this.verifySnapshot(message.uri, ranges);
         }
         if (message.uri === this.caret?.uri) {
@@ -506,6 +509,24 @@ export class Goals implements Disposable {
   sorryPositions(document: TextDocument): SourceRange[] {
     return (this.badRanges.get(document.uri.toString()) ?? [])
       .filter(range => document.getText(new Range(...range)) === 'sorry');
+  }
+
+  // Whether a full decoration snapshot arrived after the last edit, so the ranges
+  // describe this version up to the latest deltas. Enough for marks that may lag a
+  // moment; completion claims need processing().known, which a proof state confirms.
+  decorationsCurrent(document: TextDocument): boolean {
+    const uri = document.uri.toString(), seen = this.versions.get(uri);
+    return (seen === undefined || seen === document.version) && (this.snapshotAt.get(uri) ?? 0) > (this.changedAt.get(uri) ?? 0);
+  }
+
+  requestDecorations(document: TextDocument): void {
+    if (this.available) this.refreshDecorations(document.uri.toString());
+  }
+
+  // sorry and oops, which the server marks like failed commands.
+  admissionPositions(document: TextDocument): SourceRange[] {
+    return (this.badRanges.get(document.uri.toString()) ?? [])
+      .filter(range => /^(sorry|oops)$/.test(document.getText(new Range(...range))));
   }
 
   caretPosition(): { uri: string; line: number; character: number } | undefined {

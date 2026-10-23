@@ -26,6 +26,9 @@ of the language server that ships with Isabelle (`isabelle vscode_server`).
    in place of the `sorry`. When `try0`,
    `try` or `sledgehammer` finds a proof, apply it from the hover over the
    command or by clicking it in Goals; a `sorry` right after it goes too.
+   Once Isabelle has checked a lemma, definition or type, a mark appears
+   beside it: a tick when it is done, an amber ring when it contains `sorry`
+   or `oops`, a cross when it has an error (setting `isabelleRevamp.lemmaStatus`).
    As in Isabelle/jEdit, running commands are highlighted purple, unchecked
    text pink and failed text red; the colours are theme colours
    (`isabelle.runningBackground` and others) you can change in

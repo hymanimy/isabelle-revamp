@@ -130,6 +130,12 @@
           "scope": "resource",
           "description": "Highlight MCP edits in editors that show the file, without scrolling or moving your caret: new text is highlighted for 2 seconds, with the agent's name for 3 seconds."
         },
+        "isabelleRevamp.lemmaStatus": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Mark each lemma, definition and type in the gutter once Isabelle has checked it: a tick when it is checked, an amber ring when it contains sorry or oops, a cross when it has an error."
+        },
         "isabelleRevamp.prettySymbols": {
           "type": "boolean",
           "default": true,

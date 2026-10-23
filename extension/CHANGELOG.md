@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A mark beside each lemma, definition and type once Isabelle has checked it:
+  a tick when it is done, an amber ring when it contains `sorry` or `oops`, a
+  cross when it has an error. Hover over the keyword for details. Turn off with
+  `isabelleRevamp.lemmaStatus`.
 - **Isabelle: Sledgehammer** runs Isabelle's own sledgehammer at the cursor,
   as in jEdit's Sledgehammer panel, without editing the theory: from the ⚡
   button on Goals, the editor's context menu or the command palette. Proofs
