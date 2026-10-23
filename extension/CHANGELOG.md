@@ -2,14 +2,21 @@
 
 ## Unreleased
 
+- **Isabelle: Sledgehammer** runs Isabelle's own sledgehammer at the cursor,
+  as in jEdit's Sledgehammer panel, without editing the theory: from the ⚡
+  button on Goals, the editor's context menu or the command palette. Proofs
+  appear in Goals as they arrive; a click puts one in place of the following
+  `sorry`. A status bar spinner shows the run; click it to cancel.
+- MCP: a `sledgehammer` tool runs the same query for agents and waits for its
+  proofs. You and agents share one run, as Isabelle allows only one at a time.
 - The Outline view, breadcrumbs and Go to Symbol in Editor (Ctrl+Shift+O) list
   a theory's sections, lemmas, definitions, types, locales and contexts,
   nested as in the theory. A lemma's entry covers its proof.
 - Hover shows each line once. Isabelle reported the variable of a bounded
   quantifier, as in `∀i < n. P`, twice, so every line of its hover appeared twice.
 - The MCP server tells agents to check fact names with `thm` and
-  `find_theorems` instead of guessing, to try `using … try0` before
-  sledgehammer, and to run at most two sledgehammer commands at once.
+  `find_theorems` instead of guessing, and to try `using … try0` before
+  sledgehammer.
 
 ## 0.2.3 (2026-10-20)
 

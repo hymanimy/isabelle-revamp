@@ -1,7 +1,7 @@
 # Isabelle MCP
 
 An MCP server that lets an agent such as Claude Code work in the same Isabelle
-session as you: read theories, see goals, edit, and check. It exposes nine
+session as you: read theories, see goals, edit, and check. It exposes ten
 tools and never launches a second prover; it forwards each call to the VS Code
 window running the extension.
 
@@ -74,6 +74,7 @@ range ends are exclusive. A BMP symbol uses one column; an emoji uses two.
 | `errors(file)` | Returns error messages/ranges, `has_errors`, and `complete`. `complete=false` means an empty or partial list is inconclusive. |
 | `status()` | Returns per-file checking/error/unfinished/fully_checked states and an aggregate `fully_checked` flag, for the theories open in the user's tabs plus those this client has read or edited. |
 | `sorry_positions(file)` | Returns server-marked `[start_line,start_col,end_line,end_col]` ranges and a `complete` flag. Comments and strings containing the word are ignored. |
+| `sledgehammer(file, line, col, wait_seconds?, cancel?)` | Runs Isabelle's own sledgehammer query on the command at the position, as jEdit's Sledgehammer panel does: the theory is not edited, saved or re-checked. Waits up to `wait_seconds` (default 50) and returns `status` (`waiting`, `running` or `finished`), `proofs` such as `by (metis foo bar)`, `messages` and a `note`. Isabelle runs one sledgehammer at a time, shared with the user, so a call fails while another owner's run is active. A repeat call at the same position keeps waiting on the same run; `cancel: true` stops the caller's own run. Only starting a run takes the editor queue, so other clients go on while an agent waits. The run also shows in the user's Goals panel. |
 | `processing_status()` | Returns per-file `known`, `processed`, `processing`, version, and pending ranges; the top-level `processing` flag is true if any open theory is pending. |
 
 `sorry_positions` and `processing_status` follow the purposes of I/Q's `get_sorry_positions` and
@@ -133,7 +134,7 @@ mechanism.
 npm run test:integration --prefix extension -- mcp,agentEdits
 ```
 
-This starts the bundled server the way Claude Code does and drives all nine
+This starts the bundled server the way Claude Code does and drives all ten
 tools through the MCP SDK's client against VS Code and Isabelle: it replaces a
 `sorry` with a complete proof in a disposable copy of the sqrt-2 fixture, and
 checks goals, messages, hover, definitions, completion, errors, processing, authentication and file
@@ -190,40 +191,41 @@ proofs and runs sledgehammer and find_theorems. A VS Code extension reaches
 Isabelle only through the requests its language server offers, so here each of
 those needs either the edit loop or a change to Isabelle's VS Code server. This
 server starts with the essentials and grows as real use shows which tools are
-worth that work (see [Parked: dedicated query tools](#parked-dedicated-query-tools)).
+worth that work (see [Query tools: built and parked](#query-tools-built-and-parked)).
 For an agent working alone, without an editor open, use PIDE MCP; it can run
 beside this server.
 
-## Parked: dedicated query tools
+## Query tools: built and parked
 
-Agents can already run `try0`, `sledgehammer`, `find_theorems`, `term` and `thm`
-by writing the command with `edit`, reading the result with `goals_at`, and
-editing again. Dedicated tools were considered on 2026-10-20 and parked: they
-would add convenience, not capability. Revisit if agents struggle with that loop.
-(`hover` and `definition` were built the same day: they come straight from the
-language server and catch misspelt constants, which become free variables.)
+Agents can run `try0`, `find_theorems`, `term` and `thm` by writing the command
+with `edit`, reading the result with `goals_at`, and editing again. The server's
+`instructions` in `extension/src/mcpServer.ts` describe this loop: check fact
+names with `thm` and `find_theorems` rather than guessing them, try
+`using … try0` first, and call the `sledgehammer` tool only after that.
 
-What dedicated tools would add over the edit loop:
+Dedicated tools were considered on 2026-10-20. `hover` and `definition` were
+built that day: they come straight from the language server and catch misspelt
+constants, which become free variables. `sledgehammer` was built on 2026-10-23
+on the server's native `PIDE/sledgehammer_request`, which also gives the editor
+its Sledgehammer command and Goals results. Isabelle's server holds one such
+query at a time, so the user and all agents share one run; the tool refuses
+rather than replace someone else's.
+
+What a dedicated tool adds over the edit loop:
 
 - The user's file is never touched: no temporary edits, saves or undo entries,
-  and no stray `sledgehammer` left if the agent stops partway.
+  and no stray command left if the agent stops partway.
 - No re-checking of everything after the inserted command, which the edit loop
   causes twice.
 - No stale-version rejections when the user is typing in the same file.
-- Structured results and one call that waits for completion. Sledgehammer can
-  outlast `goals_at`'s 30 s wait; how `goals_at` behaves mid-run is untested.
+- Structured results and one call that waits for completion.
 
-Per tool, against Isabelle2025-2's VS Code server:
+The rest, against Isabelle2025-2's VS Code server:
 
 | Tool | Effort | Notes |
 |---|---|---|
-| sledgehammer | about a day | Native `PIDE/sledgehammer_request` (streamed output, cancel), so no file edit. Runs at Isabelle's single cursor, so the user's Goals panel waits while it runs. The same plumbing would give the editor a Sledgehammer panel. Build this one first. |
 | try0 | not worth it | No server request; a tool could only wrap the edit loop. |
 | find_theorems | 1–3 days, uncertain | No server support. Either patch the Scala server (a fork to maintain) or check a hidden scratch theory importing the current one (theory-level facts only; needs an experiment). The edit loop already works and sees local facts. |
-
-The server's `instructions` in `extension/src/mcpServer.ts` describe this loop:
-check fact names with `thm` and `find_theorems` rather than guessing them, try
-`using … try0` first, and run sledgehammer only after that, at most two at once.
 
 Trying a command without touching the document is possible from inside
 Isabelle's process: I/Q's `explore` does it as a jEdit plugin. Here it would need

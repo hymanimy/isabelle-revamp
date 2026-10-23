@@ -19,7 +19,11 @@ of the language server that ships with Isabelle (`isabelle vscode_server`).
    automatically. **Isabelle: Show Theories** lists each open theory and the
    theories it imports, with the prover's progress on each. The Outline view,
    breadcrumbs and **Go to Symbol in Editor** (Ctrl+Shift+O) list the theory's
-   sections, lemmas, definitions and types. When `try0`,
+   sections, lemmas, definitions and types. **Isabelle: Sledgehammer** (the ⚡
+   button on Goals, or the editor's context menu) runs sledgehammer at the
+   cursor without editing the theory; on a `sorry` it runs on the statement
+   before it. Its proofs appear in Goals as they arrive: click one to put it
+   in place of the `sorry`. When `try0`,
    `try` or `sledgehammer` finds a proof, apply it from the hover over the
    command or by clicking it in Goals; a `sorry` right after it goes too.
    As in Isabelle/jEdit, running commands are highlighted purple, unchecked
@@ -42,8 +46,10 @@ same goals, errors and edits you see, in the same Isabelle session. Run
 your theory folder. The server runs on VS Code's own Node.js and never moves
 your cursor or scrolls your editor.
 
-The extension uses the unmodified Isabelle language server. It never runs
-Sledgehammer automatically. Source:
+Agents get a `sledgehammer` tool too. Isabelle runs one sledgehammer at a time,
+so yours and the agent's share it: you are asked before replacing an agent's
+run, and an agent cannot replace yours. The extension uses the unmodified
+Isabelle language server and never runs Sledgehammer automatically. Source:
 [hymanimy/isabelle-revamp](https://github.com/hymanimy/isabelle-revamp).
 
 MIT licensed; see THIRD_PARTY_NOTICES.md for bundled code and Isabelle notices.
