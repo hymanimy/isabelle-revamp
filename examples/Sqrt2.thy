@@ -1,27 +1,53 @@
 theory Sqrt2
-  imports Complex_Main "HOL-Computational_Algebra.Primes"
+  imports Complex_Main
 begin
 
-text \<open>Euclid: for every bound n, a prime factor of n! + 1 lies above n.\<close>
+text \<open>A reduced fraction cannot have both numerator and denominator even.\<close>
 
-lemma fact_succ_ne_one: "fact n + 1 \<noteq> (1 :: nat)"
-  by simp
+theorem sqrt2_irrational: "sqrt (2 :: real) \<notin> \<rat>"
+proof
+  assume rational: "sqrt (2 :: real) \<in> \<rat>"
+  then obtain m n :: nat
+    where denominator: "n \<noteq> 0"
+      and fraction: "\<bar>sqrt (2 :: real)\<bar> = m / n"
+      and reduced: "coprime m n"
+    by (rule Rats_abs_nat_div_natE)
 
-lemma fact_succ_has_prime_factor: "\<exists>p. prime p \<and> p dvd fact n + (1 :: nat)"
-  using fact_succ_ne_one prime_factor_nat by blast
+  text \<open>Clear the denominator and square the equation.\<close>
+  have root_squared: "(sqrt (2 :: real)) ^ 2 = 2"
+    by simp
+  have scaled: "(m :: real) = sqrt 2 * n"
+    using denominator fraction by simp
+  have squared_real: "(m :: real) ^ 2 = 2 * (n :: real) ^ 2"
+    using scaled root_squared by (simp add: power_mult_distrib)
+  have squared: "m ^ 2 = 2 * n ^ 2"
+    using squared_real by (simp flip: of_nat_mult of_nat_power)
 
-lemma small_prime_dvd_fact: "prime p \<Longrightarrow> p \<le> n \<Longrightarrow> p dvd fact (n :: nat)"
-  using prime_gt_0_nat[of p] dvd_fact[of p n] try0
-  sorry
+  text \<open>An even square has an even root, so write the numerator as twice k.\<close>
+  have numerator_even: "even m"
+  proof -
+    have numerator_square_even: "even (m ^ 2)" using squared by simp
+    then show even_numerator: ?thesis by simp
+  qed
+  then obtain k :: nat where numerator: "m = 2 * k"
+    by (auto elim: evenE)
 
-lemma prime_factor_above_bound: "prime p \<Longrightarrow> p dvd fact n + 1 \<Longrightarrow> n < (p :: nat)"
-  using small_prime_dvd_fact[of p n] dvd_add_right_iff[of p "fact n" 1] not_le by fastforce
+  text \<open>Substitution forces the denominator to be even as well.\<close>
+  have denominator_squared: "n ^ 2 = 2 * k ^ 2"
+    using squared numerator by (simp add: power2_eq_square)
+  have denominator_even: "even n"
+  proof -
+    have denominator_square_even: "even (n ^ 2)" using denominator_squared by simp
+    then show even_denominator: ?thesis by simp
+  qed
 
-lemma prime_above_bound: "\<exists>p. prime p \<and> n < (p :: nat)"
-  using fact_succ_has_prime_factor prime_factor_above_bound by blast
-
-theorem infinitely_many_primes: "infinite {p :: nat. prime p}"
-  using prime_above_bound finite_nat_set_iff_bounded try0
-  sorry
+  text \<open>But a common factor of two contradicts the fraction being reduced.\<close>
+  have common_factor: "2 dvd gcd m n"
+    using numerator_even denominator_even by simp
+  have impossible: "(2 :: nat) dvd 1"
+    using common_factor reduced by simp
+  then show contradiction: False
+    by simp
+qed
 
 end
