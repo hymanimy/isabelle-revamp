@@ -89,8 +89,62 @@ function checkSuggestions() {
   console.log('PASS: try0/sledgehammer suggestions parse, and replace their command plus a following sorry');
 }
 
+function checkOutline() {
+  const { outline } = require('../out/outline');
+  const source = String.raw`(* lemma in_comment: "x" *)
+theory Demo imports Main begin
+section \<open>Basics\<close>
+datatype ('a, 'b) tree = Leaf | Node "('a, 'b) tree"
+definition double :: "nat \<Rightarrow> nat" where "double n = 2 * n"
+definition "triple n = 3 * (n::nat)"
+definition [simp]: "quad n = 4 * (n::nat)"
+lemma double_twice [simp]: "double (double n) = 4 * n"
+  text \<open>An indented text stays in the proof: lemma not_here\<close>
+  by (simp add: double_def)
+text\<open>A glued cartouche: lemma not_here\<close>
+subsection \<open>Unnamed\<close>
+lemma "x \<in> {x}" by simp
+lemma assumes "P" shows "P \<or> Q" using assms by simp
+section \<open>Groups\<close>
+locale semi = fixes f :: "'a \<Rightarrow> 'a \<Rightarrow> 'a"
+locale monoid = semi + fixes z begin
+lemma (in -) outside: "True" by simp
+end
+context monoid begin
+lemma inside: "f z z = f z z" ..
+end
+instantiation nat :: semi begin instance .. end
+lemma after: "True" by simp
+end
+`;
+  const lines = source.split('\n');
+  const line = (offset, text = source) => text.slice(0, offset).split('\n').length - 1;
+  const tree = (items, text = source) => items.map(item => [item.name, item.detail, line(item.start, text), line(item.end, text),
+    ...(item.children.length ? [tree(item.children, text)] : [])]);
+  const of = text => tree(outline(text), text);
+  assert.deepEqual(of(source), [['Demo', 'theory', 1, 24, [
+    ['Basics', '', 2, 13, [
+      ['tree', 'datatype', 3, 3], ['double', 'definition', 4, 4], ['triple', 'definition', 5, 5], ['quad', 'definition', 6, 6],
+      ['double_twice', 'lemma', 7, 9],
+      ['Unnamed', '', 11, 13, [['x ∈ {x}', 'lemma', 12, 12], ['P ∨ Q', 'lemma', 13, 13]]]]],
+    ['Groups', '', 14, 23, [
+      ['semi', 'locale', 15, 15],
+      ['monoid', 'locale', 16, 18, [['outside', 'lemma', 17, 17]]],
+      ['monoid', 'context', 19, 21, [['inside', 'lemma', 20, 20]]],
+      ['nat :: semi', 'instantiation', 22, 22],
+      ['after', 'lemma', 23, 23]]]]]]);
+  const [item] = outline(source)[0].children[0].children.slice(4);
+  assert.equal(source.slice(item.nameStart, item.nameEnd), 'double_twice');
+  assert.equal(lines[line(item.end)].trim(), 'by (simp add: double_def)', 'A lemma covers its proof');
+  const fixture = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures/Sqrt2.thy'), 'utf8');
+  assert.deepEqual(of(fixture), [['Sqrt2', 'theory', 0, 52, [['sqrt2_irrational', 'theorem', 6, 50]]]]);
+  assert.deepEqual(of('theory Half imports Main begin\nlemma open_proof: "x"\n  proof'), [['Half', 'theory', 0, 2, [['open_proof', 'lemma', 1, 2]]]]);
+  console.log('PASS: outline nests sections and begin…end blocks, names lemmas, definitions and types, and skips comments and cartouches');
+}
+
 (async () => {
   checkTheoryHeader();
+  checkOutline();
   checkSuggestions();
   checkWindowChoice();
   checkLastProofLine();

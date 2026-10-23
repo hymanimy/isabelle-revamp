@@ -17,7 +17,9 @@ of the language server that ships with Isabelle (`isabelle vscode_server`).
    choose **… → Install from VSIX…**.
 3. Open a folder containing your `.thy` files, then open a theory. Goals opens
    automatically. **Isabelle: Show Theories** lists each open theory and the
-   theories it imports, with the prover's progress on each. When `try0`,
+   theories it imports, with the prover's progress on each. The Outline view,
+   breadcrumbs and **Go to Symbol in Editor** (Ctrl+Shift+O) list the theory's
+   sections, lemmas, definitions and types. When `try0`,
    `try` or `sledgehammer` finds a proof, apply it from the hover over the
    command or by clicking it in Goals; a `sorry` right after it goes too.
    As in Isabelle/jEdit, running commands are highlighted purple, unchecked

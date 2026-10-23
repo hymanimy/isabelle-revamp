@@ -41,9 +41,22 @@ async function run() {
   await checkGoalMarkup(root,api);
   await checkCartouches(root,api);
   await checkGoalLinks(root,api);
+  await checkOutline(root);
 };
 
 exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync(path.resolve(__dirname,'../../.dev-host/m10-failure.txt'),String(error.stack ?? error)); console.error(error); throw error; } };
+
+// Outline, breadcrumbs and Ctrl+Shift+O all read the document symbols.
+async function checkOutline(root) {
+  const doc = await vscode.workspace.openTextDocument(path.join(root,'extension/test/fixtures/Sqrt2.thy'));
+  const symbols = await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider',doc.uri);
+  assert.deepEqual(symbols.map(symbol=>[symbol.name,symbol.detail,symbol.kind]),[['Sqrt2','theory',vscode.SymbolKind.Module]]);
+  const [theorem] = symbols[0].children;
+  assert.equal(theorem.name,'sqrt2_irrational');
+  assert.equal(theorem.kind,vscode.SymbolKind.Method);
+  assert.deepEqual([theorem.range.start.line,theorem.range.end.line,theorem.selectionRange.start.character],[6,50,8]);
+  console.log('PASS: outline lists the theory and its theorem, whose range covers the proof');
+}
 
 async function checkColors(root,api) {
   const file = path.join(root,'.dev-host/m10-fixture/Colours.thy');

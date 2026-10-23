@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The Outline view, breadcrumbs and Go to Symbol in Editor (Ctrl+Shift+O) list
+  a theory's sections, lemmas, definitions, types, locales and contexts,
+  nested as in the theory. A lemma's entry covers its proof.
 - Hover shows each line once. Isabelle reported the variable of a bounded
   quantifier, as in `∀i < n. P`, twice, so every line of its hover appeared twice.
 - The MCP server tells agents to check fact names with `thm` and

@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { commands, ConfigurationTarget, DiagnosticSeverity, env, ExtensionContext, TabInputText, Uri, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, DiagnosticSeverity, env, ExtensionContext, languages, TabInputText, Uri, window, workspace } from 'vscode';
 import { LanguageClient, ServerOptions, State } from 'vscode-languageclient/node';
 import { Goals } from './goals';
 import { GoalsView } from './goalsView';
@@ -18,6 +18,7 @@ import { distinctHover, GoalLinks } from './goalLinks';
 import { findIsabelle, isabelleVersion, mcpLaunch, onPath, registerWithClaude, setupReport, versionWarning } from './setup';
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
+import { Outline } from './outline';
 import { applySuggestion, withSuggestionLinks } from './tryButtons';
 
 // Minimal startup adapted from Isabelle2025-2:
@@ -38,7 +39,9 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(output, view,
     window.registerWebviewViewProvider('isabelleRevamp.goals', view),
     commands.registerCommand('isabelleRevamp.showGoals', () =>
-      commands.executeCommand('isabelleRevamp.goals.focus')));
+      commands.executeCommand('isabelleRevamp.goals.focus')),
+    // Read from the source, so the outline works before and without Isabelle.
+    languages.registerDocumentSymbolProvider({ language: 'isabelle' }, new Outline(), { label: 'Isabelle' }));
 
   const currentSettings = () => serverSettings(workspace.getConfiguration('isabelleRevamp'), workspace.workspaceFolders?.[0]?.uri.fsPath);
   const locate = () => findIsabelle(workspace.getConfiguration('isabelleRevamp').get<string>('executable', 'isabelle'));

@@ -57,7 +57,8 @@ async function run() {
   const notices = [], commands = new Map(), called = [], state = new Map(), providers = [];
   const disposable = { dispose() {} };
   const vscode = {
-    SemanticTokensLegend: class {}, ThemeColor: class {}, OverviewRulerLane: {},
+    SemanticTokensLegend: class {}, ThemeColor: class {}, OverviewRulerLane: {}, SymbolKind: {},
+    languages: { registerDocumentSymbolProvider: selector => { providers.push('outline:' + selector.language); return disposable; } },
     window: { visibleTextEditors: [], createOutputChannel: () => ({ ...disposable, show() {}, appendLine() {} }),
       registerWebviewViewProvider: name => { providers.push(name); return disposable; },
       showInformationMessage: async (...args) => { notices.push(args); },
@@ -83,7 +84,7 @@ async function run() {
     assert.deepEqual(notices[0], ['Isabelle not found', 'Locate…', 'Download']);
     assert(called.includes('isabelleRevamp.showGoals'));
     assert(commands.has('isabelleRevamp.setupCheck'));
-    assert.deepEqual(providers, ['isabelleRevamp.goals']);
+    assert.deepEqual(providers, ['isabelleRevamp.goals', 'outline:isabelle'], 'The outline needs no Isabelle');
     await extension.deactivate();
   } finally { Module._load = load; }
   console.log('PASS: discovery priority, setup fixes, MCP registration replacing older installs, one missing-Isabelle notification and first-theory Goals');

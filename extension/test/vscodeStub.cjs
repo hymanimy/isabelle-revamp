@@ -14,7 +14,8 @@ class EventEmitter {
 }
 class ThemeColor { constructor(id) { this.id = id; } }
 const vscode = { Position, Range, EventEmitter, ThemeColor, OverviewRulerLane: { Left: 1, Center: 2, Right: 4, Full: 7 },
-  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 } };
+  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+  SymbolKind: { Module: 1, Namespace: 2, Class: 4, Method: 5, Enum: 9, Interface: 10, Function: 11, Constant: 13, String: 14, Object: 18, Struct: 22 } };
 if (!Module._load.vscodeStub) {
   const load = Module._load;
   Module._load = function (name, ...rest) { return name === 'vscode' ? vscode : load.call(this, name, ...rest); };
