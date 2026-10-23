@@ -86,7 +86,14 @@ function checkSuggestions() {
   assert.deepEqual(suggestionRange(lines, 5, 33, 'by blast'), { start: [5, 18], end: [5, 35] }, 'The command at the position');
   assert.deepEqual(suggestionRange(lines, 5, 2, 'by blast'), { start: [5, 13], end: [5, 17] }, 'Else the first on the line');
   assert.equal(suggestionRange(lines, 0, 3, 'by simp'), undefined);
-  console.log('PASS: try0/sledgehammer suggestions parse, and replace their command plus a following sorry');
+  const { sledgehammerTarget, proofEdit } = require('../out/suggestions');
+  const proof = ['lemma comm: "a + b = b + (a::nat)"', '  sorry', '  have "x"', '    sorry', 'lemma l2: "x"'];
+  assert.deepEqual(sledgehammerTarget(proof, 1, 4), [0, 33], 'On a sorry: the statement before it');
+  assert.deepEqual(sledgehammerTarget(proof, 0, 3), [0, 3], 'Elsewhere: the cursor itself');
+  assert.deepEqual(proofEdit(proof, 0, 34, 'by simp'), { start: [1, 2], end: [1, 7], text: 'by simp' }, 'A terminal proof replaces the sorry');
+  assert.deepEqual(proofEdit(proof, 2, 10, 'apply auto'), { start: [2, 10], end: [2, 10], text: '\n    apply auto' }, 'Else a new line, one step in');
+  assert.deepEqual(proofEdit(proof, 4, 13, 'by blast'), { start: [4, 13], end: [4, 13], text: '\n  by blast' });
+  console.log('PASS: try0/sledgehammer suggestions parse, and replace their command plus a following sorry; sledgehammer targets and placement');
 }
 
 function checkOutline() {

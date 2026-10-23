@@ -29,7 +29,8 @@
     "onCommand:isabelleRevamp.showGoals",
     "onCommand:isabelleRevamp.setupCheck",
     "onView:isabelleRevamp.theories",
-    "onCommand:isabelleRevamp.registerMcp"
+    "onCommand:isabelleRevamp.registerMcp",
+    "onCommand:isabelleRevamp.sledgehammer"
   ],
   "scripts": {
     "compile": "tsc -p .",
@@ -78,6 +79,15 @@
       {
         "command": "isabelleRevamp.registerMcp",
         "title": "Isabelle: Register MCP Server with Claude Code"
+      },
+      {
+        "command": "isabelleRevamp.sledgehammer",
+        "title": "Isabelle: Sledgehammer",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "isabelleRevamp.cancelSledgehammer",
+        "title": "Isabelle: Cancel Sledgehammer"
       }
     ],
     "languages": [
@@ -328,7 +338,23 @@
           "highContrastLight": "#FF8C00FF"
         }
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "isabelleRevamp.sledgehammer",
+          "when": "view == isabelleRevamp.goals",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "isabelleRevamp.sledgehammer",
+          "when": "editorLangId == isabelle",
+          "group": "1_isabelle"
+        }
+      ]
+    }
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.1",

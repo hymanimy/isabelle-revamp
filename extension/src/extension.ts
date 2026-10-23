@@ -20,6 +20,7 @@ import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings'
 import { Theories } from './theories';
 import { Outline } from './outline';
 import { Sledgehammer } from './sledgehammer';
+import { SledgehammerUi } from './sledgehammerUi';
 import { applySuggestion, withSuggestionLinks } from './tryButtons';
 
 // Minimal startup adapted from Isabelle2025-2:
@@ -172,7 +173,8 @@ export async function activate(context: ExtensionContext) {
   const statusDecorations = new StatusDecorations(goals);
   context.subscriptions.push(semanticColors, statusDecorations);
   const sledgehammer = new Sledgehammer(client, goals);
-  context.subscriptions.push(sledgehammer);
+  const sledgehammerUi = new SledgehammerUi(sledgehammer, view, () => window.activeTextEditor ?? visibleTheory());
+  context.subscriptions.push(sledgehammer, sledgehammerUi);
   const agentEdits = new AgentEdits();
   const theories = new Theories(goals);
   context.subscriptions.push(agentEdits, theories,
@@ -225,6 +227,9 @@ export async function activate(context: ExtensionContext) {
     getTheories: async () => { await theories.refresh(); return theories.snapshot(); },
     getAgentEdits: () => agentEdits.snapshot(),
     sledgehammer,
+    runSledgehammerAtCursor: () => sledgehammerUi.runAtCursor(),
+    getHammerView: () => view.hammerSnapshot(),
+    useHammerProof: (proof: string) => view.onHammerProof?.(proof),
     getGoalLinks: () => view.linkSnapshot(),
     followGoalLink: (index: number, revision: number) => view.followLink(index,revision),
     hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),

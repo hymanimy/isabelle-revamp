@@ -6,7 +6,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 exports.run = async () => {
   const root = path.resolve(__dirname, '../..');
-  const { sledgehammer } = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
+  const api = await vscode.extensions.getExtension('hymanimy.isabelle-revamp').activate();
+  const { sledgehammer } = api;
   const file = path.join(root, '.dev-host/sledgehammer/Hammer.thy');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const source = 'theory Hammer imports Main begin\n\nlemma comm: "(a::int) * b + c = c + b * a"\n  sorry\n\n'
@@ -37,4 +38,18 @@ exports.run = async () => {
   assert.equal(run.status, 'finished'); assert(run.cancelled);
   assert(Date.now() - cancelled < 15000);
   console.log(`PASS: a second sledgehammer is refused while one runs; cancel stops it in ${Date.now() - cancelled} ms`);
+
+  // The user's command: on a sorry it runs on the statement; a clicked proof replaces the sorry.
+  editor.selection = new vscode.Selection(3, 4, 3, 4);
+  assert(await api.runSledgehammerAtCursor());
+  run = sledgehammer.run;
+  assert.deepEqual([run.owner, run.line, run.character], ['you', 2, 41]);
+  await sledgehammer.finished(run, 90000);
+  const view = api.getHammerView();
+  assert.match(view.title, /^Sledgehammer Hammer\.thy:3 · \d+ proofs? found$/, view.title);
+  assert(!view.active); assert.deepEqual(view.proofs, run.proofs);
+  await api.useHammerProof(view.proofs[0]);
+  assert.equal(document.lineAt(3).text, '  ' + view.proofs[0]);
+  assert.equal(document.lineAt(2).text, 'lemma comm: "(a::int) * b + c = c + b * a"');
+  console.log(`PASS: Isabelle: Sledgehammer on a sorry runs on its statement; Goals lists the proofs and "${view.proofs[0]}" replaces the sorry`);
 };

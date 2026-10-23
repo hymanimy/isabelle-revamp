@@ -1,8 +1,8 @@
-import { Disposable, EventEmitter, TextDocument } from 'vscode';
+import { Disposable, EventEmitter, Range, TextDocument, Uri, workspace, WorkspaceEdit } from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { Goals } from './goals';
-import { suggestedProofs } from './suggestions';
-import { unicodeSymbols } from './symbols';
+import { proofEdit, suggestedProofs } from './suggestions';
+import { encodeSymbols, unicodeSymbols } from './symbols';
 
 // Sledgehammer through Isabelle's own query, as in jEdit's Sledgehammer panel: it runs
 // on the command at the prover's caret as a temporary overlay, so the theory is never
@@ -111,6 +111,27 @@ export class Sledgehammer implements Disposable {
     if (!this.active) return;
     this.run!.cancelled = true;
     await this.client.sendNotification('PIDE/sledgehammer_cancel');
+  }
+
+  // Put a proof of the latest run into the theory, after the command it ran on.
+  async insert(proof: string): Promise<void> {
+    const run = this.run;
+    if (!run) throw new Error('Run sledgehammer first.');
+    // The server knows where the command ends, if the theory has not changed since.
+    const end = await new Promise<{ uri: string; line: number; character: number } | undefined>(resolve => {
+      const timer = setTimeout(() => { subscription.dispose(); resolve(undefined); }, 3000);
+      const subscription = this.client.onNotification('PIDE/sledgehammer_insert', (position: { uri: string; line: number; character: number }) => {
+        clearTimeout(timer); subscription.dispose(); resolve(position);
+      });
+      void this.client.sendNotification('PIDE/sledgehammer_sendback', { text: proof });
+    });
+    if (!end) throw new Error('The theory changed after sledgehammer ran there. Run it again.');
+    const document = await workspace.openTextDocument(Uri.parse(end.uri));
+    const lines = document.getText().split(/\r?\n/);
+    const { start, end: until, text } = proofEdit(lines, end.line, end.character, encodeSymbols(proof), run.line);
+    const edit = new WorkspaceEdit();
+    edit.replace(document.uri, new Range(...start, ...until), text);
+    if (!await workspace.applyEdit(edit)) throw new Error('VS Code did not apply the proof.');
   }
 
   // Resolves when the run finishes, or after `timeout` ms.

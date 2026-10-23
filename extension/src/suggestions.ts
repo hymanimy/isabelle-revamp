@@ -37,3 +37,33 @@ export function suggestionRange(lines: string[], line: number, character: number
   }
   return { start: [line, command.start], end };
 }
+
+// Where sledgehammer should run for a cursor: on a sorry or oops, the command before it,
+// whose proof state they would discard.
+export function sledgehammerTarget(lines: string[], line: number, character: number): [number, number] {
+  const text = lines[line] ?? '';
+  const word = [...text.matchAll(/\b(?:sorry|oops)\b/g)].find(match => match.index <= character && character <= match.index + match[0].length);
+  if (!word) return [line, character];
+  for (let at = line, column = word.index; at >= 0; at--, column = lines[at]?.length ?? 0) {
+    const before = (lines[at] ?? '').slice(0, column).trimEnd();
+    if (before) return [at, before.length - 1];
+  }
+  return [line, character];
+}
+
+// Where a proof found for the command ending at `line`:`character` goes: in place of a
+// directly following sorry or oops when it finishes the proof, else on a new line,
+// indented one step more than `indentLine`.
+export function proofEdit(lines: string[], line: number, character: number, proof: string, indentLine = line):
+  { start: [number, number]; end: [number, number]; text: string } {
+  if (/^(by\b|\.\.?$|done\b)/.test(proof.trim())) {
+    for (let at = line, column = character; at < lines.length; at++, column = 0) {
+      const rest = lines[at].slice(column);
+      const admission = /^(\s*)(sorry|oops)\b/.exec(rest);
+      if (admission) return { start: [at, column + admission[1].length], end: [at, column + admission[0].length], text: proof };
+      if (rest.trim()) break;
+    }
+  }
+  const indent = /^\s*/.exec(lines[indentLine] ?? '')![0] + '  ';
+  return { start: [line, character], end: [line, character], text: '\n' + indent + proof };
+}

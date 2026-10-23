@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Disposable, Webview, WebviewView, WebviewViewProvider } from 'vscode';
+import { commands, Disposable, TextEditor, Webview, WebviewView, WebviewViewProvider, window } from 'vscode';
 import { escapeText } from './outputText';
 import { GoalLink, goalMarkup } from './goalHtml';
 import { viewHeader, viewTheme } from './viewTheme';
@@ -16,6 +16,9 @@ export interface GoalState {
   // The command at the cursor is still running; text holds its output so far.
   running?: boolean;
 }
+
+// The latest sledgehammer run, shown below the goal until the next one.
+export interface HammerView { title: string; active: boolean; proofs: string[]; messages: string[] }
 
 function presentation(state: GoalState) {
   const checking = state.phase === 'checking';
@@ -46,10 +49,25 @@ html, body, .source, .source pre { max-width: 100%; min-width: 0; box-sizing: bo
 /* Isabelle's sendback markup: proofs found by try0 or sledgehammer. */
 .source .sendback { cursor: pointer; color: var(--vscode-textLink-foreground); text-decoration: underline; }
 .source .sendback:hover { color: var(--vscode-textLink-activeForeground); }
+#hammer { border-top: 1px solid var(--vscode-panel-border); margin-top: 12px; padding-top: 8px; }
+#hammer .head { display: flex; align-items: center; gap: 8px; color: var(--vscode-descriptionForeground); }
+#hammer button { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
+  border: none; padding: 2px 8px; cursor: pointer; }
+#hammer button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+#hammer ul { list-style: none; margin: 6px 0; padding: 0; }
+#hammer li a { cursor: pointer; color: var(--vscode-textLink-foreground); text-decoration: underline;
+  font-family: var(--vscode-editor-font-family), monospace; }
+#hammer li a:hover { color: var(--vscode-textLink-activeForeground); }
+#hammer summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
 </style></head><body class="${goal.phase}">
 ${viewHeader(goal.theory, goal.status)}
 <div id="goal" class="source" aria-label="Goal at cursor">${goal.html ?? escapeText(goal.text)}</div>
 <pre id="errors" class="errors" aria-label="Diagnostics">${escapeText(goal.errors)}</pre>
+<section id="hammer" aria-label="Sledgehammer" hidden>
+<div class="head"><span id="hammer-title"></span><button id="hammer-cancel" type="button">Cancel</button></div>
+<ul id="hammer-proofs"></ul>
+<details><summary>Messages</summary><pre id="hammer-messages"></pre></details>
+</section>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
 let revision = 0;
@@ -77,8 +95,27 @@ goalNode.addEventListener('mouseover', event => {
   link.node.title = 'Loading definition…';
   vscode.postMessage({ type:'goalLink', action:'hover', index:link.index, revision });
 });
+const hammer = document.getElementById('hammer');
+document.getElementById('hammer-cancel').addEventListener('click', () => vscode.postMessage({ type: 'hammerCancel' }));
+function showHammer(run) {
+  hammer.hidden = !run;
+  if (!run) return;
+  document.getElementById('hammer-title').textContent = run.title;
+  document.getElementById('hammer-cancel').hidden = !run.active;
+  const list = document.getElementById('hammer-proofs');
+  list.replaceChildren(...run.proofs.map(proof => {
+    const item = document.createElement('li'), link = document.createElement('a');
+    link.textContent = proof;
+    link.title = 'Click to put this proof after the command sledgehammer ran on';
+    link.addEventListener('click', () => vscode.postMessage({ type: 'hammerProof', text: proof }));
+    item.append(link);
+    return item;
+  }));
+  document.getElementById('hammer-messages').textContent = run.messages.join('\n');
+}
 window.addEventListener('message', event => {
   const message = event.data;
+  if (message.type === 'hammer') { showHammer(message.run); return; }
   if (message.type === 'goalHover' && message.revision === revision) {
     const node = goalNode.querySelector('.isabelle-link-' + message.index);
     if (node) node.title = message.text || 'Ctrl/Cmd-click to open definition.';
@@ -108,6 +145,9 @@ export class GoalsView implements WebviewViewProvider, Disposable {
   onNavigate?: (link: GoalLink) => Promise<void>;
   onHover?: (link: GoalLink) => Promise<string>;
   onSendback?: (proof: string) => Promise<unknown>;
+  onHammerProof?: (proof: string) => Promise<unknown>;
+  onHammerCancel?: () => Promise<unknown>;
+  private hammer?: HammerView;
 
   resolveWebviewView(view: WebviewView): void {
     this.view = view;
@@ -120,6 +160,11 @@ export class GoalsView implements WebviewViewProvider, Disposable {
     const messages = webview.onDidReceiveMessage(message => {
       if (message?.type === 'ready') {
         this.update(this.state);
+        this.showHammer(this.hammer);
+      } else if (message?.type === 'hammerProof') {
+        if (typeof message.text === 'string') void this.onHammerProof?.(message.text);
+      } else if (message?.type === 'hammerCancel') {
+        void this.onHammerCancel?.();
       } else if (message?.type === 'sendback') {
         if (message.revision === this.revision && typeof message.text === 'string') void this.onSendback?.(message.text);
       } else if (message?.type === 'goalLink') {
@@ -139,6 +184,17 @@ export class GoalsView implements WebviewViewProvider, Disposable {
     const message = { type: 'goal', goal, revision: ++this.revision };
     void this.view?.webview.postMessage(message);
   }
+  showHammer(run: HammerView | undefined): void {
+    this.hammer = run;
+    void this.view?.webview.postMessage({ type: 'hammer', run });
+  }
+  // Show the panel, keeping the keyboard in the editor.
+  async reveal(editor: TextEditor): Promise<void> {
+    if (this.view) { if (!this.view.visible) this.view.show(true); return; }
+    await commands.executeCommand('isabelleRevamp.goals.focus');
+    await window.showTextDocument(editor.document, { viewColumn: editor.viewColumn, selection: editor.selection });
+  }
+  hammerSnapshot(): HammerView | undefined { return this.hammer && { ...this.hammer }; }
   dispose(): void {}
   linkSnapshot() { return { revision:this.revision, links:this.links.map(link=>({...link})) }; }
   private link(index: number, revision: number): GoalLink | undefined {
