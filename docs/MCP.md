@@ -221,8 +221,9 @@ Per tool, against Isabelle2025-2's VS Code server:
 | try0 | not worth it | No server request; a tool could only wrap the edit loop. |
 | find_theorems | 1–3 days, uncertain | No server support. Either patch the Scala server (a fork to maintain) or check a hidden scratch theory importing the current one (theory-level facts only; needs an experiment). The edit loop already works and sees local facts. |
 
-A cheap step short of tools: describe the edit → `goals_at` → edit loop for
-these commands in the server's `instructions` in `extension/src/mcpServer.ts`.
+The server's `instructions` in `extension/src/mcpServer.ts` describe this loop:
+check fact names with `thm` and `find_theorems` rather than guessing them, try
+`using … try0` first, and run sledgehammer only after that, at most two at once.
 
 Trying a command without touching the document is possible from inside
 Isabelle's process: I/Q's `explore` does it as a jEdit plugin. Here it would need

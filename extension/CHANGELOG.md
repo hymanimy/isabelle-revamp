@@ -4,6 +4,9 @@
 
 - Hover shows each line once. Isabelle reported the variable of a bounded
   quantifier, as in `∀i < n. P`, twice, so every line of its hover appeared twice.
+- The MCP server tells agents to check fact names with `thm` and
+  `find_theorems` instead of guessing, to try `using … try0` before
+  sledgehammer, and to run at most two sledgehammer commands at once.
 
 ## 0.2.3 (2026-10-20)
 

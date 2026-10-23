@@ -98,7 +98,12 @@ const server = new McpServer({ name: 'Isabelle Revamp', version }, {
   instructions: 'Work in the open VS Code workspace. Positions are zero-based lines and UTF-16 columns; ends are exclusive. '
     + 'Start with open to read the current buffer. edit changes and saves that buffer. goals_at returns the proof state and messages at a position; hover and definition tell what a name there is and where it is defined. '
     + 'None of these move the user\'s cursor. Empty errors do not prove completion: check status and sorry_positions. '
-    + 'Read open immediately before every edit; stale edits are rejected. Never retry an uncertain edit without reading the buffer again.',
+    + 'Read open immediately before every edit; stale edits are rejected. Never retry an uncertain edit without reading the buffer again. '
+    + 'Never guess a fact name: check it exists with thm NAME, search with find_theorems (a pattern such as "_ * _ = _ * _", or name: part), and check constants and types with term or typ. '
+    + 'Run these by inserting the command with edit, reading its output with goals_at, then removing it. '
+    + 'To close a goal, first write using with the relevant facts followed by try0, and replace try0 with the method it suggests. '
+    + 'Only if try0 fails and the goal looks within reach of automation, run sledgehammer the same way, with at most two sledgehammer commands in the theories at once. '
+    + 'Sledgehammer can outlast goals_at\'s wait: call goals_at again until a proof or a failure appears.',
 });
 
 const read = { readOnlyHint: true, openWorldHint: false };
