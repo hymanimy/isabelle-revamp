@@ -142,10 +142,20 @@ end
   console.log('PASS: outline nests sections and begin…end blocks, names lemmas, definitions and types, and skips comments and cartouches');
 }
 
+function checkSledgehammerOutput() {
+  const { sledgehammerMessages } = require('../out/sledgehammer');
+  const xml = '<writeln_message>e found a proof...</writeln_message><writeln_message>e: Try this: <sendback padding="command" id="-3"><block indent="2"><block indent="2">by force</block></block></sendback> (11 ms)</writeln_message>'
+    + '<writeln_message>z3: Try this: <sendback id="-3">by (metis foo\\&lt;^sub&gt;1 bar)</sendback> (2 ms)</writeln_message><warning_message>x &lt; y &amp; z</warning_message><writeln_message>Done</writeln_message>';
+  assert.deepEqual(sledgehammerMessages(xml), [{ kind: 'writeln', text: 'e found a proof...' }, { kind: 'writeln', text: 'e: Try this: by force (11 ms)' },
+    { kind: 'writeln', text: 'z3: Try this: by (metis foo₁ bar) (2 ms)' }, { kind: 'warning', text: 'x < y & z' }, { kind: 'writeln', text: 'Done' }]);
+  console.log('PASS: sledgehammer output becomes messages with symbols and entities decoded');
+}
+
 (async () => {
   checkTheoryHeader();
   checkOutline();
   checkSuggestions();
+  checkSledgehammerOutput();
   checkWindowChoice();
   checkLastProofLine();
   require('./goalHtml.cjs').checkGoalHtml();

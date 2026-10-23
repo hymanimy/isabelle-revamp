@@ -281,6 +281,12 @@ export class Goals implements Disposable {
     });
   }
 
+  // Run `work` with the prover's caret at a position, such as to start a query there,
+  // then restore the user's caret. Does not wait for checking.
+  withCaretAt<T>(document: TextDocument, line: number, character: number, work: () => Promise<T>): Promise<T> {
+    return this.hold(document, line, character, () => work());
+  }
+
   // Ask the language server about a position, such as for hover text, once Isabelle
   // has checked up to it as for stateAt: its answers come from the checked markup.
   async queryAt<T>(document: TextDocument, line: number, character: number, tool: string,

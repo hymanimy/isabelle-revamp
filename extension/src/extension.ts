@@ -19,6 +19,7 @@ import { findIsabelle, isabelleVersion, mcpLaunch, onPath, registerWithClaude, s
 import { serverArgs, serverSettingKeys, serverSettings } from './serverSettings';
 import { Theories } from './theories';
 import { Outline } from './outline';
+import { Sledgehammer } from './sledgehammer';
 import { applySuggestion, withSuggestionLinks } from './tryButtons';
 
 // Minimal startup adapted from Isabelle2025-2:
@@ -170,6 +171,8 @@ export async function activate(context: ExtensionContext) {
   const semanticColors = new SemanticColors(goals);
   const statusDecorations = new StatusDecorations(goals);
   context.subscriptions.push(semanticColors, statusDecorations);
+  const sledgehammer = new Sledgehammer(client, goals);
+  context.subscriptions.push(sledgehammer);
   const agentEdits = new AgentEdits();
   const theories = new Theories(goals);
   context.subscriptions.push(agentEdits, theories,
@@ -221,6 +224,7 @@ export async function activate(context: ExtensionContext) {
     useProofFromGoals: (proof: string) => view.onSendback?.(proof),
     getTheories: async () => { await theories.refresh(); return theories.snapshot(); },
     getAgentEdits: () => agentEdits.snapshot(),
+    sledgehammer,
     getGoalLinks: () => view.linkSnapshot(),
     followGoalLink: (index: number, revision: number) => view.followLink(index,revision),
     hoverGoalLink: (index: number, revision: number) => view.hoverLink(index,revision),
