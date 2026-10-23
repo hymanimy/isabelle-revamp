@@ -50,12 +50,11 @@ exports.run = async () => { try { await run(); } catch(error) { fs.writeFileSync
 async function checkOutline(root) {
   const doc = await vscode.workspace.openTextDocument(path.join(root,'extension/test/fixtures/Sqrt2.thy'));
   const symbols = await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider',doc.uri);
-  assert.deepEqual(symbols.map(symbol=>[symbol.name,symbol.detail,symbol.kind]),[['Sqrt2','theory',vscode.SymbolKind.Module]]);
-  const [theorem] = symbols[0].children;
-  assert.equal(theorem.name,'sqrt2_irrational');
-  assert.equal(theorem.kind,vscode.SymbolKind.Method);
+  // The theory itself is left out: its file names it, and sticky scroll would spend a line on it.
+  assert.deepEqual(symbols.map(symbol=>[symbol.name,symbol.detail,symbol.kind]),[['sqrt2_irrational','theorem',vscode.SymbolKind.Method]]);
+  const [theorem] = symbols;
   assert.deepEqual([theorem.range.start.line,theorem.range.end.line,theorem.selectionRange.start.character],[6,50,8]);
-  console.log('PASS: outline lists the theory and its theorem, whose range covers the proof');
+  console.log('PASS: outline lists the theorem without the theory, and its range covers the proof');
 }
 
 async function checkColors(root,api) {

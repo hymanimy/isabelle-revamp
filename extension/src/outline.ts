@@ -220,6 +220,8 @@ export class Outline implements DocumentSymbolProvider {
       result.children = item.children.map(symbol);
       return result;
     };
-    return outline(document.getText()).map(symbol);
+    // The theory is named by its file already: list its contents at the top, so that
+    // sticky scroll spends no line on it.
+    return outline(document.getText()).flatMap(item => item.kind === 'theory' ? item.children : [item]).map(symbol);
   }
 }
