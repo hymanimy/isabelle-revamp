@@ -1,8 +1,8 @@
 {
   "name": "isabelle-revamp",
   "displayName": "Isabelle Revamp",
-  "description": "Isabelle/HOL in stock VS Code using the installed Isabelle language server.",
-  "version": "0.1.0",
+  "description": "Unofficial Isabelle/HOL support for VS Code: live goals, Unicode symbols and an MCP server for AI agents, using your installed Isabelle.",
+  "version": "0.2.3",
   "publisher": "hymanimy",
   "private": true,
   "license": "MIT",
@@ -12,25 +12,33 @@
   "categories": [
     "Programming Languages"
   ],
+  "keywords": [
+    "isabelle",
+    "isabelle/hol",
+    "hol",
+    "isar",
+    "theorem prover",
+    "proof assistant",
+    "formal verification",
+    "mcp"
+  ],
   "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:isabelle",
     "onView:isabelleRevamp.goals",
-    "onView:isabelleRevamp.swarm",
-    "onCommand:isabelleRevamp.ask",
     "onCommand:isabelleRevamp.showGoals",
-    "onCommand:isabelleRevamp.showSwarm",
     "onCommand:isabelleRevamp.setupCheck",
-    "onCommand:isabelleRevamp.showProofGraph",
-    "onView:isabelleRevamp.ask",
-    "onCommand:isabelleRevamp.demoLayout",
-    "onView:isabelleRevamp.proofGraph"
+    "onView:isabelleRevamp.theories",
+    "onCommand:isabelleRevamp.registerMcp",
+    "onCommand:isabelleRevamp.sledgehammer"
   ],
   "scripts": {
-    "compile": "tsc -p . && node build-webview.cjs",
+    "compile": "tsc -p .",
     "vscode:prepublish": "npm run build",
     "build": "tsc -p . --noEmit && node build.cjs",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "tsc -p . && node test/unit.cjs",
+    "test:integration": "tsc -p . && node test/runIntegration.cjs"
   },
   "contributes": {
     "views": {
@@ -41,23 +49,8 @@
           "type": "webview"
         },
         {
-          "id": "isabelleRevamp.swarm",
-          "name": "Isabelle Swarm",
-          "type": "webview"
-        }
-      ],
-      "isabelle-revamp-ask": [
-        {
-          "id": "isabelleRevamp.ask",
-          "name": "Ask Isabelle",
-          "type": "webview",
-          "when": "config.isabelleRevamp.showAsk"
-        },
-        {
-          "id": "isabelleRevamp.proofGraph",
-          "name": "Proof Graph",
-          "type": "webview",
-          "when": "!isabelleRevamp.demoLayout"
+          "id": "isabelleRevamp.theories",
+          "name": "Isabelle Theories"
         }
       ]
     },
@@ -67,16 +60,12 @@
         "title": "Isabelle: Toggle Pretty Symbols"
       },
       {
-        "command": "isabelleRevamp.ask",
-        "title": "Isabelle: Ask"
-      },
-      {
         "command": "isabelleRevamp.showGoals",
         "title": "Isabelle: Show Goals"
       },
       {
-        "command": "isabelleRevamp.showSwarm",
-        "title": "Isabelle: Show Swarm"
+        "command": "isabelleRevamp.showTheories",
+        "title": "Isabelle: Show Theories"
       },
       {
         "command": "isabelleRevamp.convertQuotes",
@@ -88,12 +77,17 @@
         "title": "Isabelle Revamp: Setup check"
       },
       {
-        "command": "isabelleRevamp.showProofGraph",
-        "title": "Isabelle: Show Proof Graph"
+        "command": "isabelleRevamp.registerMcp",
+        "title": "Isabelle: Register MCP Server with Claude Code"
       },
       {
-        "command": "isabelleRevamp.demoLayout",
-        "title": "Isabelle: Demo Layout"
+        "command": "isabelleRevamp.sledgehammer",
+        "title": "Isabelle: Sledgehammer",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "isabelleRevamp.cancelSledgehammer",
+        "title": "Isabelle: Cancel Sledgehammer"
       }
     ],
     "languages": [
@@ -134,7 +128,13 @@
           "type": "boolean",
           "default": true,
           "scope": "resource",
-          "description": "Reveal MCP edits without moving your caret; preview replaced text for 200 ms, highlight new text for 2 seconds, and show the agent name for 3 seconds."
+          "description": "Highlight MCP edits in editors that show the file, without scrolling or moving your caret: new text is highlighted for 2 seconds, with the agent's name for 3 seconds."
+        },
+        "isabelleRevamp.lemmaStatus": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Mark each lemma, definition and type in the gutter once Isabelle has checked it: a tick when it is checked, an amber ring when it contains sorry or oops, a cross when it has an error."
         },
         "isabelleRevamp.prettySymbols": {
           "type": "boolean",
@@ -148,23 +148,41 @@
           "scope": "machine-overridable",
           "description": "Path to the Isabelle executable (~/ is supported), or isabelle on PATH. Reload the window after changing this setting."
         },
+        "isabelleRevamp.logic": {
+          "type": "string",
+          "default": "HOL",
+          "scope": "window",
+          "description": "Logic session the prover starts from (isabelle vscode_server -l), e.g. HOL-Analysis. Its heap must be built: isabelle build -b <logic>. Reload the window after changing this setting."
+        },
+        "isabelleRevamp.sessionDirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "window",
+          "description": "Extra session directories (isabelle vscode_server -d), e.g. ~/afp/thys. Relative paths resolve against the first workspace folder. Reload the window after changing this setting."
+        },
+        "isabelleRevamp.checkingPerspective": {
+          "type": "integer",
+          "default": 50,
+          "minimum": 0,
+          "scope": "window",
+          "description": "Like Isabelle/jEdit, check only the text near the cursor: this many lines above and below it, plus everything before. 0 checks every open theory in full, which is slower on large theories. Reload the window after changing this setting."
+        },
+        "isabelleRevamp.outputDelay": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0.05,
+          "maximum": 2,
+          "scope": "window",
+          "description": "Seconds Isabelle waits for checking to go quiet before sending results (vscode_output_delay). Lower shows results sooner; higher sends less on very large theories. Isabelle's own default is 0.5, Isabelle/jEdit uses 0.1. Reload the window after changing this setting."
+        },
         "isabelleRevamp.unicodeOnSave": {
           "type": "boolean",
           "default": false,
           "scope": "resource",
           "description": "Save recognised Isabelle symbols as Unicode. Off by default: completions and saved source use ASCII Isabelle spellings."
-        },
-        "isabelleRevamp.demoLayoutOnStartup": {
-          "type": "boolean",
-          "default": false,
-          "scope": "window",
-          "description": "Open the source left, Goals above Proof Graph right, and Terminal across the bottom when this window starts."
-        },
-        "isabelleRevamp.showAsk": {
-          "type": "boolean",
-          "default": true,
-          "scope": "window",
-          "description": "Register the Ask Isabelle view. Demo Layout turns this off and uses the Terminal for Claude Code."
         }
       }
     },
@@ -225,19 +243,129 @@
         }
       }
     ],
-    "viewsContainers": {
-      "panel": [
+    "colors": [
+      {
+        "id": "isabelle.unprocessedBackground",
+        "description": "Background of Isabelle commands not yet checked (jEdit: unprocessed1_color).",
+        "defaults": {
+          "light": "#FFA0A032",
+          "dark": "#A040A026",
+          "highContrast": "#A040A026",
+          "highContrastLight": "#FFA0A032"
+        }
+      },
+      {
+        "id": "isabelle.runningBackground",
+        "description": "Background of Isabelle commands still running (jEdit: running1_color).",
+        "defaults": {
+          "light": "#61006164",
+          "dark": "#B040B066",
+          "highContrast": "#B040B066",
+          "highContrastLight": "#61006164"
+        }
+      },
+      {
+        "id": "isabelle.canceledBackground",
+        "description": "Background of Isabelle commands whose execution was canceled.",
+        "defaults": {
+          "light": "#FF6A6A64",
+          "dark": "#FF6A6A40",
+          "highContrast": "#FF6A6A40",
+          "highContrastLight": "#FF6A6A64"
+        }
+      },
+      {
+        "id": "isabelle.badBackground",
+        "description": "Background of failed or admitted (sorry) Isabelle text.",
+        "defaults": {
+          "light": "#FF6A6A64",
+          "dark": "#FF6A6A40",
+          "highContrast": "#FF6A6A40",
+          "highContrastLight": "#FF6A6A64"
+        }
+      },
+      {
+        "id": "isabelle.intensifyBackground",
+        "description": "Background of Isabelle text highlighted by the prover.",
+        "defaults": {
+          "light": "#FFCC6664",
+          "dark": "#CC880033",
+          "highContrast": "#CC880033",
+          "highContrastLight": "#FFCC6664"
+        }
+      },
+      {
+        "id": "isabelle.unprocessedOverview",
+        "description": "Scrollbar mark for Isabelle text not yet checked.",
+        "defaults": {
+          "light": "#FFA0A0FF",
+          "dark": "#D89090FF",
+          "highContrast": "#D89090FF",
+          "highContrastLight": "#FFA0A0FF"
+        }
+      },
+      {
+        "id": "isabelle.runningOverview",
+        "description": "Scrollbar mark for Isabelle commands still running.",
+        "defaults": {
+          "light": "#610061FF",
+          "dark": "#C060C0FF",
+          "highContrast": "#C060C0FF",
+          "highContrastLight": "#610061FF"
+        }
+      },
+      {
+        "id": "isabelle.writelnUnderline",
+        "description": "Dotted underline of Isabelle text with output messages.",
+        "defaults": {
+          "light": "#C0C0C0FF",
+          "dark": "#9C9C9CFF",
+          "highContrast": "#9C9C9CFF",
+          "highContrastLight": "#C0C0C0FF"
+        }
+      },
+      {
+        "id": "isabelle.informationUnderline",
+        "description": "Dotted underline of Isabelle text with information messages.",
+        "defaults": {
+          "light": "#C1DFEEFF",
+          "dark": "#77B800FF",
+          "highContrast": "#77B800FF",
+          "highContrastLight": "#C1DFEEFF"
+        }
+      },
+      {
+        "id": "isabelle.warningUnderline",
+        "description": "Dotted underline of Isabelle text with warnings.",
+        "defaults": {
+          "light": "#FF8C00FF",
+          "dark": "#FF8C00FF",
+          "highContrast": "#FF8C00FF",
+          "highContrastLight": "#FF8C00FF"
+        }
+      }
+    ],
+    "menus": {
+      "view/title": [
         {
-          "id": "isabelle-revamp-ask",
-          "title": "Isabelle",
-          "icon": "media/ask.svg"
+          "command": "isabelleRevamp.sledgehammer",
+          "when": "view == isabelleRevamp.goals",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "isabelleRevamp.sledgehammer",
+          "when": "editorLangId == isabelle",
+          "group": "1_isabelle"
         }
       ]
     }
   },
   "dependencies": {
-    "@dagrejs/dagre": "3.1.1",
-    "vscode-languageclient": "10.1.2"
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "vscode-languageclient": "10.1.2",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -250,6 +378,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/hymanimy/isabelle-revamp.git"
+  },
+  "homepage": "https://github.com/hymanimy/isabelle-revamp#readme",
+  "bugs": {
+    "url": "https://github.com/hymanimy/isabelle-revamp/issues"
   },
   "vsce": {
     "dependencies": false,

@@ -1,6 +1,7 @@
 **/*
 !package.json
 !README.md
+!CHANGELOG.md
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !out/extension.js
@@ -9,6 +10,4 @@
 !media/**
 !language-configuration.json
 !out/symbolCodes.json
-!mcp/server.py
-!mcp/requirements.txt
-!mcp/launch.py
+!out/mcpServer.js

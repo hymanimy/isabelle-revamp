@@ -132,10 +132,17 @@
       ]
     },
     "attributes": {
+      "comment": "Terms inside, as in [of \"[0..<n]\"], and nested attributes, as in [OF foo[of x]], have their own brackets.",
       "name": "meta.attribute.isabelle",
       "begin": "\\[",
       "end": "\\]",
-      "patterns": [{ "include": "#symbols" }]
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#cartouches" },
+        { "include": "#attributes" },
+        { "include": "#symbols" }
+      ]
     },
     "admissions": {
       "comment": "Unfinished proofs stand out.",

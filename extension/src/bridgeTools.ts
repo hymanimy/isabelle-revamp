@@ -1,20 +1,57 @@
-import { realpath, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
-import { DiagnosticSeverity, EndOfLine, languages, Position, Range, Selection, TabInputText, TextDocument, Uri, window, workspace } from 'vscode';
+import { commands, DiagnosticSeverity, EndOfLine, Hover, languages, Location, LocationLink, Position, Range, TabInputText,
+  TextDocument, Uri, window, workspace, WorkspaceEdit } from 'vscode';
 import { Goals } from './goals';
-import { GoalsView } from './goalsView';
-import { Swarm } from './swarm';
-import { encodeSymbols } from './symbols';
-import { ProofGraph } from './proofGraph';
+import { encodeSymbols, unicodeSymbols } from './symbols';
+import { hoverText } from './goalLinks';
 import { AgentEdits } from './agentEdits';
+import { Sledgehammer, SledgehammerRun } from './sledgehammer';
 
 export interface AgentSession { name: string; versions: Map<string, number> }
 
-const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BridgeTools {
-  constructor(private goals: Goals, private view: GoalsView, private swarm: Swarm, private graph: ProofGraph,
-    private agentEdits: AgentEdits) {}
+  // Finished runs whose result an agent has already received.
+  private delivered = new WeakSet<SledgehammerRun>();
+
+  constructor(private goals: Goals, private agentEdits: AgentEdits, private hammer: Sledgehammer) {}
+
+  // Start sledgehammer at a position, or keep waiting on this agent's run there, for up
+  // to wait_seconds. Only starting needs the editor queue.
+  async sledgehammer(params: Record<string, unknown>, agent: AgentSession,
+    exclusive: <T>(work: () => Promise<T>) => Promise<T>): Promise<unknown> {
+    if (params.cancel === true) {
+      const run = this.hammer.run;
+      if (!run || !this.hammer.active) return { cancelled: false, note: 'No sledgehammer is running.' };
+      if (run.owner !== agent.name) throw new Error(`The running sledgehammer belongs to ${run.owner}; only its owner can cancel it.`);
+      await this.hammer.cancel();
+      await this.hammer.finished(run, 10000);
+      return this.hammerResult(run, agent);
+    }
+    const wait = typeof params.wait_seconds === 'number' && params.wait_seconds >= 0 ? Math.min(params.wait_seconds, 300) : 50;
+    const run = await exclusive(async () => {
+      const document = await this.document(params.file);
+      const position = this.position(document, params.line, params.col);
+      const current = this.hammer.run;
+      if (current && current.owner === agent.name && current.uri === document.uri.toString() && current.line === position.line
+        && (this.hammer.active || !this.delivered.has(current))) return current;
+      return this.hammer.start(document, position.line, position.character, agent.name);
+    });
+    await this.hammer.finished(run, wait * 1000);
+    return this.hammerResult(run, agent);
+  }
+
+  private hammerResult(run: SledgehammerRun, agent: AgentSession) {
+    const finished = run.status === 'finished';
+    if (finished) this.delivered.add(run);
+    const replaced = run.cancelled && this.hammer.run !== run && this.hammer.run?.owner !== agent.name;
+    return { file: Uri.parse(run.uri).fsPath, line: run.line, col: run.character, status: run.status,
+      cancelled: run.cancelled, proofs: run.proofs, messages: run.messages.slice(-40).map(message => message.text),
+      note: replaced ? `${this.hammer.run?.owner ?? 'Someone'} started another sledgehammer, which replaced this run.`
+        : finished ? (run.proofs.length ? 'Use a proof with edit; check it with goals_at or errors.' : 'No proof found.')
+        : 'Still running: call sledgehammer again at the same position to keep waiting, or with cancel: true to stop it.' };
+  }
 
   private async filePath(file: unknown): Promise<string> {
     if (typeof file !== 'string' || !file.endsWith('.thy')) throw new Error('Expected a .thy file path.');
@@ -48,34 +85,49 @@ export class BridgeTools {
     return new Position(line, col);
   }
 
-  private async documents(): Promise<TextDocument[]> {
+  // Where a definition is, and its source: the lines from its start to the next blank line.
+  private async definition(target: Location | LocationLink) {
+    const uri = 'targetUri' in target ? target.targetUri : target.uri;
+    const range = 'targetUri' in target ? target.targetSelectionRange ?? target.targetRange : target.range;
+    // Read files that aren't open from disk: opening a library theory would hand it to Isabelle as an editor buffer.
+    const open = workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
+    const lines = (open?.getText() ?? await readFile(uri.fsPath, 'utf8').catch(() => '')).split(/\r?\n/);
+    const blank = lines.findIndex((text, line) => line > range.start.line && !text.trim());
+    const end = Math.min(blank < 0 ? lines.length : blank, range.start.line + 20);
+    return { file: uri.fsPath, range: [range.start.line, range.start.character, range.end.line, range.end.character],
+      source: unicodeSymbols(lines.slice(range.start.line, end).join('\n')) };
+  }
+
+  // Theories open in the user's tabs, plus those this agent has read or edited.
+  private async documents(agent: AgentSession): Promise<TextDocument[]> {
+    const uris = new Set(window.tabGroups.all.flatMap(group => group.tabs.flatMap(tab =>
+      tab.input instanceof TabInputText && tab.input.uri.scheme === 'file' ? [tab.input.uri.toString()] : [])));
+    for (const uri of agent.versions.keys()) uris.add(uri);
     const result = [];
-    // textDocuments also contains cached buffers whose tabs have already closed.
-    const tabs = new Set(window.tabGroups.all.flatMap(group => group.tabs.flatMap(tab =>
-      tab.input instanceof TabInputText ? [tab.input.uri.toString()] : [])));
-    for (const document of workspace.textDocuments) {
-      if (document.isClosed || !tabs.has(document.uri.toString())
-        || document.languageId !== 'isabelle' || document.uri.scheme !== 'file') continue;
-      try { await this.filePath(document.uri.fsPath); result.push(document); } catch { /* outside workspace */ }
+    for (const uri of uris) {
+      try { result.push(await this.document(Uri.parse(uri).fsPath)); } catch { /* not a workspace theory, or deleted */ }
     }
     return result;
   }
 
   async call(method: string, params: Record<string, unknown>, agent: AgentSession): Promise<unknown> {
+    // Isabelle checks only near the user's cursor; status answers cover whole theories.
     if (method === 'status' || method === 'processing_status') {
-      const documents = await this.documents();
+      const documents = await this.documents(agent);
+      for (const document of documents) await this.goals.checkWhole(document, method === 'status' ? 15000 : 5000);
       const files = documents.map(document => method === 'status'
         ? this.goals.documentStatus(document) : this.goals.processing(document));
       return method === 'status'
         ? { fully_checked: files.length > 0 && files.every(file => 'fully_checked' in file && file.fully_checked), files }
         : { processing: files.some(file => file.processing), files };
     }
-    if (!['open', 'edit', 'goals_at', 'errors', 'sorry_positions', 'proof_graph'].includes(method)) {
+    if (!['open', 'edit', 'goals_at', 'hover', 'definition', 'errors', 'sorry_positions'].includes(method)) {
       throw new Error('Unknown method: ' + method);
     }
     const document = await this.document(params.file);
     const identity = () => ({ file: document.uri.fsPath, version: document.version });
     if (method === 'errors') {
+      await this.goals.checkWhole(document);
       const errors = languages.getDiagnostics(document.uri).filter(d => d.severity === DiagnosticSeverity.Error)
         .map(d => ({ message: d.message, range: [d.range.start.line, d.range.start.character, d.range.end.line, d.range.end.character] }));
       const status = this.goals.documentStatus(document);
@@ -84,17 +136,13 @@ export class BridgeTools {
         has_errors: hasErrors, errors };
     }
     if (method === 'sorry_positions') {
+      await this.goals.checkWhole(document);
       const processing = this.goals.processing(document);
       return { ...identity(), complete: processing.processed,
         positions: processing.known ? this.goals.sorryPositions(document) : [] };
     }
-    if (method === 'proof_graph') return this.graph.snapshot(document);
-    const column = window.tabGroups.all.find(group => group.tabs.some(tab =>
-      tab.input instanceof TabInputText && tab.input.uri.toString() === document.uri.toString()))?.viewColumn;
-    const keepGraph = this.graph.panel.active;
-    const editor = await window.showTextDocument(document, { viewColumn: column, preserveFocus: method === 'edit' || keepGraph });
-    this.graph.follow(editor);
-    this.goals.follow(editor);
+    // Agents work on the document model, never on the user's editor: no tab
+    // switches, cursor moves or scrolling.
     if (method === 'open') {
       agent.versions.set(document.uri.toString(), document.version);
       return { ...identity(), text: document.getText(), saved: !document.isDirty };
@@ -107,52 +155,41 @@ export class BridgeTools {
       const end = this.position(document, params.end_line, params.end_col);
       if (start.isAfter(end)) throw new Error('Edit start must not be after its end.');
       if (typeof params.text !== 'string') throw new Error('Edit text must be a string.');
-      const ids = this.swarm.editedCards(document, new Range(start, end));
-      const graphIds = this.graph.editedNodes(document, new Range(start, end));
       const version = document.version;
       const offset = document.offsetAt(start);
       // Match VS Code's newline normalization when computing the new range.
       const eol = document.eol === EndOfLine.LF ? '\n' : '\r\n';
       const text = encodeSymbols(params.text as string).replace(/\r\n|\r|\n/g, eol);
-      await this.agentEdits.preview(editor, new Range(start, end));
-      if (document.isClosed || document.version !== version) {
-        throw new Error('The buffer changed during the edit preview. Call open and recompute the edit range.');
-      }
-      if (!await editor.edit(edit => edit.replace(new Range(start, end), text))) {
+      const visible = () => window.visibleTextEditors.find(editor => editor.document === document);
+      // A workspace edit joins the document's undo history without needing an editor.
+      const edit = new WorkspaceEdit();
+      edit.replace(document.uri, new Range(start, end), text);
+      if (!await workspace.applyEdit(edit) || document.version === version) {
         throw new Error('Document changed during the edit; read it again with open.');
       }
-      // VS Code tracks all user selections through the replacement. Do not
-      // restore old coordinates or put the caret on the agent's proof step.
       this.goals.observe(document);
-      this.goals.follow(editor);
-      this.swarm.tag(document, ids, agent.name);
-      // An appended counter-lemma has no node in the pre-edit document.
       const inserted = new Range(start, document.positionAt(offset + text.length));
-      this.agentEdits.applied(editor, inserted, agent.name);
-      this.graph.tag(document, [...new Set([...graphIds, ...this.graph.editedNodes(document, inserted)])], agent.name);
+      const editor = visible();
+      if (editor) this.agentEdits.applied(editor, inserted, agent.name);
       agent.versions.set(document.uri.toString(), document.version);
       if (!await document.save()) throw new Error('Edit is in the editor, but saving failed. Do not retry the edit blindly.');
       return { ...identity(), saved: true, status: this.goals.documentStatus(document) };
     }
     const position = this.position(document, params.line, params.col);
-    editor.selection = new Selection(position, position);
-    editor.revealRange(new Range(position, position));
-    this.goals.follow(editor);
-    const version = document.version;
-    const deadline = Date.now() + 30000;
-    while (Date.now() < deadline) {
-      if (document.version !== version || (window.activeTextEditor !== editor && !this.graph.panel.active)
-        || !editor.selection.active.isEqual(position) || !this.goals.matches(document, position.line, position.character)) {
-        throw new Error('The document or cursor changed during the query. Retry goals_at.');
-      }
-      const state = this.view.snapshot();
-      if (['ready', 'unfinished', 'error'].includes(state.phase) && this.goals.processing(document).processed) {
-        const { html: _html, ...plain } = state;
-        return { ...identity(), line: position.line, col: position.character, ...plain };
-      }
-      if (state.phase === 'unavailable') throw new Error('No goal state at this position; choose a proof command.');
-      await pause(25);
+    const at = { ...identity(), line: position.line, col: position.character };
+    if (method === 'hover') {
+      const hovers = await this.goals.queryAt(document, position.line, position.character, method,
+        () => commands.executeCommand<Hover[]>('vscode.executeHoverProvider', document.uri, position)) ?? [];
+      const range = hovers.find(hover => hover.range)?.range;
+      return { ...at, text: hoverText(hovers).replace(/\n\s*\n/g, '\n'),
+        range: range ? [range.start.line, range.start.character, range.end.line, range.end.character] : null };
     }
-    throw new Error('Isabelle is still checking; query processing_status and retry goals_at.');
+    if (method === 'definition') {
+      const targets = await this.goals.queryAt(document, position.line, position.character, method,
+        () => commands.executeCommand<(Location | LocationLink)[]>('vscode.executeDefinitionProvider', document.uri, position)) ?? [];
+      return { ...at, definitions: await Promise.all(targets.map(target => this.definition(target))) };
+    }
+    const { html: _html, ...state } = await this.goals.stateAt(document, position.line, position.character);
+    return { ...at, ...state };
   }
 }

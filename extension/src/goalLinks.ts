@@ -4,6 +4,17 @@ import { commands, Hover, Position, Range, Uri, window, workspace } from 'vscode
 import { GoalLink } from './goalHtml';
 import { encodeSymbols, unicodeSymbols } from './symbols';
 
+// Isabelle adds a tooltip for each markup at a position, so the variable of a bounded
+// quantifier (∀i < n. P is ∀i. i < n ⟶ P) comes back twice. Show each once.
+export function distinctHover(hover: Hover | null | undefined): Hover | null | undefined {
+  if (!hover) return hover;
+  const seen = new Set<string>();
+  const contents = hover.contents.filter(content => {
+    const text = typeof content === 'string' ? content : content.value;
+    return !seen.has(text) && !!seen.add(text);
+  });
+  return contents.length === hover.contents.length ? hover : new Hover(contents, hover.range);
+}
 export function hoverText(hovers: Hover[]): string {
   return hovers.flatMap(hover=>hover.contents.map(content=>typeof content==='string'?content:content.value))
     .map(text=>unicodeSymbols(text.replace(/```[^\n]*\n/g,'').replace(/```/g,''))).join('\n\n').trim();
